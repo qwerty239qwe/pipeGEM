@@ -1,4 +1,5 @@
 from typing import List, Union, Dict
+from functools import lru_cache
 
 import pandas as pd
 
@@ -31,7 +32,6 @@ class Batch:
                                     batch=self, name="all", name_manager=self._name_manager,
                                     complement_batch=self._complement_batch)
 
-
     def __len__(self):
         return len(self._models)
 
@@ -41,6 +41,15 @@ class Batch:
     def __del__(self):
         for name, group in self._groups.items():
             group.batch = self._complement_batch
+
+    @lru_cache(maxsize=128)
+    def component(self):
+        return pd.DataFrame([{'reactions': len(mod.reactions),
+                              'metabolites': len(mod.metabolites),
+                              'genes': len(mod.genes)}
+                             for mod in self._models],
+                            columns=['reactions', 'metabolites', 'genes'],
+                            index=[mod.name for mod in self._models])
 
     def _check_groups(self, groups) -> dict:
         if isinstance(groups, list):

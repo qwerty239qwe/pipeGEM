@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List
+from typing import List, Union, Dict
 
 import pandas as pd
 
@@ -22,18 +22,18 @@ class ModelGroup:
     _obj = "group"
 
     def __init__(self,
-                 named_models: List[NamedModel],
+                 named_models: Union[Dict[str, List], List[NamedModel]],
                  name_manager,
                  complement_batch,
                  batch = None,
                  name: str = None):
         self._name_manager = name_manager
         self._name = self._name_manager.add(name, self)
-        self._named_models = named_models
-        self._model_dict = {mod.name: mod for mod in self._named_models}
-        print(self._model_dict, type(self))
-        self._batch = batch if batch is not None else complement_batch
         self._complement_batch = complement_batch
+        self._batch = batch if batch is not None else complement_batch
+        self._named_models = self._check_models(named_models)
+        self._model_dict = {mod.name: mod for mod in self._named_models}
+
         for model in self._named_models:
             model.batch = self._batch
 
@@ -85,6 +85,19 @@ class ModelGroup:
         self._batch = batch
         for model in self._named_models:
             model.batch = batch
+
+    def _check_models(self, models):
+        if isinstance(models, dict):
+            valid = [NamedModel(model=model, name=name, complement_batch=self._complement_batch,
+                                complement_group=self._batch.complement_group, name_manager=self._name_manager)
+                     for name, model in models.items()]
+        elif isinstance(models, list):
+            if not all([isinstance(m, NamedModel) for m in models]):
+                raise TypeError("Some of the models are not pipeGEM.model, please init them first")
+            valid = models
+        else:
+            raise TypeError("Models should be a dict or list")
+        return valid
 
     def items(self):
         return self._model_dict.items()
