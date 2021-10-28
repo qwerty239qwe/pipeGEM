@@ -1,7 +1,9 @@
 from typing import List, Any
+from warnings import warn
+from functools import reduce
 
 
-__all__ = ("get_objective_rxn", "get_subsystems", "get_rxns_in_subsys", "get_genes_in_subsys")
+__all__ = ("get_objective_rxn", "get_subsystems", "get_rxns_in_subsys", "get_genes_in_subsys", "select_rxns_from_model")
 
 
 def get_objective_rxn(model, attr="id") -> List[Any]:
@@ -21,3 +23,23 @@ def get_rxns_in_subsys(model, subsys_id, dtype="id", match_all=True):
 def get_genes_in_subsys(model, subsys_id):
     r_in_sub = get_rxns_in_subsys(model, subsys_id, "")
     return list(set([g.id for r in r_in_sub for g in r.genes]))
+
+
+def select_rxn_from_model(named_model, query_id, return_id: bool = True):
+    assert isinstance(query_id, str), f"query_id should be a str but a {type(query_id)} is passed"
+    if query_id in get_subsystems(named_model):
+        return [rxn.id if return_id else rxn for rxn in named_model.reactions if rxn.subsystem == query_id]
+    for rxn in named_model.reactions:
+        if rxn.id == query_id:
+            return [rxn.id if return_id else rxn]
+    warn(f"{query_id} is not in the {str(named_model)}")
+    return []
+
+
+def select_rxns_from_model(named_model, query_id, return_id: bool = True) -> list:
+    if isinstance(query_id, str):
+        return select_rxn_from_model(named_model, query_id, return_id)
+    elif isinstance(query_id, list):
+        return list(reduce(set.union, [set(select_rxn_from_model(named_model, qid, return_id)) for qid in query_id]))
+
+    raise ValueError(f"query_id should be a str or a list but a {type(query_id)} is passed")

@@ -7,6 +7,8 @@ from cobra.flux_analysis.variability import flux_variability_analysis
 from cobra.flux_analysis.parsimonious import pfba
 from cobra.sampling import sampling
 
+from pipeGEM.integration.constraints import add_constraint, add_constraint_f
+
 
 ANALYSIS_METHODS = {}
 

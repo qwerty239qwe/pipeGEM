@@ -89,7 +89,7 @@ def load_test_model(name: str = "e_coli_core.xml",
                     use_gene_level: bool = True,
                     model_path: Optional[PathLike] = None) -> cobra.Model:
     """
-    Get a cobra.Model in the models folder
+    Get a cobra.Model in the core folder
 
     Parameters
     ----------
@@ -98,7 +98,7 @@ def load_test_model(name: str = "e_coli_core.xml",
     use_gene_level: bool
         If true, use gene entrez id (without transcript part)
     model_path: Optional[PathLike]
-        The path of model directory, default: ../../assets/models from the folder the package is located
+        The path of model directory, default: ../../assets/core from the folder the package is located
 
     Returns
     -------
@@ -107,7 +107,7 @@ def load_test_model(name: str = "e_coli_core.xml",
     """
     fn_path = Path(name)
     if model_path is None:
-        model_path = Path(__file__).parent.parent / Path("assets/models")
+        model_path = Path(__file__).parent.parent / Path("assets/core")
     if fn_path.suffix == ".xml":
         mod = cobra.io.read_sbml_model(str(model_path / fn_path))
     elif fn_path.suffix == ".mat":
@@ -131,7 +131,7 @@ def save_model(model: cobra.Model,
     model: cobra.Model
         Saved cobra.Model
     output_file_name: Union[str, PathLike]
-        Saved models' file name
+        Saved core' file name
     output_extension: str
         File extension, choices: .mat, .json, .xml, .yaml
     Returns

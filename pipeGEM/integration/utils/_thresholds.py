@@ -4,9 +4,12 @@ from scipy.stats import gaussian_kde
 from scipy.optimize import curve_fit
 import numpy as np
 import matplotlib.pyplot as plt
+import cobra
+
+from pipeGEM.integration.mapping import Expression
 
 
-__all__ = ["get_rfastcormics_thresholds", "get_PROM_threshold"]
+__all__ = ["get_rfastcormics_thresholds", "get_PROM_threshold", "find_exp_threshold"]
 
 
 def gaussian(x, amp, cen, wid):
@@ -120,3 +123,25 @@ def get_rfastcormics_thresholds(dat: np.ndarray,
     print("Fitted values: ")
     print(best_vals_right[1], best_vals_left[1])
     return best_vals_right[1], best_vals_left[1]
+
+
+def find_exp_threshold(model: cobra.Model,
+                       gene_data_dict: dict,
+                       transform=np.log2,
+                       threshold=1e-4,
+                       plot_dist=False):
+    if transform:
+        threshold = transform(threshold)
+        trans_data_dict = {i: transform(v) if v != 0 else threshold - 1 for i, v in gene_data_dict.items()}
+        trans_data_arr = np.array(list(trans_data_dict.values()))
+    else:
+        trans_data_dict = gene_data_dict.copy()
+        trans_data_arr = np.array(list(trans_data_dict.values()))
+    expr = Expression(model, trans_data_dict, expression_threshold=threshold, method='mCADRE')
+    rxn_scores_dict = expr.rxn_scores  # want to recognize no gene related rxns and zero expr rxns
+    hi, lo = get_rfastcormics_thresholds(trans_data_arr, threshold, plot_dist=plot_dist)
+    for rxn, exp in rxn_scores_dict.items():
+        if exp == 0:
+            rxn_scores_dict[rxn] = hi
+
+    return hi, lo, rxn_scores_dict
