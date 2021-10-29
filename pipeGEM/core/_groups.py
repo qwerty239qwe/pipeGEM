@@ -49,8 +49,13 @@ class ModelGroup:
     def __len__(self):
         return len(self._model_dict)
 
-    def __getitem__(self, item):
-        return self._model_dict[item]
+    def __getitem__(self, key):
+        return self._model_dict[key]
+
+    def __delitem__(self, key):
+        self._model_dict[key].leave_group()
+        self._named_models.pop(self._named_models.index(self._model_dict[key]))
+        del self._model_dict[key]
 
     def __contains__(self, item):
         return item in self._model_dict

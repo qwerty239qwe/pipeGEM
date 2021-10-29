@@ -50,14 +50,13 @@ class NamedModel:
         return getattr(self._model, item)
 
     def __del__(self):
-        pass
         # from ._groups import ModelGroup
         # from ._batch import Batch
         # if isinstance(self._group, ModelGroup):
         #     self._group.pop_models(self.name)
         # if isinstance(self._batch, Batch):
         #     self._batch.pop_models(self.name)
-        # self._name_manager.delete(self.name, self)
+        self._name_manager.delete(self.name, self)
 
     @classproperty
     def obj_type(self):
@@ -98,9 +97,10 @@ class NamedModel:
         from ._batch import Batch
         assert isinstance(group, ModelGroup)
         # unlink the model from its original group and supergroup
-        if isinstance(self._batch, Batch):
+
+        if isinstance(self._batch, Batch) and self._batch != self._complement_batch:
             self._batch.pop_models(self._name)
-        elif isinstance(self._group, ModelGroup):
+        elif isinstance(self._group, ModelGroup) and self._group != self._complement_group:
             self._group.pop_models(self._name)
         self._group = group
         self._batch = group.batch
@@ -115,9 +115,9 @@ class NamedModel:
         from ._batch import Batch
         # assert isinstance(supergroup, ModelSuperGroup) or isinstance(supergroup, cobrave.comparison.ModelComparer)
         if batch is not self._batch:
-            if isinstance(self._batch, Batch):
+            if isinstance(self._batch, Batch) and self._batch != self._complement_batch:
                 self._batch.pop_models(self._name)
-            elif isinstance(self._group, ModelGroup):
+            elif isinstance(self._group, ModelGroup) and self._group != self._complement_group:
                 self._group.pop_models(self._name)
             self._batch = batch
 
@@ -130,10 +130,15 @@ class NamedModel:
         self._expression = Expression(self._model, data)
 
     def leave_group(self):
-        self.group = self._complement_group
+        if self.group != self._complement_group:
+            self._group = self._complement_group
 
     def leave_batch(self):
-        self.batch = self._complement_batch
+        if self.batch != self._complement_batch:
+            self._batch = self._complement_batch
+            if self.group != self._batch.complement_group:
+                self._complement_group = self._batch.complement_group
+                self._group = self._complement_group
 
     def set_analyzer(self, solver: str):
         self._analyzer = FluxAnalyzer(model=self._model,

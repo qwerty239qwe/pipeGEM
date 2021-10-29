@@ -2,6 +2,7 @@ from typing import List, Union, Dict
 from functools import lru_cache
 
 import pandas as pd
+import cobra
 
 from ._groups import Group, VirtualGroup, ComplementGroup
 from ._models import NamedModel
@@ -15,7 +16,7 @@ class Batch:
     _obj = "batch"
 
     def __init__(self,
-                 groups: Union[List[Group], Dict[str, List[NamedModel]]],
+                 groups: Union[List[Group], Dict[str, List[NamedModel]], Dict[str, Dict[str, cobra.Model]]],
                  complement_group,
                  complement_batch,
                  name_manager,
@@ -39,8 +40,9 @@ class Batch:
         return self._models[item]
 
     def __del__(self):
-        for name, group in self._groups.items():
-            group.batch = self._complement_batch
+        if self != self._complement_batch:
+            for name, group in self._groups.items():
+                group.batch = self._complement_batch
 
     @lru_cache(maxsize=128)
     def component(self):
@@ -217,12 +219,22 @@ class Batch:
             raise ValueError("input groups or models to remove components")
 
         if groups is not None:
-            self._groups[groups].leave_batch()
+            if isinstance(groups, str):
+                self._groups[groups].leave_batch()
+                for name, m in self._groups[groups].items():
+                    del self._models[name]
+                del self._groups[groups]
             if isinstance(groups, list):
                 for g in groups:
                     self._groups[g].leave_batch()
+                    for name, m in self._groups[g].items():
+                        print(name)
+                        del self._models[name]
+                    del self._groups[g]
+
         if models is not None:
-            self._models[models].leave_batch()
+            if isinstance(models, str):
+                self._models[models].leave_batch()
             if isinstance(models, list):
                 for m in models:
                     self._models[m].leave_batch()
@@ -242,6 +254,9 @@ class Batch:
                 self._models[old].name = new
 
     def pop_model(self, name):
+        if not hasattr(self, "_groups"):
+            return
+
         for gname, group in self._groups.items():
             if name in group:
                 return group.pop_model(name)
@@ -296,7 +311,7 @@ class ComplementBatch(Batch):
 
     def __init__(self,
                  name,
-                 groups: Union[List[Group], Dict[str, List[NamedModel]]],
+                 groups: Union[List[Group], Dict[str, List[NamedModel]], Dict[str, Dict[str, cobra.Model]]],
                  complement_group,
                  complement_batch,
                  name_manager
@@ -315,11 +330,11 @@ class ComplementBatch(Batch):
 
 class ComparableBatch(Batch):
     def __init__(self,
-                 name,
-                 groups: Union[List[Group], Dict[str, List[NamedModel]]],
+                 groups: Union[List[Group], Dict[str, List[NamedModel]], Dict[str, Dict[str, cobra.Model]]],
                  complement_group,
                  complement_batch,
-                 name_manager
+                 name_manager,
+                 name=None,
                  ):
         super().__init__(name=name,
                          groups=groups,

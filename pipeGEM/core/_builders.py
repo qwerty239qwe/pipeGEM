@@ -207,21 +207,22 @@ class ComparableBatchBuilder:
         return cls._instance
 
     def __call__(self, *args, **kwargs):
+        kwargs.update({"complement_group": self._complement_group})
         return ComparableBatch(*args, **kwargs)
 
 
-def get_batch(builders, **kwargs):
+def get_batch(builders, **kwargs) -> Batch:
     """API"""
     return builders.get(**kwargs)
 
 
-def get_group(builders, complement_batch, **kwargs):
+def get_group(builders, complement_batch, **kwargs) -> Group:
     """API"""
     kwargs.update({"complement_batch": complement_batch})
     return builders.get(**kwargs)
 
 
-def get_model(builders, complement_batch, complement_group, **kwargs):
+def get_model(builders, complement_batch, complement_group, **kwargs) -> NamedModel:
     """API"""
     kwargs.update({"complement_batch": complement_batch,
                    "complement_group": complement_group})
