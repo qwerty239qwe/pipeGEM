@@ -11,7 +11,8 @@ class Model(GEMComposite):
     def __init__(self,
                  model,
                  name_tag = None,
-                 data=None):
+                 solver = "glpk",
+                 data = None):
         super().__init__(name_tag=name_tag)
         self._lvl = 0
         self._model = model
@@ -19,6 +20,10 @@ class Model(GEMComposite):
             self.expression = data
         else:
             self._expression = None
+
+        self._analyzer = FluxAnalyzer(model=self._model,
+                                      solver=solver,
+                                      rxn_expr_score=self.expression)
 
     def __getattr__(self, item):
         return getattr(self._model, item)
@@ -35,13 +40,21 @@ class Model(GEMComposite):
     def model(self):
         return self._model
 
-    def set_analyzer(self, solver: str):
-        self._analyzer = FluxAnalyzer(model=self._model,
-                                      solver=solver,
-                                      rxn_expr_score=self.expression)
-
-    def get_analyzer(self):
+    @property
+    def analyzer(self):
         return self._analyzer
+
+    @property
+    def reaction_ids(self):
+        return [r.id for r in self._model.reactions]
+
+    @property
+    def gene_ids(self):
+        return [g.id for g in self._model.genes]
+
+    @property
+    def metabolite_ids(self):
+        return [m.id for m in self._model.metabolites]
 
     def get_analysis(self, method, constr="default", keep_rc=False):
         return self._analyzer.get_df(method=method, constr=constr, keep_rc=keep_rc)

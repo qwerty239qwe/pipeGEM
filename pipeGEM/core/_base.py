@@ -17,5 +17,14 @@ class GEMComposite:
     def name_tag(self):
         return self._name_tag
 
-    def tget(self, tag):
+    @property
+    def reaction_ids(self):
+        raise NotImplementedError()
+
+    @property
+    def metabolite_ids(self):
+        raise NotImplementedError()
+
+    @property
+    def gene_ids(self):
         raise NotImplementedError()

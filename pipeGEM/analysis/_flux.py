@@ -7,7 +7,7 @@ from cobra.flux_analysis.variability import flux_variability_analysis
 from cobra.flux_analysis.parsimonious import pfba
 from cobra.sampling import sampling
 
-from pipeGEM.integration.constraints import add_constraint, add_constraint_f
+from pipeGEM.integration.constraints import add_constraint, add_constraint_f, constraint_dict, post_process
 
 
 ANALYSIS_METHODS = {}
@@ -73,7 +73,7 @@ class FluxAnalyzer:
         else:
             self.rxn_expr_score = rxn_expr_score.rxn_scores
         self._df = {constr: {name: None
-                             for name, method in self.method_dicts.items()} for constr, _ in CONSTR_DICT.items()}
+                             for name, method in self.method_dicts.items()} for constr, _ in constraint_dict.items()}
 
     @add_constraint
     def do_analysis(self,
