@@ -1,12 +1,14 @@
-from typing import List, Union
+from typing import List, Union, Dict
 from functools import reduce
 import itertools
 
 import numpy as np
 import pandas as pd
+import cobra
 
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
+from pipeGEM.plotting import plot_model_components, plot_heatmap
 
 
 class Group(GEMComposite):
@@ -16,6 +18,14 @@ class Group(GEMComposite):
                  group,
                  name_tag: str = None,
                  data=None):
+        """
+
+        Parameters
+        ----------
+        group
+        name_tag
+        data
+        """
         super().__init__(name_tag=name_tag)
         self.data = data
         self._lvl = 0
@@ -36,6 +46,26 @@ class Group(GEMComposite):
             yield self._group[index]
             index += 1
 
+    def __getitem__(self, item):
+        for g in self._group:
+            if g.name_tag == item:
+                return g
+
+    def __setitem__(self, key, value):
+        if isinstance(value, dict):
+            self._group.append(Group(group=value, name_tag=key))
+        elif isinstance(value, list):
+            if all([isinstance(g, GEMComposite) for g in value]):
+                self._group.extend(value)
+            else:
+                ValueError("Input list must only contain Group or Model objects")
+        elif isinstance(value, cobra.Model):
+            self._group.append(Model(model=value, name_tag=key))
+        elif isinstance(value, Model):
+            self._group.append(value)
+        else:
+            raise TypeError("Inputted value should be a dict, list, Model, or a cobra.model")
+
     @property
     def reaction_ids(self):
         return list(reduce(set.union, [set(g.reaction_ids) for g in self._group]))
@@ -48,12 +78,33 @@ class Group(GEMComposite):
     def gene_ids(self):
         return list(reduce(set.union, [set(g.gene_ids) for g in self._group]))
 
-    def tget(self, tag):
-        if isinstance(tag, str):
-            if tag == self.name_tag:
-                selected = [self]
-            else:
-                selected = [g for g in self._group if g.name_tag == tag]
+    def tget(self,
+             tag: Union[str, list]) -> List[GEMComposite]:
+        """
+        Use name_tag to find groups or models in this group
+
+        Parameters
+        ----------
+        tag: str, list or None
+            tag could be different types:
+                None - get all of the group objects in this group
+                str - get the group objs whose name_tag match the tag in this group
+                list - sequentially find the matched objects
+
+        Examples
+        ----------
+        g = Group({'G1': {'model_1': model_1, 'model_2': model_2}})
+        g.tget(['G1', 'model_1'])
+
+        Returns
+        -------
+        selected_objects: list
+            A list of selected objects
+        """
+        if tag is None:
+            selected = [self]
+        elif isinstance(tag, str):
+            selected = [g for g in self._group if g.name_tag == tag]
         elif isinstance(tag, list):
             if len(tag) > 1:
                 selected = [g.tget(tag[1:]) if not g.is_leaf else g for g in self._group if g.name_tag == tag[0]]
@@ -63,8 +114,25 @@ class Group(GEMComposite):
             raise ValueError
         return selected
 
-    def iget(self, index):
-        if isinstance(index, int):
+    def iget(self, index) -> List[GEMComposite]:
+        """
+        Use index to find groups or models in this group
+
+        Parameters
+        ----------
+        index: int, list or None
+            index could be different types:
+                None - get all of the group objects in this group
+                int - get the group objs whose index match the index in this group
+                list - sequentially find the matched objects
+        Returns
+        -------
+        selected_objects: list
+            A list of selected objects
+        """
+        if index is None:
+            selected = [self]
+        elif isinstance(index, int):
             selected = self._group[index]
         elif isinstance(index, list):
             if len(index) > 1:
@@ -115,7 +183,8 @@ class Group(GEMComposite):
     def _traverse_util(self, comp: GEMComposite, suffix_row, max_lvl, features):
         assert max_lvl >= len(suffix_row)
         if comp.is_leaf:
-            return suffix_row + ["-" for _ in range(max_lvl - len(suffix_row))] + [len(comp.reactions), len(comp.metabolites), len(comp.genes)]
+            return suffix_row + ["-" for _ in range(max_lvl - len(suffix_row))] + \
+                   [len(comp.reactions), len(comp.metabolites), len(comp.genes)]
         res = []
         for c in comp:
             r = self._traverse_util(c, suffix_row + [c.name_tag], max_lvl, features)
@@ -138,7 +207,6 @@ class Group(GEMComposite):
         return res
 
     def _traverse(self, tag=None, index=None, features=None):
-        assert (tag is not None) ^ (index is not None)
         if tag is not None:
             comps = self.tget(tag)
         else:
@@ -153,9 +221,8 @@ class Group(GEMComposite):
                 data += self._traverse_util(c, [], max_lvl=max_lvl, features=features)
         return data
 
-    def get_info(self, tag=None, index=None, features=None):
-        if tag is None and index is None:
-            tag = self.name_tag
+    def get_info(self, tag=None, index=None, features=None) -> pd.DataFrame:
+
         if features is None:
             features = ["n_rxns", "n_mets", "n_genes"]
         data = self._traverse(tag, index, features)
@@ -167,14 +234,28 @@ class Group(GEMComposite):
             tag = self.name_tag
         return self._traverse(tag, index, None)
 
+    def _find_by_nametag(self,
+                         info_df: pd.DataFrame,
+                         name_tag: str,
+                         keep: str = "first",
+                         ) -> Union[pd.Series, pd.DataFrame]:
+        assert keep in ["first", "last", "all"]
+        queries = [f"{c}=='{name_tag}" for c in info_df.columns]
+        res = info_df.query(" or ".join(queries))
+        if keep == "first":
+            res = res.iloc[:, 0]
+        elif keep == "last":
+            res = res.iloc[:, -1]
+        return res
+
     def summary(self):
         pass
 
     def plot_components(self,
                         group_order,
-                        file_name: str = None):
+                        file_name: str = None) -> pd.DataFrame:
         """
-        Plot number of models' components
+        Plot number of models' components and return the used df
 
         Parameters
         ----------
@@ -198,19 +279,21 @@ class Group(GEMComposite):
         """
         if group_order is None:
             group_order = list([g.name_tag for g in self._group])
-        comp_df = self._component
-        models_group = {mod.name: mod.group.name for mod in self._models}
-        comp_df["samples"] = [s for s in comp_df.index]
-        comp_df["groups"] = [models_group[s] for s in comp_df["samples"].to_list()]
-        sample_grps = dict(zip(comp_df["samples"], comp_df["groups"]))
+        comp_df = self.get_info()
+        found_objs: Dict[str, pd.Series] = {g: self._find_by_nametag(comp_df, g) for g in group_order}
+        obj_parents = {name: g.iloc[g[g == name].index[0]-1] for name, g in found_objs.items()}
+        comp_df["obj"] = group_order
+        comp_df["groups"] = [obj_parents[n] for n in comp_df["obj"].to_list()]
+        sample_grps = dict(zip(comp_df["obj"], comp_df["groups"]))
         new_comp_df = pd.concat(
-            (pd.melt(comp_df, id_vars="samples", value_vars="reactions", var_name="component", value_name="number"),
-             pd.melt(comp_df, id_vars="samples", value_vars="metabolites", var_name="component", value_name="number"),
-             pd.melt(comp_df, id_vars="samples", value_vars="genes", var_name="component", value_name="number")),
+            (pd.melt(comp_df, id_vars="obj", value_vars="n_rxns", var_name="component", value_name="number"),
+             pd.melt(comp_df, id_vars="obj", value_vars="n_mets", var_name="component", value_name="number"),
+             pd.melt(comp_df, id_vars="obj", value_vars="n_genes", var_name="component", value_name="number")),
             ignore_index=True
         )
-        new_comp_df["group"] = new_comp_df["samples"].apply(lambda x: sample_grps[x])
+        new_comp_df["group"] = new_comp_df["obj"].apply(lambda x: sample_grps[x])
         plot_model_components(new_comp_df, group_order, file_name=file_name)
+        return new_comp_df
 
     def plot_flux(self):
         pass
@@ -257,6 +340,7 @@ class Group(GEMComposite):
         -------
 
         """
+        # TODO: finish
         model_names = self.get_model_labels(model_labels)
         label_index = {label: ind for ind, label in enumerate(model_names)}
         jaccard_index = {f'{A}_to_{B}': self._cal_jaccard_index(A, B, components)

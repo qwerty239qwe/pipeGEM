@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pandas as pd
 import seaborn as sns
-from ._utils import _set_default_ax, save_fig, _get_subsystem_ticks
+from ._utils import save_fig, _get_subsystem_ticks
 
 
 @save_fig

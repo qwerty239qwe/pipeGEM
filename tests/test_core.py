@@ -24,3 +24,15 @@ def test_get_group(ecoli_core):
     assert len(g2.gene_ids) == len(m1.genes)
 
     assert all([isinstance(g, Model) for g in g2.get_models()])
+
+
+def test_group_operations(ecoli_core):
+    m1 = ecoli_core
+
+    g = Group({"ecoli_g1": {"e11": m1, "e12": m1, "e13": m1}, "ecoli_g2": {"e21": m1, "e22": m1}, "a": m1}, name_tag="G2")
+    assert len(g["ecoli_g1"])==3
+    assert isinstance(g["ecoli_g1"]["e11"], Model)
+    g["ecoli_g3"] = {"e31": m1, "e32": m1}
+    assert len(g["ecoli_g3"])==2
+    for gi in g:
+        print(gi.name_tag)
