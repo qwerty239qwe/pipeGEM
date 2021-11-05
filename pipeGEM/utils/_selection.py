@@ -2,8 +2,10 @@ from typing import List, Any
 from warnings import warn
 from functools import reduce
 
+import cobra
 
-__all__ = ("get_objective_rxn", "get_subsystems", "get_rxns_in_subsys", "get_genes_in_subsys", "select_rxns_from_model")
+__all__ = ("get_objective_rxn", "get_subsystems", "get_rxns_in_subsys", "get_rxn_set",
+           "get_genes_in_subsys", "select_rxns_from_model")
 
 
 def get_objective_rxn(model, attr="id") -> List[Any]:
@@ -43,3 +45,47 @@ def select_rxns_from_model(named_model, query_id, return_id: bool = True) -> lis
         return list(reduce(set.union, [set(select_rxn_from_model(named_model, qid, return_id)) for qid in query_id]))
 
     raise ValueError(f"query_id should be a str or a list but a {type(query_id)} is passed")
+
+
+def get_rxn_set(model, cond: str = ""):
+    if cond == "irreversible":
+        return set([rxn.id for rxn in model.reactions
+                    if not rxn.reversibility])
+    if cond == "not_expressed":
+        return set([rxn.id for rxn in model.reactions
+                    if (rxn.lower_bound == 0 and rxn.upper_bound == 0) or not rxn.functional])
+    if cond == "backward":  # ub <= 0 and lb < 0
+        return set([rxn.id for rxn in model.reactions
+                    if rxn.upper_bound <= 0 and rxn.lower_bound < 0])
+    if cond == "forward":  # ub > 0 and lb >= 0
+        return set([rxn.id for rxn in model.reactions
+                    if rxn.upper_bound > 0 and rxn.lower_bound >= 0])
+    if cond == "reversed_single_met":  # S = -1
+        return set([rxn.id for rxn in model.reactions
+                    if len(rxn.metabolites) == 1 and all([c < 0 for m, c in rxn.metabolites.items()])])
+    if cond == "forward_single_met":  # S = 1
+        return set([rxn.id for rxn in model.reactions
+                    if len(rxn.metabolites) == 1 and all([c > 0 for m, c in rxn.metabolites.items()])])
+
+    return set([rxn.id for rxn in model.reactions])
+
+
+def get_organic_exs(model,
+                    except_mets: List[str],
+                    except_rxns: List[str]) -> List[cobra.Reaction]:
+    ex_rxns = model.exchanges + model.sinks + model.demands
+    return [r
+            for r in ex_rxns
+            if r.id not in except_rxns and
+               all([m.id not in except_mets for m in r.metabolites]) and
+               any(["C" in m.formula for m in r.metabolites])]
+
+
+def get_not_met_exs(model,
+                     mets: List[str],
+                     except_rxns) -> List[cobra.Reaction]:
+    ex_rxns = model.exchanges + model.sinks + model.demands
+    to_ko_ids = list(set([r.id for r in ex_rxns]) - set([r.id
+                                                         for r in model.exchanges
+                                                         if any([m.id in mets for m in r.metabolites])] + except_rxns))
+    return [r for r in ex_rxns if r.id in to_ko_ids]

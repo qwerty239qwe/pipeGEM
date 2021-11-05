@@ -67,3 +67,12 @@ def get_rxn_set(model, cond: str = ""):
                     if len(rxn.metabolites) == 1 and all([c > 0 for m, c in rxn.metabolites.items()])])
 
     return set([rxn.id for rxn in model.reactions])
+
+
+def flip_direction(model, to_flip: List[str]):
+    for rxn_id in to_flip:
+        rxn = model.reactions.get_by_id(rxn_id)
+        rxn.lower_bound, rxn.upper_bound = -rxn.upper_bound if rxn.upper_bound != 0 else 0, -rxn.lower_bound if rxn.lower_bound != 0 else 0
+        rxn.subtract_metabolites({
+            met: 2 * c for met, c in rxn.metabolites.items()
+        })

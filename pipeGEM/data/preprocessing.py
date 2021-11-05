@@ -113,7 +113,8 @@ def unify_score_column(data_df: pd.DataFrame,
             if score_col in data_df.columns:
                 data_df.rename(columns={score_col: score_col_name}, inplace=True)
                 break
-    return {"data_df": data_df, "used_rxn_thres": used_rxn_thres, "score_col_name": score_col_name}
+    return {"data_df": data_df,
+            "used_rxn_thres": used_rxn_thres}
 
 
 def transform_HPA_data(data_df,
@@ -158,3 +159,16 @@ def get_uniform_expr_threshold_dic(data_df,
     return {"_sample_names": sample_names,
             "_expr_threshold_dic": expr_threshold_dic,
             "_non_expr_threshold_dic": non_expr_threshold_dic}
+
+
+def get_discretize_data(sample_names,
+                        data_df,
+                        expr_threshold_dic,
+                        non_expr_threshold_dic):
+    disc_data = data_df.copy()
+    for sample_name in sample_names:
+        exp_thres, nexp_thres = expr_threshold_dic[sample_name], non_expr_threshold_dic[sample_name]
+        disc_data[sample_name] = disc_data[sample_name].apply(lambda x: 1
+                                                              if x >= exp_thres else -1 if x <= nexp_thres else 0)
+
+    return {"data_df": disc_data}

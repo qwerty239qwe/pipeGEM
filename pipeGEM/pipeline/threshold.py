@@ -1,0 +1,28 @@
+from typing import Optional, List, Union
+
+import numpy as np
+import pandas as pd
+
+from ._base import Pipeline
+from pipeGEM.integration.utils import get_rfastcormics_thresholds
+
+
+class BimodalThreshold(Pipeline):
+    def __init__(self,
+                 cut_off: float = -np.inf,
+                 naming_format: Optional[str] = "./thresholds/{sample_name}.png",
+                 plot_dist: bool = False
+                 ):
+        super().__init__()
+        self.cut_off = cut_off
+        self.plot_dist = plot_dist
+        self.naming_format = naming_format
+
+    def run(self,
+            data: pd.Series,
+            sample_name: str) -> (float, float):
+        return get_rfastcormics_thresholds(data.values,
+                                           cut_off=self.cut_off,
+                                           file_name=self.naming_format.format(sample_name=sample_name)
+                                           if self.naming_format is not None else None,
+                                           plot_dist=self.plot_dist)

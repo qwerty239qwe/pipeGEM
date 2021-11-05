@@ -1,6 +1,6 @@
 from statistics import mean, median
 from warnings import warn
-from typing import Dict
+from typing import Dict, Optional, List
 
 import json
 import pandas as pd
@@ -159,3 +159,18 @@ class Expression:
             warn(f"{not_exist_subsystems} are not model's subsystems!")
 
         return {subsystem: data for subsystem, data in subsystem_score.items() if subsystem not in not_exist_subsystems}
+
+
+def map_data_to_rxns(data_df,
+                     ref_model,
+                     sample_names: Optional[List[str]] = None,
+                     missing_value: float = 0,
+                     expression_threshold: float = 1e-4):
+    expression_dic = {}
+    for sample in data_df.columns:
+        if sample_names is None or sample in sample_names:
+            expression_dic[sample] = Expression(ref_model,
+                                                data_df[sample],
+                                                missing_value=missing_value,
+                                                expression_threshold=expression_threshold)
+    return expression_dic

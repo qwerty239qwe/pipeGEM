@@ -64,7 +64,7 @@ def _modify_clustermap_for_subsys(g, ticks_pos, subsystems):
 def plot_clustermap(data,
                     model_groups=None,
                     group_list=None,
-                    rxn_subsystem=None,
+                    row_category=None,
                     c_bar_label=None,
                     top_ele_ratio=0.1,
                     row_cluster=False,
@@ -82,11 +82,11 @@ def plot_clustermap(data,
 
     nonzeros = (data.var(axis=1) != 0)
     data = data.loc[nonzeros, :]
-    if rxn_subsystem is not None:
-        data, subsystems, ticks_pos = _get_subsystem_ticks(data, rxn_subsystem)
+    if row_category is not None:
+        data, subsystems, ticks_pos = _get_subsystem_ticks(data, row_category)
         colors = sns.color_palette(c_palette, as_cmap=True)(np.linspace(0, 1, len(subsystems)))
         color_dict = dict(zip(subsystems, colors))
-        row_colors = {r: color_dict[rxn_subsystem[r]] for r in data.index}
+        row_colors = {r: color_dict[row_category[r]] for r in data.index}
         row_colors = [color for r_id, color in row_colors.items()]
 
     g = sns.clustermap(data=data,

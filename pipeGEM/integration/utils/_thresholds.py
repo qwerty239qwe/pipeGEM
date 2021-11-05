@@ -1,4 +1,5 @@
 import warnings
+from pathlib import Path
 
 from scipy.stats import gaussian_kde
 from scipy.optimize import curve_fit
@@ -9,7 +10,8 @@ import cobra
 from pipeGEM.integration.mapping import Expression
 
 
-__all__ = ["get_rfastcormics_thresholds", "get_PROM_threshold", "find_exp_threshold"]
+__all__ = ["get_rfastcormics_thresholds", "get_PROM_threshold",
+           "find_exp_threshold", "get_expression_thresholds"]
 
 
 def gaussian(x, amp, cen, wid):
@@ -145,3 +147,26 @@ def find_exp_threshold(model: cobra.Model,
             rxn_scores_dict[rxn] = hi
 
     return hi, lo, rxn_scores_dict
+
+
+def get_expression_thresholds(data_df,
+                              sample_names,
+                              cut_off=-np.inf,
+                              naming_format="./thresholds/{sample_name}.png",
+                              plot_dist=True):
+    expr, nexpr = {}, {}
+    if naming_format is not None:
+        Path(naming_format).parent.mkdir(parents=True, exist_ok=True)
+
+    if sample_names == "all":
+        sample_names = data_df.columns.to_list()
+
+    for sample_name in sample_names:
+        expr[sample_name], nexpr[sample_name] = get_rfastcormics_thresholds(data_df[sample_name].values,
+                                                                            cut_off=cut_off,
+                                                                            file_name=naming_format.format(sample_name=sample_name)
+                                                                            if naming_format is not None else None,
+                                                                            plot_dist=plot_dist)
+    return {"expr_threshold_dic": expr,
+            "non_expr_threshold_dic": nexpr,
+            "data_df": data_df}

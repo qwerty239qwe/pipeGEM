@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any, Union, List
+from typing import Dict, Any, Union, List, Optional
 from pathlib import Path
 
 import pandas as pd
@@ -9,10 +9,9 @@ from cobra.exceptions import Infeasible
 
 from pipeGEM.analysis import FluxAnalyzer
 from pipeGEM.integration.utils import find_exp_threshold
+from pipeGEM.integration.mapping import Expression
 from pipeGEM.analysis.tasks import *
-
-
-# TASK_FILE_PATH = Path(__file__).resolve().parent.parent.parent / Path('assets/tasks/metabolicTasks.xlsx')
+from ._var import TASKS_FILE_PATH
 
 
 class Task:
@@ -257,6 +256,7 @@ class TaskHandler:
 
         self._result_df = pd.DataFrame(columns=['Passed', 'Should fail',
                                                 'Missing mets', 'Status', 'Obj_value'])
+        self._expr_th, self._non_expr_th, self._rxn_score = 0, 0, {}
 
     @property
     def result_df(self):
@@ -291,12 +291,16 @@ class TaskHandler:
             self._constr_kwargs['rxn_expression_dict'] = self._rxn_score
             self._constr_kwargs['low_exp'], self._constr_kwargs['high_exp'] = self._non_expr_th, self._expr_th
 
-    def update_thresholds_for_gimme(self, express_thres, non_express_thres, rxn_score):
-        assert self._constr == "GIMME", "Please make sure you are using GIMME's continuous constraint"
-
-        self._expr_th, self._non_expr_th, self._rxn_score = express_thres, non_express_thres, rxn_score
-        self._constr_kwargs['rxn_expression_dict'] = self._rxn_score
-        self._constr_kwargs['low_exp'], self._constr_kwargs['high_exp'] = self._non_expr_th, self._expr_th
+    def update_thresholds(self,
+                          express_thres,
+                          non_express_thres,
+                          rxn_scores):
+        self._expr_th = express_thres if express_thres is not None else self._expr_th
+        self._non_expr_th = non_express_thres if non_express_thres is not None else self._non_expr_th
+        self._rxn_score = rxn_scores if rxn_scores is not None else self._rxn_score
+        if self._constr == "GIMME":
+            self._constr_kwargs['rxn_expression_dict'] = self._rxn_score
+            self._constr_kwargs['low_exp'], self._constr_kwargs['high_exp'] = self._non_expr_th, self._expr_th
 
     def _get_test_result(self, ID, sol_df, dummy_rxns):
         raise NotImplementedError
@@ -310,7 +314,7 @@ class TaskHandler:
             model.objective = {rxn: 1 for rxn in obj_rxns}
         sol = model.optimize()
         true_status = sol.status
-        if (true_status != 'infeasible'):
+        if true_status != 'infeasible':
             try:
                 kws = {}
                 kws.update(self._constr_kwargs)
@@ -394,7 +398,7 @@ class TaskTester(TaskHandler):
         if method == 'pFBA':
             self._method_kwargs['fraction_of_optimum'] = 1.0
 
-        self._passed_rxns = {}
+        self._passed_rxns: Union[Dict[str, List[str]], dict] = {}
         self._tasks_scores = {}
         self._passed_tasks_list = []
 
@@ -430,7 +434,6 @@ class TaskTester(TaskHandler):
             self._non_expr_th = non_expression_threshold
         if rxn_scores is not None:
             self._rxn_score = rxn_scores
-
         if self._passed_rxns is not None:
             self._tasks_scores = dict()
             for ID, rxns in self._passed_rxns.items():
@@ -480,3 +483,56 @@ class TaskValidator(TaskHandler):
         df = sol_df.loc[[r for r in sol_df.index.to_list()
                          if r not in dummy_rxn_id_list], :]
         self._flux_dfs[ID] = df
+
+
+def get_task_protection_rxns(ref_model,
+                             sample_names: List[str],
+                             expr_threshold_dic: Dict[str, float],
+                             non_expr_threshold_dic: Dict[str, float],
+                             expression_dic: Dict[str, Expression],
+                             constr="default",
+                             task_file_path=TASKS_FILE_PATH,
+                             model_compartment_format="[{}]",
+                             added_protected_rxns: List[str] = None,
+                             plot_file_name: Optional[str] = None,
+                             score_z_score=0,
+                             task_kwargs=None) -> Dict[str, Dict[str, List[str]]]:
+    if task_kwargs is None:
+        task_kwargs = {}
+    protected_rxns = {sample: [] for sample in sample_names}
+    task_scores = {}
+    constr = "None" if constr is None else constr
+    model_tester = TaskTester(ref_model,
+                              constr=constr,
+                              task_container=task_file_path,
+                              model_compartment_parenthesis=model_compartment_format,
+                              **task_kwargs)
+    if constr not in ["GIMME"]:
+        model_tester.test()
+    for sample in sample_names:
+        model_tester.update_thresholds(express_thres=expr_threshold_dic[sample],
+                                       non_express_thres=non_expr_threshold_dic[sample],
+                                       rxn_scores=expression_dic[sample].rxn_scores)
+        if constr in ["GIMME"]:
+            model_tester.test()
+        model_tester.map_expr_to_tasks()
+        protected_rxns[sample].extend(model_tester.get_all_passed_rxns())
+        task_scores[sample] = model_tester.tasks_scores
+        if added_protected_rxns is not None:
+            protected_rxns[sample].extend(added_protected_rxns)
+    if plot_file_name:
+        score_data = pd.DataFrame(task_scores).fillna(-1)
+        subsystem_dict = {ID: task.subsystem
+                          for ID, task in model_tester.tasks.items()}
+        # plot_clustermap(score_data,
+        #                 rxn_subsystem=subsystem_dict,  # TODO rename plot_clustermap's arg
+        #                 file_name = plot_file_name,
+        #                 z_score=score_z_score,
+        #                 )
+    else:
+        score_data = None
+        subsystem_dict = None
+
+    return {"protected_rxns": protected_rxns,
+            "score_data": score_data,
+            "subsystem_dict": subsystem_dict}
