@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from ._utils import save_fig
+from ._prep import prep_fva_plotting_data
 
 
 @save_fig(dpi=300)
@@ -57,7 +58,8 @@ def plot_fba(flux_df: pd.DataFrame,
 
 
 @save_fig(dpi=300)
-def plot_fva(flux_df: pd.DataFrame,
+def plot_fva(min_flux_df: pd.DataFrame,
+             max_flux_df: pd.DataFrame,
              rxn_ids: Union[List[str], Dict[str, str]],
              kind: str = "bar",
              group_layer: str = "",
@@ -67,8 +69,16 @@ def plot_fva(flux_df: pd.DataFrame,
              vertical: bool = True,
              name_format: str = "{method}_result.png",
              verbosity: int = 0,
+             **kwargs
              ):
-    pass
+    ready_df = prep_fva_plotting_data(min_flux_df, max_flux_df)
+    fig, ax = plt.subplots()
+    sns.boxplot(data=ready_df, x="Reactions", y="Flux", hue="model",
+                ax=ax,
+                whis=10, linewidth=0)
+    plot_kws = {"g": fig}
+    plt.show()
+    return plot_kws
 
 def plot_sampling():
     pass
