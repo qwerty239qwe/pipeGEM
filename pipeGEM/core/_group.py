@@ -8,7 +8,8 @@ import cobra
 
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
-from pipeGEM.plotting import plot_model_components, plot_heatmap
+from pipeGEM.plotting.categorical import plot_model_components
+from pipeGEM.plotting.heatmap import plot_heatmap
 
 
 class Group(GEMComposite):

@@ -1,8 +1,11 @@
-from typing import Set, Union, List
+from typing import Set, Union, List, Dict
+import copy
+import re
 
 import cobra
 import numpy as np
 
+from pipeGEM.integration.mapping import Expression
 from pipeGEM.integration.utils import get_rxn_set, flip_direction
 from ._LP import LP3, LP7, LP9, non_convex_LP7, non_convex_LP3
 
