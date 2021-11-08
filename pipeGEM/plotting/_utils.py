@@ -104,3 +104,23 @@ def save_fig(func=None, *, prefix="", dpi=150, name_format="{file_name}"):
             plt.show()
         return info_kws
     return plot_the_result
+
+
+def draw_significance(ax, x_pos_list, y_pos_list, num_stars):
+    # check the line is valid
+    if (y_pos_list[0] == y_pos_list[1]) == (x_pos_list[0] == x_pos_list[1]):
+        raise ValueError('The line is neither a vertical nor a horizontal line.')
+
+    ax.plot(x_pos_list, y_pos_list, c=(0.2, 0.2, 0.2), lw=3)
+    x_lim, y_lim = ax.get_xlim(), ax.get_ylim()
+    x_len, y_len = x_lim[1] - x_lim[0], y_lim[1] - y_lim[0]
+
+    # horizontal
+    if y_pos_list[0] == y_pos_list[1]:
+        ax.text((x_pos_list[0] + x_pos_list[1]) / 2, y_pos_list[1] + y_len * 0.02, '*' * num_stars, size=20,
+                horizontalalignment='center', verticalalignment='center')
+
+    # vertical
+    if x_pos_list[0] == x_pos_list[1]:
+        ax.text(x_pos_list[1] + x_len * 0.02, (y_pos_list[0] + y_pos_list[1]) / 2, '*' * num_stars, size=20,
+                horizontalalignment='center', verticalalignment='center', rotation=90)

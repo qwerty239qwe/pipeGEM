@@ -230,7 +230,7 @@ class Group(GEMComposite):
     def get_info(self, tag=None, index=None, features=None) -> pd.DataFrame:
         data = self._traverse(tag, index, features)
         features = ["model_obj"] if features is None else features
-        col_names = [f"group_{i}" for i in range(len(data[0]) - len(features))] + features
+        col_names = [f"group_{i}" for i in range(len(data) - len(features))] + features
         return pd.DataFrame(data=np.array(data), columns=col_names)
 
     def _find_by_nametag(self,
