@@ -1,3 +1,4 @@
+import pandas as pd
 
 
 class GEMComposite:
@@ -20,6 +21,18 @@ class GEMComposite:
         return self._name_tag
 
     @property
+    def n_rxns(self):
+        return len(self.reaction_ids)
+
+    @property
+    def n_mets(self):
+        return len(self.metabolite_ids)
+
+    @property
+    def n_genes(self):
+        return len(self.gene_ids)
+
+    @property
     def reaction_ids(self):
         raise NotImplementedError()
 
@@ -34,3 +47,9 @@ class GEMComposite:
     @property
     def order(self):
         return self._order
+
+    def get_flux(self, **kwargs):
+        raise NotImplementedError()
+
+    def do_analysis(self, **kwargs) -> pd.DataFrame:
+        raise NotImplementedError()

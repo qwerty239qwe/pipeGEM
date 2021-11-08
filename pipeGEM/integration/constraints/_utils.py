@@ -29,8 +29,8 @@ def add_constraint(func=None):
                 constr_details = constraint_dict[constr_name][0](**constr_kws)  # apply additional constraints
             else:
                 constr_details = None
-            func(self, **kwargs)
-            sol_df = self.get_df(method=kwargs["method"], constr=kwargs["constr"])
+            func(self, **kwargs)  # do_analysis
+            sol_df = self.get_flux(method=kwargs["method"], constr=kwargs["constr"])
             if constr_follow_up and constr_details is not None:
                 return follow_up(constr_details, constr=constr_name, sol_df=sol_df)
             return constr_details

@@ -81,7 +81,6 @@ def _GIMME_post_process(sol_df, forward_prefix="_F_", backward_prefix="_R_"):
 
 def _GIMME_follow_up(obj_dict, **kwargs):
     sol_df = kwargs.get("sol_df").copy()
-    print("in fu")
     sol_df["obj_coef"] = sol_df.index.to_series().apply(
         lambda x: obj_dict[x] if x in obj_dict else None)
     sol_df["inconsistency score"] = sol_df["obj_coef"] * sol_df["fluxes"]

@@ -56,8 +56,14 @@ class Model(GEMComposite):
     def metabolite_ids(self):
         return [m.id for m in self._model.metabolites]
 
-    def get_analysis(self, method, constr="default", keep_rc=False):
-        return self._analyzer.get_df(method=method, constr=constr, keep_rc=keep_rc)
+    def do_analysis(self, **kwargs):
+        return self._analyzer.do_analysis(**kwargs)
+
+    def get_flux(self, **kwargs):
+        return self._analyzer.get_flux(**kwargs)
+
+    def get_sol(self, **kwargs):
+        return self._analyzer.get_sol(**kwargs)
 
     def save_analysis(self, file_dir_path):
         path = Path(file_dir_path)

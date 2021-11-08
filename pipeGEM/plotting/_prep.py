@@ -1,6 +1,14 @@
 import pandas as pd
 
 
+def prep_flux_df(flux_df, rxn_ids) -> (pd.DataFrame, pd.DataFrame):
+    model_df = flux_df.loc[:, [i for i in flux_df.columns if i not in rxn_ids]]
+    flux_df = flux_df.copy().loc[:, rxn_ids if isinstance(rxn_ids, list) else list(rxn_ids.keys())]
+    if isinstance(rxn_ids, dict):
+        flux_df = flux_df.rename(columns=rxn_ids)
+    return model_df, flux_df
+
+
 def prep_fva_plotting_data(min_df, max_df):
     min_df = min_df.copy()
     max_df = max_df.copy()

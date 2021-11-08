@@ -28,3 +28,11 @@ def classproperty(func):
         func = classmethod(func)
 
     return ClassPropertyDescriptor(func)
+
+
+def is_iter(obj) -> bool:
+    try:
+        iter(obj)
+        return True
+    except TypeError:
+        return False

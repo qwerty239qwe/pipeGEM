@@ -10,6 +10,8 @@ from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
 from pipeGEM.plotting.categorical import plot_model_components
 from pipeGEM.plotting.heatmap import plot_heatmap
+from pipeGEM.plotting._flux import plot_fba, plot_fva
+from pipeGEM.utils import is_iter, calc_jaccard_index
 
 
 class Group(GEMComposite):
@@ -79,6 +81,22 @@ class Group(GEMComposite):
     def gene_ids(self):
         return list(reduce(set.union, [set(g.gene_ids) for g in self._group]))
 
+    def get_flux(self, aggregate="concat", **kwargs) -> pd.DataFrame:
+        if aggregate not in ["concat", "mean", "sum", "min", "max", "weighted_mean"]:
+            raise ValueError("This aggregation method is not exist")
+
+        dfs: Dict[str, pd.DataFrame] = {g.name_tag: g.get_flux(**kwargs) for g in self._group}
+        col_name_dic = {c: f"{k}_{c}" for k, v in dfs.items() for c in v.columns }
+        dfs = {k: v.rename(columns=col_name_dic) for k, v in dfs.items()}
+        result = pd.concat(list(dfs.values()), axis=1)
+        if aggregate in ["mean", "sum", "min", "max"]:
+            result = result.T
+            label_dic = {v: k for k, v in dfs.items()}
+            result["label"] = result.index.map(label_dic)
+            gp = result.groupby("label")
+            result = getattr(gp, aggregate).T
+        return result
+
     def tget(self,
              tag: Union[str, list]) -> List[GEMComposite]:
         """
@@ -99,7 +117,7 @@ class Group(GEMComposite):
 
         Returns
         -------
-        selected_objects: list
+        selected_objects: list of Groups or Models
             A list of selected objects
         """
         if tag is None:
@@ -148,25 +166,6 @@ class Group(GEMComposite):
     def members(self):
         return "\n".join([str(g) for g in self._group])
 
-    def _cal_jaccard_index(self, model_a_label, model_b_label, components='all'):
-        if components == 'all':
-            components = ['genes', 'reactions', 'metabolites']
-        union_components = {'genes': set(self._group[model_a_label].gene_ids) |
-                                     set(self._group[model_b_label].gene_ids),
-                            'reactions': set(self._group[model_a_label].reaction_ids) |
-                                         set(self._group[model_b_label].reaction_ids),
-                            'metabolites': set(self._group[model_a_label].metabolite_ids) |
-                                           set(self._group[model_b_label].metabolite_ids)}
-        intersect_components = {'genes': set(self._group[model_a_label].gene_ids) &
-                                         set(self._group[model_b_label].gene_ids),
-                                'reactions': set(self._group[model_a_label].reaction_ids) &
-                                             set(self._group[model_b_label].reaction_ids),
-                                'metabolites': set(self._group[model_a_label].metabolite_ids) &
-                                               set(self._group[model_b_label].metabolite_ids)}
-
-        return sum([len(intersect_components[c]) for c in components]) / \
-               sum([len(union_components[c]) for c in components])
-
     def _form_group(self, group_dict) -> list:
         group_lis = []
         max_g = 0
@@ -181,24 +180,30 @@ class Group(GEMComposite):
         self._lvl = max_g + 1
         return group_lis
 
-    def _traverse_util(self, comp: GEMComposite, suffix_row, max_lvl, features):
+    def _traverse_util(self, comp: GEMComposite, suffix_row, max_lvl, features, f_kws: dict) -> List:
         assert max_lvl >= len(suffix_row)
         if comp.is_leaf:
-            return suffix_row + ["-" for _ in range(max_lvl - len(suffix_row))] + \
-                   [len(comp.reactions), len(comp.metabolites), len(comp.genes)]
+            return suffix_row + \
+                   ["-" for _ in range(max_lvl - len(suffix_row))] + \
+                   [getattr(comp, f)
+                    if isinstance(getattr(type(comp), f), property)
+                    else getattr(comp, f)(**f_kws.get(f, default={}))
+                    for f in features]
         res = []
+        assert is_iter(comp)
         for c in comp:
-            r = self._traverse_util(c, suffix_row + [c.name_tag], max_lvl, features)
+            r = self._traverse_util(c, suffix_row + [c.name_tag], max_lvl, features, f_kws)
             if isinstance(r[0], list):
                 res.extend(r)
             else:
                 res.append(r)
         return res
 
-    def _traverse_get_model(self, comp: GEMComposite):
+    def _traverse_get_model(self, comp: GEMComposite) -> Union[List[GEMComposite], GEMComposite]:
         if comp.is_leaf:
             return comp
         res = []
+        assert is_iter(comp)
         for c in comp:
             r = self._traverse_get_model(c)
             if isinstance(r, list):
@@ -223,17 +228,10 @@ class Group(GEMComposite):
         return data
 
     def get_info(self, tag=None, index=None, features=None) -> pd.DataFrame:
-
-        if features is None:
-            features = ["n_rxns", "n_mets", "n_genes"]
         data = self._traverse(tag, index, features)
+        features = ["model_obj"] if features is None else features
         col_names = [f"group_{i}" for i in range(len(data[0]) - len(features))] + features
         return pd.DataFrame(data=np.array(data), columns=col_names)
-
-    def get_models(self, tag=None, index=None):
-        if tag is None and index is None:
-            tag = self.name_tag
-        return self._traverse(tag, index, None)
 
     def _find_by_nametag(self,
                          info_df: pd.DataFrame,
@@ -249,8 +247,28 @@ class Group(GEMComposite):
             res = res.iloc[:, -1]
         return res
 
-    def summary(self):
-        pass
+    def _get_by_tags(self, tags, get_model_level) -> List[GEMComposite]:
+        if tags == "all":
+            result = self._group
+        if isinstance(tags, str):
+            result = self.tget(tags)
+        elif isinstance(tags, list):
+            result = []
+            for t in tags:
+                result.extend(self.tget(t))
+
+        else:
+            raise TypeError("")
+
+        if get_model_level:
+            models = []
+            for r in result:
+                if r.is_leaf:
+                    models.append(r)
+                else:
+                    models.extend(self._traverse_get_model(r))
+            return models
+        return result
 
     def plot_components(self,
                         group_order,
@@ -280,7 +298,7 @@ class Group(GEMComposite):
         """
         if group_order is None:
             group_order = list([g.name_tag for g in self._group])
-        comp_df = self.get_info()
+        comp_df = self.get_info(features=["n_rxns", "n_mets", "n_genes"])
         found_objs: Dict[str, pd.Series] = {g: self._find_by_nametag(comp_df, g) for g in group_order}
         obj_parents = {name: g.iloc[g[g == name].index[0]-1] for name, g in found_objs.items()}
         comp_df["obj"] = group_order
@@ -296,10 +314,33 @@ class Group(GEMComposite):
         plot_model_components(new_comp_df, group_order, file_name=file_name)
         return new_comp_df
 
-    def plot_flux(self):
-        pass
+    def plot_flux(self,
+                  method,
+                  constr,
+                  tags: Union[str, List[str]] = "all",
+                  get_model_level: bool = True,
+                  aggregation_method="mean",
+                  **kwargs
+                  ):
+        compos: List[GEMComposite] = self._get_by_tags(tags, get_model_level)
+        fluxes = {c.name_tag: c.get_flux(aggregate=aggregation_method,
+                                         method=method, constr=constr, keep_rc=False)
+                  for c in compos}
+        if method in ["FBA", "pFBA"]:
+            if aggregation_method == "concat":
+                plot_fba(flux_df=pd.concat(list(fluxes.values()), axis=1), **kwargs)
+            else:
+                fs = []
+                for name, f_df in fluxes.items():
+                    fs.append(f_df.rename(columns={"fluxes": name}))
+                plot_fba(flux_df=pd.concat(fs, axis=1), **kwargs)
+        else:
+            raise NotImplementedError()  # TODO: finish
 
     def plot_flux_emb(self):
+        pass
+
+    def plot_flux_cluster(self):
         pass
 
     def plot_flux_heatmap(self):
@@ -308,16 +349,13 @@ class Group(GEMComposite):
     def plot_expr_cluster(self):
         pass
 
-    def plot_flux_cluster(self):
-        pass
-
-    def plot_model_heatmap(self, model_labels: Union[str, List[str]] = 'all',
+    def plot_model_heatmap(self,
+                           tags: Union[str, List[str]] = "all",
                            components: Union[str, List[str]] = 'all',
-                           all_model_level: bool = True,
+                           get_model_level: bool = True,
                            annotate: bool = True,
-                           fig_title: bool = None,
                            file_name=None,
-                           prefix="heatmap_",
+                           prefix="model_jaccard_",
                            dpi=300,
                            **kwargs):
         """
@@ -325,36 +363,48 @@ class Group(GEMComposite):
 
         Parameters
         ----------
-        model_labels: str or a list of str
-
+        tags: str or list of str, default = 'all'
+            Tag used to get the analyzed models, if input 'all', then get all the groups in this object
         components: str or a list of str
             if components is a list, use the names in the list to calculate similarity score.
             if 'all', use all of the components to calculate similarity score.
             Choose a category / categories from ['reactions', 'metabolites', 'genes']
-        all_model_level
-        annotate
-        save_fig
-        fig_title
-        kwargs
+        get_model_level: bool, default = True
+            Whether to use model level only or use group level
+        annotate: bool, default = True
+            If to add annotation (number) on the heatmap
+        file_name: str, optional, default = None
+            output file name, if None then no file will be saved
+        prefix: str, default = 'model_jaccard_'
+            The file name prefix
+        **kwargs
 
         Returns
         -------
-
+        None
         """
-        # TODO: finish
-        model_names = self.get_model_labels(model_labels)
-        label_index = {label: ind for ind, label in enumerate(model_names)}
-        jaccard_index = {f'{A}_to_{B}': self._cal_jaccard_index(A, B, components)
-                         for A, B in itertools.combinations(model_names, 2)}
-        jaccard_index.update({f'{A}_to_{A}': 1 for A in model_names})
-
-        data = np.array([[jaccard_index[f'{sorted([A, B], key=lambda x: label_index[x])[0]}_to_{sorted([A, B], key=lambda x: label_index[x])[1]}']
+        models: List[GEMComposite] = self._get_by_tags(tags, get_model_level)
+        label_index = {model.name_tag: ind for ind, model in enumerate(models)}
+        jaccard_index = {f'{A.name_tag}_to_{B.name_tag}': calc_jaccard_index(A, B, components)
+                         for A, B in itertools.combinations(models, 2)}
+        jaccard_index.update({f'{A.name_tag}_to_{A.name_tag}': 1 for A in models})
+        model_names = [A.name_tag for A in models]
+        data = np.array([[jaccard_index[f'{sorted([A, B],key=lambda x: label_index[x])[0]}'
+                                        f'_to_'
+                                        f'{sorted([A, B], key=lambda x: label_index[x])[1]}']
                          for A in model_names]
                          for B in model_names])
+
         plot_heatmap(data=pd.DataFrame(data, index=model_names, columns=model_names),
-                     xticklabels=True, yticklabels=True, scale=1,
-                     cbar_label='Jaccard Index', cmap='magma', annotate=annotate,
-                     fig_title=fig_title, file_name=file_name, prefix=prefix, dpi=dpi, **kwargs)
+                     xticklabels=True,
+                     yticklabels=True,
+                     scale=1,
+                     cbar_label='Jaccard Index',
+                     cmap='magma',
+                     annotate=annotate,
+                     file_name=file_name,
+                     prefix=prefix,
+                     dpi=dpi, **kwargs)
 
 
 

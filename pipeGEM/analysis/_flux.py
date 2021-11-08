@@ -1,5 +1,6 @@
 from pathlib import Path
 from functools import wraps
+from typing import Union, Dict
 
 import pandas as pd
 import cobra
@@ -81,10 +82,6 @@ class FluxAnalyzer:
                     constr,
                     postprocess_kwargs=None,
                     **kwargs) -> None:
-        if kwargs.get("methods"):
-            ValueError("Methods arg is now removed, use method instead")
-        if kwargs.get("const"):
-            ValueError("const arg is now renamed, use constr instead")
         if postprocess_kwargs is None:
             postprocess_kwargs = {}
         if method not in self.method_dicts:
@@ -95,23 +92,40 @@ class FluxAnalyzer:
                                                 constr=constr,
                                                 **postprocess_kwargs)
 
-    def get_df(self, method=None, constr="default", keep_rc=False):
+    def get_flux(self,
+                 method: str,
+                 constr: str = "default",
+                 keep_rc: bool = False) -> pd.DataFrame:
+        """
+        Get stored flux analysis result. If the result is not found, do the flux analysis and return the result.
 
+        Parameters
+        ----------
+        method: str
+            The flux analysis method
+        constr: str
+            Applied additional constraint type
+        keep_rc: bool
+            If the returned dataframe contains reduced costs column
+        Returns
+        -------
+        flux_df: pd.DataFrame
+            Flux result stored in a pd.DataFrame,
+            expected rows: reactions
+            expected columns: depends on the method,
+                FBA and pFBA: [fluxes, [reduced_costs]],
+                FVA: [maximum, minimum],
+                samping: [0, 1, ..., n] (n = number of samples)
+        """
         if self._df[constr][method] is None:
-            print(self.model, constr, method, self._df[constr][method])
-
-        if method is not None:
-            if self._df[constr][method] is None:
-                self.do_analysis(methods=method, const=constr)
-            df = self._df[constr][method].to_frame() \
-                if not isinstance(self._df[constr][method], pd.DataFrame) else self._df[constr][method]
-            return df if keep_rc \
-                else df.loc[:, [i for i in df.columns.to_list() if i != "reduced_costs"]]
-        return self._df[constr]
+            self.do_analysis(methods=method, const=constr)
+        df = self._df[constr][method].to_frame() \
+            if not isinstance(self._df[constr][method], pd.DataFrame) else self._df[constr][method]
+        return df if keep_rc else df.drop(columns=["reduced_costs"])
 
     def get_sol(self, method=None, constr="default"):
         if method not in ["pFBA", "FBA"]:
-            raise ValueError("This method don't return cobra.Solution, use get_df instead")
+            raise AttributeError("This method doesn't have cobra.Solution, use get_flux instead")
 
         if method is not None:
             if not isinstance(self._df[constr][method], cobra.Solution):
@@ -155,4 +169,4 @@ class FluxAnalyzer:
         with model:
             biom = model.problem.Constraint(model.objective.expression, obj_lb)
             model.solver.add(biom)
-            return sampling.sample(model, n=n, **kwargs)
+            return sampling.sample(model, n=n, **kwargs).T

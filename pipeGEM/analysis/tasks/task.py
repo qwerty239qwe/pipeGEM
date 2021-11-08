@@ -322,9 +322,9 @@ class TaskHandler:
                 self.analyzer.do_analysis(method=self._method,
                                           constr=self._constr,
                                           **kws)
-                sol_df = self.analyzer.get_df(method=self._method,
-                                              constr=self._constr,
-                                              keep_rc=False)
+                sol_df = self.analyzer.get_flux(method=self._method,
+                                                constr=self._constr,
+                                                keep_rc=False)
                 self._get_test_result(ID, sol_df, dummy_rxns)
             except Infeasible:
                 true_status = "infeasible"
