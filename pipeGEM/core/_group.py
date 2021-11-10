@@ -16,7 +16,7 @@ from pipeGEM.utils import is_iter, calc_jaccard_index
 
 class Group(GEMComposite):
     _is_leaf = False
-
+    agg_methods = ["concat", "mean", "sum", "min", "max", "weighted_mean", "absmin", "absmax"]
     def __init__(self,
                  group,
                  name_tag: str = None,
@@ -113,7 +113,7 @@ class Group(GEMComposite):
         -------
 
         """
-        if aggregate not in ["concat", "mean", "sum", "min", "max", "weighted_mean"]:
+        if aggregate not in self.agg_methods:
             raise ValueError("This aggregation method is not exist")
 
         dfs: Dict[str, Dict[str,
@@ -122,13 +122,24 @@ class Group(GEMComposite):
         col_names = list(list(dfs.values())[0].keys())
         grouped_dfs = {c: pd.concat([dfs[g.name_tag][c] for g in self._group], axis=1)
                        for c in col_names}
-        if aggregate in ["mean", "sum", "min", "max", "weighted_mean"]:
+
+        # TODO: fix - violate open-close principle
+        if aggregate in ["mean", "sum", "min", "max", "weighted_mean", "absmin", "absmax"]:
             for k, v in grouped_dfs.items():
-                grouped_dfs[k] = getattr(v, aggregate if aggregate != "weighted_mean" else "sum")(axis=1)
+                first_agg = {a: a for a in self.agg_methods}
+                first_agg.update({"weighted_mean": "sum", "absmin": "abs", "absmax": "abs"})
+                if aggregate in ["absmin", "absmax"]:
+                    grouped_dfs[k] = getattr(v, first_agg[aggregate])()
+                else:
+                    grouped_dfs[k] = getattr(v, first_agg[aggregate])(axis=1)
                 grouped_dfs[k] = grouped_dfs[k].to_frame()
                 grouped_dfs[k].columns = [self.name_tag]
                 if aggregate == "weighted_mean":
                     grouped_dfs[k] = grouped_dfs[k] / [g.size for g in self._group]
+                elif aggregate == "absmin":
+                    grouped_dfs[k] = grouped_dfs[k].min()
+                elif aggregate == "absmax":
+                    grouped_dfs[k] = grouped_dfs[k].max()
         return grouped_dfs
 
     def tget(self,
@@ -290,7 +301,6 @@ class Group(GEMComposite):
             result = []
             for t in tags:
                 result.extend(self.tget(t))
-
         else:
             raise TypeError("")
 
@@ -348,6 +358,27 @@ class Group(GEMComposite):
         plot_model_components(new_comp_df, group_order, file_name=file_name)
         return new_comp_df
 
+    def _process_flux(self,
+                      tags,
+                      get_model_level,
+                      aggregation_method,
+                      method,
+                      constr):
+        compos: List[GEMComposite] = self._get_by_tags(tags, get_model_level)
+
+        # TODO: add info to fluxes result
+        # compo_info = self.get_info(tags=tags if tags is not "all" else None)
+        fluxes: Dict[str, Dict[str, pd.DataFrame]] = {c.name_tag: c.get_flux(aggregate=aggregation_method,
+                                                                             method=method,
+                                                                             constr=constr,
+                                                                             keep_rc=False)
+                                                     for c in compos}
+        results = []
+        # for c_name, fluxes_dic in fluxes.items():
+        #
+        #     for f_name, f_df in fluxes_dic.items():
+        #         f_df.T
+
     def plot_flux(self,
                   method,
                   constr,
@@ -357,20 +388,18 @@ class Group(GEMComposite):
                   **kwargs
                   ):
         compos: List[GEMComposite] = self._get_by_tags(tags, get_model_level)
+
+        # TODO: add info to fluxes result
+        compo_info = self.get_info(tags=tags if tags is not "all" else None)
         fluxes = {c.name_tag: c.get_flux(aggregate=aggregation_method,
                                          method=method, constr=constr, keep_rc=False)
                   for c in compos}
         if method in ["FBA", "pFBA"]:
-            if aggregation_method == "concat":
-                plot_fba(flux_df=pd.concat(list(fluxes.values()), axis=1), **kwargs)
-            else:
-                fs = []
-                for name, f_df in fluxes.items():
-                    fs.append(f_df.rename(columns={"fluxes": name}))
-                plot_fba(flux_df=pd.concat(fs, axis=1), **kwargs)
+            plot_fba(flux_df=pd.concat(list(fluxes.values()), axis=1), **kwargs)
         elif method == "FVA":
-            if aggregation_method == "concat":
-                pass
+            if aggregation_method == ["concat", "sum"]:
+                raise ValueError("This aggregation method is not appropriate, choose from mean, absmin, absmax")
+
         else:
             raise NotImplementedError()  # TODO: finish
 
