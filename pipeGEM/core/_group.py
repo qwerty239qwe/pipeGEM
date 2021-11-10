@@ -31,7 +31,6 @@ class Group(GEMComposite):
         """
         super().__init__(name_tag=name_tag)
         self.data = data
-        self._lvl = 0
         self._group: List[GEMComposite] = self._form_group(group)
 
     def __repr__(self):
@@ -81,21 +80,56 @@ class Group(GEMComposite):
     def gene_ids(self):
         return list(reduce(set.union, [set(g.gene_ids) for g in self._group]))
 
-    def get_flux(self, aggregate="concat", **kwargs) -> pd.DataFrame:
+    @property
+    def size(self):
+        return sum([g.size for g in self._group])
+
+    def do_analysis(self, **kwargs):
+        for g in self._group:
+            g.do_analysis(**kwargs)
+
+    def get_flux(self, aggregate="concat", as_dict=True, **kwargs) -> Dict[str, pd.DataFrame]:
+        """
+        Get flux dataframe in this object,
+        The output of this function could be a dataframe(FBA, pFBA, sampling), or two dataframes (FVA)
+        The shape of the dataframes also depend on the method and aggregation method users specified,
+        method -
+            FBA or pFBA: return a dataframe with shape = (n_models, n_rxns) when aggregate = 'concat',
+                otherwise the shape will be (1, n_rxns)
+            FVA: return two dataframes with shape = (n_models, n_rxns) when aggregate = 'concat',
+                otherwise the shape will be (1, n_rxns)
+            sampling: return n dataframe with shape = (n_models, n_rxns) when aggregate = 'concat',
+                otherwise the shape will be (1, n_rxns)
+
+        Parameters
+        ----------
+        as_dict
+        aggregate: str
+            The name of aggregation method, choose from: ["concat", "mean", "sum", "min", "max", "weighted_mean"]
+
+        kwargs
+
+        Returns
+        -------
+
+        """
         if aggregate not in ["concat", "mean", "sum", "min", "max", "weighted_mean"]:
             raise ValueError("This aggregation method is not exist")
 
-        dfs: Dict[str, pd.DataFrame] = {g.name_tag: g.get_flux(**kwargs) for g in self._group}
-        col_name_dic = {c: f"{k}_{c}" for k, v in dfs.items() for c in v.columns }
-        dfs = {k: v.rename(columns=col_name_dic) for k, v in dfs.items()}
-        result = pd.concat(list(dfs.values()), axis=1)
-        if aggregate in ["mean", "sum", "min", "max"]:
-            result = result.T
-            label_dic = {v: k for k, v in dfs.items()}
-            result["label"] = result.index.map(label_dic)
-            gp = result.groupby("label")
-            result = getattr(gp, aggregate).T
-        return result
+        dfs: Dict[str, Dict[str,
+                            Union[pd.DataFrame, pd.Series]]] = \
+            {g.name_tag: g.get_flux(as_dict=as_dict, **kwargs) for g in self._group}
+        col_names = list(list(dfs.values())[0].keys())
+        grouped_dfs = {c: pd.concat([dfs[g.name_tag][c] for g in self._group], axis=1)
+                       for c in col_names}
+        if aggregate in ["mean", "sum", "min", "max", "weighted_mean"]:
+            for k, v in grouped_dfs.items():
+                grouped_dfs[k] = getattr(v, aggregate if aggregate != "weighted_mean" else "sum")(axis=1)
+                grouped_dfs[k] = grouped_dfs[k].to_frame()
+                grouped_dfs[k].columns = [self.name_tag]
+                if aggregate == "weighted_mean":
+                    grouped_dfs[k] = grouped_dfs[k] / [g.size for g in self._group]
+        return grouped_dfs
 
     def tget(self,
              tag: Union[str, list]) -> List[GEMComposite]:
@@ -155,7 +189,7 @@ class Group(GEMComposite):
             selected = self._group[index]
         elif isinstance(index, list):
             if len(index) > 1:
-                selected = [g.tget(index[1:]) if not g.is_leaf else g for g in self._group[index[0]]]
+                selected = [g.iget(index[1:]) if not g.is_leaf else g for g in self._group[index[0]]]
             else:
                 selected = self.iget(index[0])
         else:
@@ -172,7 +206,7 @@ class Group(GEMComposite):
         for name, comp in group_dict.items():
             if isinstance(comp, dict):
                 g = Group(group=comp, name_tag=name, data=self.data)
-                max_g = max(max_g, g._lvl)
+                max_g = max(max_g, g.tree_level)
                 group_lis.append(g)
             else:
                 group_lis.append(Model(model=comp, name_tag=name, data=self.data))
@@ -180,19 +214,19 @@ class Group(GEMComposite):
         self._lvl = max_g + 1
         return group_lis
 
-    def _traverse_util(self, comp: GEMComposite, suffix_row, max_lvl, features, f_kws: dict) -> List:
+    def _traverse_util(self, comp: GEMComposite, suffix_row, max_lvl, features, **f_kws) -> List:
         assert max_lvl >= len(suffix_row)
         if comp.is_leaf:
             return suffix_row + \
                    ["-" for _ in range(max_lvl - len(suffix_row))] + \
                    [getattr(comp, f)
                     if isinstance(getattr(type(comp), f), property)
-                    else getattr(comp, f)(**f_kws.get(f, default={}))
+                    else getattr(comp, f)(**f_kws)
                     for f in features]
         res = []
         assert is_iter(comp)
         for c in comp:
-            r = self._traverse_util(c, suffix_row + [c.name_tag], max_lvl, features, f_kws)
+            r = self._traverse_util(c, suffix_row + [c.name_tag], max_lvl, features, **f_kws)
             if isinstance(r[0], list):
                 res.extend(r)
             else:
@@ -212,7 +246,7 @@ class Group(GEMComposite):
                 res.append(r)
         return res
 
-    def _traverse(self, tag=None, index=None, features=None):
+    def _traverse(self, tag=None, index=None, features=None, **kwargs):
         if tag is not None:
             comps = self.tget(tag)
         else:
@@ -220,17 +254,17 @@ class Group(GEMComposite):
 
         data = []
         for c in comps:
-            if features is None:
-                data += self._traverse_get_model(c)
-            else:
-                max_lvl = max([c._lvl for c in comps])
-                data += self._traverse_util(c, [], max_lvl=max_lvl, features=features)
+            max_lvl = max([c.tree_level for c in comps])
+            data += self._traverse_util(c, [], max_lvl=max_lvl, features=features if features is not None else [],
+                                        **kwargs)
+
         return data
 
-    def get_info(self, tag=None, index=None, features=None) -> pd.DataFrame:
-        data = self._traverse(tag, index, features)
-        features = ["model_obj"] if features is None else features
-        col_names = [f"group_{i}" for i in range(len(data) - len(features))] + features
+    def get_info(self, tag=None, index=None, features=None, **kwargs) -> pd.DataFrame:
+        data = self._traverse(tag, index, features, **kwargs)
+        features = features if features is not None else []
+        col_names = [f"group_{i}" for i in range(len(data[0]) -
+                                                 len(features))] + features
         return pd.DataFrame(data=np.array(data), columns=col_names)
 
     def _find_by_nametag(self,
@@ -250,7 +284,7 @@ class Group(GEMComposite):
     def _get_by_tags(self, tags, get_model_level) -> List[GEMComposite]:
         if tags == "all":
             result = self._group
-        if isinstance(tags, str):
+        elif isinstance(tags, str):
             result = self.tget(tags)
         elif isinstance(tags, list):
             result = []
@@ -334,6 +368,9 @@ class Group(GEMComposite):
                 for name, f_df in fluxes.items():
                     fs.append(f_df.rename(columns={"fluxes": name}))
                 plot_fba(flux_df=pd.concat(fs, axis=1), **kwargs)
+        elif method == "FVA":
+            if aggregation_method == "concat":
+                pass
         else:
             raise NotImplementedError()  # TODO: finish
 

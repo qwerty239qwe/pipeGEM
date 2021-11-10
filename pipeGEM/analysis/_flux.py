@@ -97,7 +97,8 @@ class FluxAnalyzer:
                  constr: str = "default",
                  keep_rc: bool = False) -> pd.DataFrame:
         """
-        Get stored flux analysis result. If the result is not found, do the flux analysis and return the result.
+        Get stored flux analysis result.
+        If the result is not found, do the flux analysis and return the result.
 
         Parameters
         ----------
@@ -118,10 +119,10 @@ class FluxAnalyzer:
                 samping: [0, 1, ..., n] (n = number of samples)
         """
         if self._df[constr][method] is None:
-            self.do_analysis(methods=method, const=constr)
+            self.do_analysis(method=method, constr=constr)
         df = self._df[constr][method].to_frame() \
             if not isinstance(self._df[constr][method], pd.DataFrame) else self._df[constr][method]
-        return df if keep_rc else df.drop(columns=["reduced_costs"])
+        return df if keep_rc or "reduced_costs" not in df.columns else df.drop(columns=["reduced_costs"])
 
     def get_sol(self, method=None, constr="default"):
         if method not in ["pFBA", "FBA"]:

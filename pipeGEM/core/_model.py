@@ -1,4 +1,7 @@
 from pathlib import Path
+from typing import Union
+
+import pandas as pd
 
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.integration.mapping import Expression
@@ -14,7 +17,6 @@ class Model(GEMComposite):
                  solver = "glpk",
                  data = None):
         super().__init__(name_tag=name_tag)
-        self._lvl = 0
         self._model = model
         if data is not None:
             self.expression = data
@@ -37,7 +39,15 @@ class Model(GEMComposite):
         self._expression = Expression(self._model, data)
 
     @property
+    def size(self):
+        return 1
+
+    @property
     def model(self):
+        return self
+
+    @property
+    def cobra_model(self):
         return self._model
 
     @property
@@ -57,10 +67,13 @@ class Model(GEMComposite):
         return [m.id for m in self._model.metabolites]
 
     def do_analysis(self, **kwargs):
-        return self._analyzer.do_analysis(**kwargs)
+        self._analyzer.do_analysis(**kwargs)
 
-    def get_flux(self, **kwargs):
-        return self._analyzer.get_flux(**kwargs)
+    def get_flux(self, as_dict=False, **kwargs) -> Union[dict, pd.DataFrame]:
+        flux_df = self._analyzer.get_flux(**kwargs)
+        if not as_dict:
+            return flux_df
+        return {c: flux_df[c].to_frame().rename(columns={c: self.name_tag}) for c in flux_df.columns}
 
     def get_sol(self, **kwargs):
         return self._analyzer.get_sol(**kwargs)

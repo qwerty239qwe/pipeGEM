@@ -6,6 +6,7 @@ class GEMComposite:
 
     def __init__(self,
                  name_tag):
+        self._lvl = 0
         self._name_tag = name_tag
         self._order = -1
 
@@ -45,11 +46,19 @@ class GEMComposite:
         raise NotImplementedError()
 
     @property
+    def size(self):
+        raise NotImplementedError()
+
+    @property
     def order(self):
         return self._order
 
-    def get_flux(self, **kwargs):
+    def get_flux(self, as_dict=False, **kwargs):
         raise NotImplementedError()
 
-    def do_analysis(self, **kwargs) -> pd.DataFrame:
+    def do_analysis(self, **kwargs) -> None:
         raise NotImplementedError()
+
+    @property
+    def tree_level(self):
+        return self._lvl
