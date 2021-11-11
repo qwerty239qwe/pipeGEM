@@ -50,6 +50,10 @@ class GEMComposite:
         raise NotImplementedError()
 
     @property
+    def subsystems(self) -> dict:
+        raise NotImplementedError()
+
+    @property
     def order(self):
         return self._order
 

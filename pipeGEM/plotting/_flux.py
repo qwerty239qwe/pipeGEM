@@ -27,14 +27,14 @@ def plot_fba(flux_df: pd.DataFrame,
              ):
     model_df, flux_df = prep_flux_df(flux_df, rxn_ids)
     if filter_all_zeros:
-        all_zeros_rxn = (abs(flux_df) < threshold).all(axis=0).columns.to_list()
+        all_zeros_rxn = flux_df.loc[:, (abs(flux_df) < threshold).all(axis=0)].columns.to_list()
         if verbosity > 0:
             print(f"Reactions contain zeros fluxes: {all_zeros_rxn}, were removed from the plot")
         flux_df = flux_df.loc[:, (abs(flux_df) > threshold).any(axis=0)]
-    flux_df = pd.concat([flux_df, model_df], axis=1)
-    flux_df = flux_df.melt(id_vars=model_df.columns,
+    flux_df = pd.concat([flux_df, model_df.loc[:, [group_layer]]], axis=1)
+    flux_df = flux_df.melt(id_vars=[group_layer],
                            var_name=["Reactions"],
-                           value_name=[r'Flux ($\mu$mol/min/gDW)'])
+                           value_name=r'Flux ($\mu$mol/min/gDW)')
     x_var = "Reactions" if vertical else r'Flux ($\mu$mol/min/gDW)'
     y_var = "Reactions" if not vertical else r'Flux ($\mu$mol/min/gDW)'
     g = sns.catplot(data=flux_df,
@@ -153,7 +153,7 @@ def plot_one_sampling(flux_df,
     return plot_kws
 
 
-def plot_sampling(sampling_flux_df: pd.DataFrame,  # (n_samples, n_rxns)
+def plot_sampling(sampling_flux_df: Dict[str, pd.DataFrame],  # n_samples: (n_models, n_rxns)
                   sample_category_df: pd.DataFrame,  # (n_samples, n_cats)
                   rxn_ids: Union[List[str], Dict[str, str]],
                   group_layer: str = "",

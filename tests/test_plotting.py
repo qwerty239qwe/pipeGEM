@@ -39,3 +39,11 @@ def test_plot_FVA():
 def test_plot_components(ecoli_core, ecoli):
     g = pg.Group({"ecoli": ecoli, "ecoli_core": ecoli_core})
     g.plot_components(group_order=["ecoli", "ecoli_core"])
+
+
+def test_plot_fba(ecoli_core):
+    g = pg.Group({"ecoli": ecoli_core, "ecoli2": ecoli_core.copy()})
+
+    g.do_analysis(method="FBA", constr="default")
+    g.plot_flux(method="FBA", constr="default", rxn_ids=['PFK', 'PGI', 'PGK', 'EX_lac__D_e', 'PGL'],
+                verbosity=1)

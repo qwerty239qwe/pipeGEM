@@ -66,6 +66,16 @@ class Model(GEMComposite):
     def metabolite_ids(self):
         return [m.id for m in self._model.metabolites]
 
+    @property
+    def subsystems(self):
+        subs = {}
+        for r in self._model.reactions:
+            if r.subsystem in subs:
+                subs[r.subsystem].append(r.id)
+            else:
+                subs[r.subsystem] = [r.id]
+        return subs
+
     def do_analysis(self, **kwargs):
         self._analyzer.do_analysis(**kwargs)
 

@@ -17,6 +17,7 @@ from pipeGEM.utils import is_iter, calc_jaccard_index
 class Group(GEMComposite):
     _is_leaf = False
     agg_methods = ["concat", "mean", "sum", "min", "max", "weighted_mean", "absmin", "absmax"]
+
     def __init__(self,
                  group,
                  name_tag: str = None,
@@ -83,6 +84,23 @@ class Group(GEMComposite):
     @property
     def size(self):
         return sum([g.size for g in self._group])
+
+    @property
+    def members(self):
+        return "\n".join([str(g) for g in self._group])
+
+    @property
+    def subsystems(self):
+        subs = {}
+        for g in self._group:
+            for s_name, rxns in g.subsystems.items():
+                if s_name in subs:
+                    subs[s_name] += rxns
+                else:
+                    subs[s_name] = rxns
+        for g, rxns in subs.items():
+            subs[g] = set(rxns)
+        return subs
 
     def do_analysis(self, **kwargs):
         for g in self._group:
@@ -207,9 +225,17 @@ class Group(GEMComposite):
             raise ValueError
         return selected
 
-    @property
-    def members(self):
-        return "\n".join([str(g) for g in self._group])
+    @staticmethod
+    def _check_rxn_id(comp: GEMComposite, index, subsystems):
+        if index is None and subsystems is None:
+            return []
+        if index is not None:
+            return [comp.reaction_ids[r] for r in index]
+        if subsystems is not None:
+            all = []
+            for s in subsystems:
+                all += comp.subsystems[s]
+            return all
 
     def _form_group(self, group_dict) -> list:
         group_lis = []
@@ -360,50 +386,62 @@ class Group(GEMComposite):
         return new_comp_df
 
     def _process_flux(self,
+                      method,
+                      constr,
                       tags,
                       get_model_level,
                       aggregation_method,
-                      method,
-                      constr):
+                      ):
         compos: List[GEMComposite] = self._get_by_tags(tags, get_model_level)
-
-        # TODO: add info to fluxes result
+        # TODO: add more model info to fluxes result
         # compo_info = self.get_info(tags=tags if tags is not "all" else None)
-        fluxes: Dict[str, Dict[str, pd.DataFrame]] = {c.name_tag: c.get_flux(aggregate=aggregation_method,
-                                                                             method=method,
-                                                                             constr=constr,
-                                                                             keep_rc=False)
-                                                     for c in compos}
-        results = []
-        # for c_name, fluxes_dic in fluxes.items():
-        #
-        #     for f_name, f_df in fluxes_dic.items():
-        #         f_df.T
+        fluxes: Dict[str, Dict[str, pd.DataFrame]] = {}
+        for c in compos:
+            if c.is_leaf:
+                flux = c.get_flux(method=method,
+                                  constr=constr,
+                                  as_dict=True,
+                                  keep_rc=False)
+            else:
+                flux = c.get_flux(aggregate=aggregation_method,
+                                  as_dict=True,
+                                  method=method,
+                                  constr=constr,
+                                  keep_rc=False)
+            for k, f in flux.items():
+                if k not in fluxes:
+                    fluxes[k] = {}
+                processed = f.T
+                processed["model"] = processed.index
+                processed["group"] = c.name_tag
+                fluxes[k][c.name_tag] = processed
+        return {fname: pd.concat(list(fdfs.values()), axis=0) for fname, fdfs in fluxes.items() }
 
     def plot_flux(self,
                   method,
                   constr,
+                  rxn_ids = None,
+                  rxn_index = None,
+                  subsystems = None,
                   tags: Union[str, List[str]] = "all",
                   get_model_level: bool = True,
                   aggregation_method="mean",
                   **kwargs
                   ):
-        compos: List[GEMComposite] = self._get_by_tags(tags, get_model_level)
+        rxn_ids = rxn_ids if rxn_ids is not None else []
+        rxn_ids += self._check_rxn_id(self.tget(tags if tags is not "all" else None)[0], rxn_index, subsystems)
+        fluxes = self._process_flux(method, constr, tags, get_model_level, aggregation_method)
+        print(fluxes["fluxes"])
 
-        # TODO: add info to fluxes result
-        compo_info = self.get_info(tags=tags if tags is not "all" else None)
-        fluxes = {c.name_tag: c.get_flux(aggregate=aggregation_method,
-                                         method=method, constr=constr, keep_rc=False)
-                  for c in compos}
         if method in ["FBA", "pFBA"]:
-            plot_fba(flux_df=pd.concat(list(fluxes.values()), axis=1), **kwargs)
+            plot_fba(flux_df=fluxes["fluxes"], rxn_ids=rxn_ids, group_layer="group", **kwargs)
         elif method == "FVA":
             if aggregation_method == ["concat", "sum"]:
                 raise ValueError("This aggregation method is not appropriate, choose from mean, absmin, absmax")
             plot_fva(min_flux_df=fluxes["minimum"],
-                     max_flux_df=fluxes["maximum"], **kwargs)
+                     max_flux_df=fluxes["maximum"], rxn_ids=rxn_ids, **kwargs)
         elif method == "sampling":
-            plot_sampling(sampling_flux_dfs=fluxes, **kwargs)
+            plot_sampling(sampling_flux_dfs=fluxes, rxn_ids=rxn_ids, **kwargs)
         else:
             raise NotImplementedError()
 
