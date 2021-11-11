@@ -108,15 +108,14 @@ def plot_one_sampling(flux_df,
                       prefix: str = "FS_",
                       **kwargs):
     facet: sns.FacetGrid = getattr(sns, plotting_style)(data=flux_df,
-                                                        y=r,
-                                                        x=group_layer if plotting_style == "catplot" else None,
+                                                        x=r,
+                                                        y=group_layer if plotting_style == "catplot" else None,
                                                         hue=group_layer if plotting_style == "displot" else None,
                                                         kind=plotting_kind,
                                                         palette=color_maps,
-                                                        alpha=1 / len(grps),
                                                         **kwargs)
     ax = facet.ax
-    ax.set_title(fig_title.format(r))
+    ax.set_title(fig_title.format(r=r))
     if plotting_kind in ["kde", "hist"]:
         for grp, color in color_maps.items():
             ax.axvline(np.median(flux_df[r]),
@@ -146,15 +145,15 @@ def plot_one_sampling(flux_df,
                                            for _ in range(2)],
                                           stars)
                         num_significance += 1
-    plot_kws = {"file_dir": str(file_dir),
+    plot_kws = {
                 "g": facet.figure,
-                "rxn_id": r,
-                "name_format": "{file_dir}/{rxn_id}.png"}
+                 # "file_dir": str(file_dir),
+                 # "rxn_id": r,
+               } # TODO: fix saving function (add name_format)
     return plot_kws
 
 
 def plot_sampling(sampling_flux_df: Dict[str, pd.DataFrame],  # n_samples: (n_models, n_rxns)
-                  sample_category_df: pd.DataFrame,  # (n_samples, n_cats)
                   rxn_ids: Union[List[str], Dict[str, str]],
                   group_layer: str = "",
                   plotting_style='displot',
@@ -165,13 +164,14 @@ def plot_sampling(sampling_flux_df: Dict[str, pd.DataFrame],  # n_samples: (n_mo
                   file_dir="./sampling",
                   prefix: str = "FS_",
                   **kwargs):
-    flux_df = pd.concat([sampling_flux_df, sample_category_df], axis=1)
+    flux_df = pd.concat(list(sampling_flux_df.values()), axis=0, ignore_index=True)
     if isinstance(rxn_ids, dict):
         flux_df = flux_df.rename(columns=rxn_ids)
         rxn_ids = list(rxn_ids.values())
-    flux_df = flux_df.loc[:, rxn_ids + sample_category_df.columns.to_list()]
+    flux_df = flux_df.loc[:, rxn_ids + [group_layer]]
     grps = flux_df[group_layer].unique()
-    color_maps = {g: sns.color_palette(palette, n_colors=len(grps)) for g in grps}
+    pl = sns.color_palette(palette, n_colors=len(grps))
+    color_maps = {g: pl[i] for i, g in enumerate(grps)}
     for r in rxn_ids:
         plot_one_sampling(flux_df=flux_df,
                           r=r,

@@ -431,17 +431,15 @@ class Group(GEMComposite):
         rxn_ids = rxn_ids if rxn_ids is not None else []
         rxn_ids += self._check_rxn_id(self.tget(tags if tags != "all" else None)[0], rxn_index, subsystems)
         fluxes = self._process_flux(method, constr, tags, get_model_level, aggregation_method)
-        print(fluxes["fluxes"])
-
         if method in ["FBA", "pFBA"]:
             plot_fba(flux_df=fluxes["fluxes"], rxn_ids=rxn_ids, group_layer="group", **kwargs)
         elif method == "FVA":
             if aggregation_method == ["concat", "sum"]:
                 raise ValueError("This aggregation method is not appropriate, choose from mean, absmin, absmax")
             plot_fva(min_flux_df=fluxes["minimum"],
-                     max_flux_df=fluxes["maximum"], rxn_ids=rxn_ids, **kwargs)
+                     max_flux_df=fluxes["maximum"], rxn_ids=rxn_ids, group_layer="group", **kwargs)
         elif method == "sampling":
-            plot_sampling(sampling_flux_dfs=fluxes, rxn_ids=rxn_ids, **kwargs)
+            plot_sampling(sampling_flux_df=fluxes, rxn_ids=rxn_ids, group_layer="group", **kwargs)
         else:
             raise NotImplementedError()
 

@@ -47,3 +47,10 @@ def test_plot_fba(ecoli_core):
     g.do_analysis(method="FBA", constr="default")
     g.plot_flux(method="FBA", constr="default", rxn_ids=['PFK', 'PGI', 'PGK', 'EX_lac__D_e', 'PGL'],
                 verbosity=1)
+
+
+def test_plot_sampling(ecoli_core):
+    g = pg.Group({"ecoli": ecoli_core, "ecoli2": ecoli_core.copy()})
+
+    g.do_analysis(method="sampling", constr="default", n=50)
+    g.plot_flux(method="sampling", constr="default", rxn_ids=['PFK', 'PGI', 'PGK'])
