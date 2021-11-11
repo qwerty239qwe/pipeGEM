@@ -7,6 +7,7 @@ from ._base import Pipeline
 from pipeGEM.data.preprocessing import (get_gene_id_map, translate_gene_id, unify_score_column,
                                         transform_HPA_data, get_discretize_data)
 from pipeGEM.data.fetching import fetch_HPA_data, load_HPA_data
+from pipeGEM.integration.mapping import Expression
 
 
 # data converter, loader, transformer,
@@ -60,6 +61,39 @@ class GeneDataDiscretizer(Pipeline):
                                      expr_threshold_dic=expr_threshold_dic,
                                      non_expr_threshold_dic=non_expr_threshold_dic)
         return output["data_df"]
+
+
+class GeneData(Pipeline):
+    def __init__(self):
+        super(GeneData, self).__init__()
+        self._expression = None
+
+    def run(self, data, model, *args, **kwargs):
+        self._expression = Expression(data, model, *args, **kwargs)
+        self.output = {"expression": self._expression}
+        return self.output
+
+
+class GeneDataSet(Pipeline):
+    def __init__(self, data_df: pd.DataFrame):
+        super(GeneDataSet, self).__init__()
+        self.data_df = data_df
+        self.jobs = {c: GeneData() for c in data_df.columns}
+        self._expression_dict = {}
+
+    def __getitem__(self, item):
+        return self._expression_dict[item]
+
+    def items(self):
+        return self._expression_dict.items()
+
+    def run(self, model, *args, **kwargs):
+        for c, job in self.jobs.items():
+            self._expression_dict[c] = job(data=self.data_df[c],
+                                           model=model[c] if isinstance(model, dict) else model,
+                                           *args, **kwargs)
+        self.output = {"expression_dict": self._expression_dict}
+        return self.output
 
 
 class ProteinDataLoader(Pipeline):
