@@ -429,7 +429,7 @@ class Group(GEMComposite):
                   **kwargs
                   ):
         rxn_ids = rxn_ids if rxn_ids is not None else []
-        rxn_ids += self._check_rxn_id(self.tget(tags if tags is not "all" else None)[0], rxn_index, subsystems)
+        rxn_ids += self._check_rxn_id(self.tget(tags if tags != "all" else None)[0], rxn_index, subsystems)
         fluxes = self._process_flux(method, constr, tags, get_model_level, aggregation_method)
         print(fluxes["fluxes"])
 
