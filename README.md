@@ -1,4 +1,4 @@
-# PipeGEM v0.1.0
+# PipeGEM v0.1.0-beta
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/biodbs.svg)](https://pypi.python.org/pypi/biodbs/)
 [![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
 ![ci](https://github.com/qwerty239qwe/biodbs/actions/workflows/ci.yml/badge.svg)
@@ -40,8 +40,8 @@ model_2 = load_model("your_model_path_2")
 group = pg.Group({"model1": model_1, "model2": model_2})
 
 # Do and plot pFBA result
-group.do_flux_analysis("pFBA")
-group.plot_flux_analysis("pFBA")
+group.do_analysis("pFBA")
+group.plot_flux("pFBA")
 ```
 
 **Generate context-specific models**

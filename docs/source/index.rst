@@ -11,6 +11,7 @@ Welcome to pipeGEM's documentation!
    :caption: Contents:
 
    quickstart
+   api
 
 
 Indices and tables
