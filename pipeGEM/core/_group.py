@@ -10,7 +10,8 @@ from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
 from pipeGEM.plotting.categorical import plot_model_components
 from pipeGEM.plotting.heatmap import plot_heatmap
-from pipeGEM.plotting._flux import plot_fba, plot_fva, plot_sampling
+from pipeGEM.plotting import plot_fba, plot_fva, plot_sampling
+from pipeGEM.plotting.scatter import plot_PCA, plot_embedding
 from pipeGEM.utils import is_iter, calc_jaccard_index
 
 
@@ -112,12 +113,12 @@ class Group(GEMComposite):
         The output of this function could be a dataframe(FBA, pFBA, sampling), or two dataframes (FVA)
         The shape of the dataframes also depend on the method and aggregation method users specified,
         method -
-            FBA or pFBA: return a dataframe with shape = (n_models, n_rxns) when aggregate = 'concat',
-                otherwise the shape will be (1, n_rxns)
-            FVA: return two dataframes with shape = (n_models, n_rxns) when aggregate = 'concat',
-                otherwise the shape will be (1, n_rxns)
-            sampling: return n dataframe with shape = (n_models, n_rxns) when aggregate = 'concat',
-                otherwise the shape will be (1, n_rxns)
+            FBA or pFBA: return a dict contains a dataframe with shape = (n_rxns, n_models) when aggregate = 'concat',
+                otherwise the shape will be (n_rxns, 1)
+            FVA: return a dict contains two dataframes with shape = (n_rxns, n_models) when aggregate = 'concat',
+                otherwise the shape of each frame will be (n_rxns, 1)
+            sampling: return a dict contains n dataframes with shape = (n_rxns, n_models) when aggregate = 'concat',
+                otherwise the shape of each frame will be (n_rxns, 1)
 
         Parameters
         ----------
@@ -443,8 +444,34 @@ class Group(GEMComposite):
         else:
             raise NotImplementedError()
 
-    def plot_flux_emb(self):
-        pass
+    def plot_flux_emb(self,
+                      method,
+                      constr,
+                      dr_method="PCA",
+                      rxn_ids=None,
+                      rxn_index=None,
+                      subsystems=None,
+                      tags: Union[str, List[str]] = "all",
+                      aggregation_method="mean",
+                      **kwargs
+                      ):
+        get_model_level = True
+        rxn_ids = rxn_ids if rxn_ids is not None else []
+        rxn_ids += self._check_rxn_id(self.tget(tags if tags != "all" else None)[0], rxn_index, subsystems)
+        fluxes = self._process_flux(method, constr, tags, get_model_level, aggregation_method)
+        if method in ["FBA", "pFBA"]:
+            df: pd.DataFrame = fluxes["fluxes"]
+        elif method == "sampling":
+            df: pd.DataFrame = pd.concat(list(fluxes.values()), axis=0)
+        else:
+            raise NotImplementedError()
+        groups = dict(df["group"].to_frame().reset_index(drop=True).reset_index().groupby("group")["index"].apply(list).iteritems())
+        df = df.drop(columns=["model", "group"]).reset_index(drop=True)
+        if dr_method == "PCA":
+            plot_PCA(df=df.T, groups=groups, **kwargs)
+        else:
+            plot_embedding(df=df.T, reducer=dr_method, groups=groups, **kwargs)
+
 
     def plot_flux_cluster(self):
         pass

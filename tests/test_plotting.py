@@ -54,3 +54,21 @@ def test_plot_sampling(ecoli_core):
 
     g.do_analysis(method="sampling", constr="default", n=50)
     g.plot_flux(method="sampling", constr="default", rxn_ids=['PFK', 'PGI', 'PGK'])
+
+
+def test_plot_model_heatmap(ecoli_core):
+    g = pg.Group({"ecoli": ecoli_core, "ecoli2": ecoli_core.copy(), "ecoli3": ecoli_core.copy()})
+
+    g.plot_model_heatmap()
+
+
+def test_plot_model_emb(ecoli_core):
+    ecoli_2 = ecoli_core.copy()
+    ecoli_2.reactions.get_by_id('PFK').knock_out()
+    ecoli_3 = ecoli_2.copy()
+    ecoli_3.reactions.get_by_id("PGM").knock_out()
+
+    g = pg.Group({"ecoli": ecoli_core, "ecoli2": ecoli_2, "ecoli3": ecoli_3})
+    g.do_analysis(method="sampling", constr="default", n=10)
+    g.plot_flux_emb(method="sampling", constr="default", title="PCA")
+    g.plot_flux_emb(method="sampling", constr="default", dr_method="UMAP", title="UMAP")

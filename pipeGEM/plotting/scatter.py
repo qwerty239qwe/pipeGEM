@@ -11,7 +11,7 @@ from pipeGEM.analysis import prepare_PCA_dfs, prepare_embedding_dfs
 
 def plot_PCA(df,
              groups,
-             title,
+             title=None,
              transform_func=None,
              standardize=True,
              plot_2D=True,
@@ -54,7 +54,7 @@ def plot_PCA(df,
 @save_fig(prefix="", dpi=150)
 def plot_embedding(df,
                    groups: dict,
-                   title,
+                   title=None,
                    palette="muted",
                    transform_func=None,
                    standardize=True,
@@ -110,7 +110,6 @@ def plot_2D_PCA_score(pca_df,
     colors = sns.color_palette(palette,
                                as_cmap=continuous) if colors is None else colors
     fig, ax = plt.subplots(figsize=(7, 7))
-
     if features is None:
         for i, (group_name, model_names) in enumerate(groups.items()):
             pc1, pc2 = np.array([pca_df.loc['PC1', name] for name in model_names]), \

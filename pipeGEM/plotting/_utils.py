@@ -34,9 +34,9 @@ def _set_default_ax(ax,
     ax.spines['top'].set_visible(False)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
-    if z_label:
+    if z_label is not None:
         ax.set_zlabel(z_label)
-    if title:
+    if title is not None:
         ax.set_title(title)
     ax.set_facecolor(face_color)
     if with_legend:
