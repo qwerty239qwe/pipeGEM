@@ -22,15 +22,15 @@ class GEMComposite:
         return self._name_tag
 
     @property
-    def n_rxns(self):
+    def n_rxns(self) -> int:
         return len(self.reaction_ids)
 
     @property
-    def n_mets(self):
+    def n_mets(self) -> int:
         return len(self.metabolite_ids)
 
     @property
-    def n_genes(self):
+    def n_genes(self) -> int:
         return len(self.gene_ids)
 
     @property

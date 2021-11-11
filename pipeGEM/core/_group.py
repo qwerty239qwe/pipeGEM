@@ -10,7 +10,7 @@ from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
 from pipeGEM.plotting.categorical import plot_model_components
 from pipeGEM.plotting.heatmap import plot_heatmap
-from pipeGEM.plotting._flux import plot_fba, plot_fva
+from pipeGEM.plotting._flux import plot_fba, plot_fva, plot_sampling
 from pipeGEM.utils import is_iter, calc_jaccard_index
 
 
@@ -276,7 +276,7 @@ class Group(GEMComposite):
         features = features if features is not None else []
         col_names = [f"group_{i}" for i in range(len(data[0]) -
                                                  len(features))] + features
-        return pd.DataFrame(data=np.array(data), columns=col_names)
+        return pd.DataFrame(data=np.array(data), columns=col_names).infer_objects()
 
     def _find_by_nametag(self,
                          info_df: pd.DataFrame,
@@ -284,7 +284,7 @@ class Group(GEMComposite):
                          keep: str = "first",
                          ) -> Union[pd.Series, pd.DataFrame]:
         assert keep in ["first", "last", "all"]
-        queries = [f"{c}=='{name_tag}" for c in info_df.columns]
+        queries = [f"{c}=='{name_tag}'" for c in info_df.columns]
         res = info_df.query(" or ".join(queries))
         if keep == "first":
             res = res.iloc[:, 0]
@@ -354,6 +354,7 @@ class Group(GEMComposite):
              pd.melt(comp_df, id_vars="obj", value_vars="n_genes", var_name="component", value_name="number")),
             ignore_index=True
         )
+        new_comp_df["number"] = new_comp_df["number"].astype(dtype=int)
         new_comp_df["group"] = new_comp_df["obj"].apply(lambda x: sample_grps[x])
         plot_model_components(new_comp_df, group_order, file_name=file_name)
         return new_comp_df
@@ -399,9 +400,12 @@ class Group(GEMComposite):
         elif method == "FVA":
             if aggregation_method == ["concat", "sum"]:
                 raise ValueError("This aggregation method is not appropriate, choose from mean, absmin, absmax")
-
+            plot_fva(min_flux_df=fluxes["minimum"],
+                     max_flux_df=fluxes["maximum"], **kwargs)
+        elif method == "sampling":
+            plot_sampling(sampling_flux_dfs=fluxes, **kwargs)
         else:
-            raise NotImplementedError()  # TODO: finish
+            raise NotImplementedError()
 
     def plot_flux_emb(self):
         pass

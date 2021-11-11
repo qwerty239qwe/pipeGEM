@@ -1,5 +1,6 @@
 import pandas as pd
 
+import pipeGEM as pg
 from pipeGEM.plotting._prep import prep_fva_plotting_data
 from pipeGEM.plotting._flux import plot_fva
 
@@ -33,3 +34,8 @@ def test_plot_FVA():
                           index=[f"model_{i}" for i in range(5)])
 
     plot_fva(min_df, max_df, rxn_ids=["Reaction_1", "Reaction_2"], group_layer="group")
+
+
+def test_plot_components(ecoli_core, ecoli):
+    g = pg.Group({"ecoli": ecoli, "ecoli_core": ecoli_core})
+    g.plot_components(group_order=["ecoli", "ecoli_core"])

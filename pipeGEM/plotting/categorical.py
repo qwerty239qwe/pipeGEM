@@ -25,11 +25,11 @@ def plot_model_components(comp_df: pd.DataFrame,
     fig, axes = plt.subplots(1, 3, figsize=(12, 7))
     order_key = {v: i for i, v in enumerate(order)}
     comp_df = comp_df.sort_values(by=["group"], key=lambda x: x.apply(lambda x1: order_key[x1]))
-    sns.boxplot(data=comp_df[comp_df["component"] == "reactions"], y="number", x="group", hue="group",
+    sns.boxplot(data=comp_df[comp_df["component"] == "n_rxns"], y="number", x="group", hue="group",
                 palette="deep", order=order, ax=axes[0], dodge=False)
-    sns.boxplot(data=comp_df[comp_df["component"] == "metabolites"], y="number", x="group", hue="group",
+    sns.boxplot(data=comp_df[comp_df["component"] == "n_mets"], y="number", x="group", hue="group",
                 palette="deep", order=order, ax=axes[1], dodge=False)
-    sns.boxplot(data=comp_df[comp_df["component"] == "genes"], y="number", x="group", hue="group",
+    sns.boxplot(data=comp_df[comp_df["component"] == "n_genes"], y="number", x="group", hue="group",
                 palette="deep", order=order, ax=axes[2], dodge=False)
     for i in range(3):
         axes[i].get_legend().remove()
