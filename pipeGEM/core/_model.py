@@ -96,3 +96,10 @@ class Model(GEMComposite):
     def load_analysis(self, file_dir_path):
         path = Path(file_dir_path)
         self._analyzer.load_analysis(path)
+
+    def get_problem_fluxes(self) -> pd.DataFrame:
+        index, vals = [], []
+        for var_name, val in self._model.solver.primal_values.items():
+            index.append(var_name)
+            vals.append(val)
+        return pd.DataFrame({"fluxes": vals}, index=index)

@@ -6,6 +6,8 @@ import numpy as np
 from numpy import linalg as LA
 from optlang.symbolics import Zero
 
+from pipeGEM.analysis import Problem
+
 
 def LP3(J: Union[set, np.ndarray, List[str]],
         model: cobra.Model,
@@ -220,3 +222,8 @@ def LP9(K,
             return []
         fm = sol.to_frame()["fluxes"].abs()
     return fm[fm > 0.99 * epsilon].index.to_list()  # supp
+
+
+class BlockedProblem(Problem):
+    def __init__(self, model):
+        super().__init__(model=model)
