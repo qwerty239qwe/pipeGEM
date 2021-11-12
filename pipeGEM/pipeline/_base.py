@@ -4,6 +4,15 @@ from collections import OrderedDict
 __all__ = ["Pipeline"]
 
 
+class ConfigManager:
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+    def __setstate__(self, state):
+        pass
+
+
 class Pipeline:
     def __init__(self, *args, **kwargs):
         self.output = None

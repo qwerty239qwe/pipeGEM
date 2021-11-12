@@ -58,6 +58,10 @@ class FastCore(Pipeline):
 class rFastCormics(Pipeline):
     def __init__(self):
         super().__init__()
+        self.fastcc = FastCC()
+
+    def run(self, *args, **kwargs):
+        pass
 
 
 class CORDA(Pipeline):
