@@ -72,3 +72,16 @@ def test_plot_model_emb(ecoli_core):
     g.do_analysis(method="sampling", constr="default", n=10)
     g.plot_flux_emb(method="sampling", constr="default", title="PCA")
     g.plot_flux_emb(method="sampling", constr="default", dr_method="UMAP", title="UMAP")
+
+
+def test_plot_flux_heatmap(ecoli_core):
+    ecoli_2 = ecoli_core.copy()
+    ecoli_2.reactions.get_by_id('PFK').knock_out()
+    ecoli_3 = ecoli_2.copy()
+    ecoli_3.reactions.get_by_id("PGM").knock_out()
+
+    g = pg.Group({"ecoli": {"mod1_1": ecoli_core, "mod2_1": ecoli_core},
+                  "ecoli2": {"mod1_2": ecoli_2, "mod2_2": ecoli_2},
+                  "ecoli3": {"mod1_3": ecoli_3, "mod2_3": ecoli_3} })
+    g.do_analysis(method="FBA", constr="default")
+    g.plot_flux_heatmap(method="FBA", constr="default", get_model_level=True)

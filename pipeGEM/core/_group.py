@@ -5,11 +5,12 @@ import itertools
 import numpy as np
 import pandas as pd
 import cobra
+from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, manhattan_distances
 
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
 from pipeGEM.plotting.categorical import plot_model_components
-from pipeGEM.plotting.heatmap import plot_heatmap
+from pipeGEM.plotting.heatmap import plot_heatmap, plot_clustermap
 from pipeGEM.plotting import plot_fba, plot_fva, plot_sampling
 from pipeGEM.plotting.scatter import plot_PCA, plot_embedding
 from pipeGEM.utils import is_iter, calc_jaccard_index
@@ -24,6 +25,7 @@ class Group(GEMComposite):
                  name_tag: str = None,
                  data=None):
         """
+        Main container for performing model comparison
 
         Parameters
         ----------
@@ -299,6 +301,19 @@ class Group(GEMComposite):
         return data
 
     def get_info(self, tag=None, index=None, features=None, **kwargs) -> pd.DataFrame:
+        """
+
+        Parameters
+        ----------
+        tag
+        index
+        features
+        kwargs
+
+        Returns
+        -------
+
+        """
         data = self._traverse(tag, index, features, **kwargs)
         features = features if features is not None else []
         col_names = [f"group_{i}" for i in range(len(data[0]) -
@@ -365,7 +380,8 @@ class Group(GEMComposite):
                               file_name = "model_components.png")
         Returns
         -------
-
+        df: pd.DataFrame
+            The dataframe used to generate the plot
         """
         if group_order is None:
             group_order = list([g.name_tag for g in self._group])
@@ -392,7 +408,7 @@ class Group(GEMComposite):
                       tags,
                       get_model_level,
                       aggregation_method,
-                      ):
+                      ) -> Dict[str, pd.DataFrame]:
         compos: List[GEMComposite] = self._get_by_tags(tags, get_model_level)
         # TODO: add more model info to fluxes result
         # compo_info = self.get_info(tags=tags if tags is not "all" else None)
@@ -429,6 +445,25 @@ class Group(GEMComposite):
                   aggregation_method="mean",
                   **kwargs
                   ):
+        """
+        Plot the flux analysis results stored in the model
+
+        Parameters
+        ----------
+        method
+        constr
+        rxn_ids
+        rxn_index
+        subsystems
+        tags
+        get_model_level
+        aggregation_method
+        kwargs
+
+        Returns
+        -------
+
+        """
         rxn_ids = rxn_ids if rxn_ids is not None else []
         rxn_ids += self._check_rxn_id(self.tget(tags if tags != "all" else None)[0], rxn_index, subsystems)
         fluxes = self._process_flux(method, constr, tags, get_model_level, aggregation_method)
@@ -448,7 +483,7 @@ class Group(GEMComposite):
                       method,
                       constr,
                       dr_method="PCA",
-                      rxn_ids=None,
+                      rxn_ids="all",
                       rxn_index=None,
                       subsystems=None,
                       tags: Union[str, List[str]] = "all",
@@ -456,8 +491,8 @@ class Group(GEMComposite):
                       **kwargs
                       ):
         get_model_level = True
-        rxn_ids = rxn_ids if rxn_ids is not None else []
-        rxn_ids += self._check_rxn_id(self.tget(tags if tags != "all" else None)[0], rxn_index, subsystems)
+        # rxn_ids = rxn_ids if rxn_ids is not None else []
+        # rxn_ids += self._check_rxn_id(self.tget(tags if tags != "all" else None)[0], rxn_index, subsystems)
         fluxes = self._process_flux(method, constr, tags, get_model_level, aggregation_method)
         if method in ["FBA", "pFBA"]:
             df: pd.DataFrame = fluxes["fluxes"]
@@ -472,14 +507,67 @@ class Group(GEMComposite):
         else:
             plot_embedding(df=df.T, reducer=dr_method, groups=groups, **kwargs)
 
-
-    def plot_flux_cluster(self):
+    def plot_flux_cluster(self,
+                          method,
+                          constr,
+                          dr_method="PCA",
+                          rxn_ids="all",
+                          rxn_index=None,
+                          subsystems=None,
+                          tags: Union[str, List[str]] = "all",
+                          aggregation_method="mean",
+                          **kwargs
+                          ):
         pass
 
-    def plot_flux_heatmap(self):
-        pass
+    def plot_flux_heatmap(self,
+                          method,
+                          constr,
+                          similarity="cosine",
+                          rxn_ids="all",
+                          rxn_index=None,
+                          subsystems=None,
+                          tags: Union[str, List[str]] = "all",
+                          get_model_level=True,
+                          aggregation_method="mean",
+                          fig_size=(10, 10),
+                          **kwargs
+                          ):
+
+        similarity_method = {'cosine': cosine_similarity,
+                             'euclidean': lambda x: 1 - euclidean_distances(x) / np.amax(euclidean_distances(x)),
+                             'manhattan': lambda x: 1 - manhattan_distances(x) / np.amax(manhattan_distances(x))}
+        # rxn_ids = rxn_ids if rxn_ids is not None else []
+        # rxn_ids += self._check_rxn_id(self.tget(tags if tags != "all" else None)[0], rxn_index, subsystems)
+        fluxes = self._process_flux(method, constr, tags, get_model_level, aggregation_method)
+        print(fluxes["fluxes"])
+        if method in ["FBA", "pFBA"]:
+            model_names = fluxes["fluxes"]["model"] if not get_model_level else fluxes["fluxes"]["group"]
+            comp_info = dict(zip(fluxes["fluxes"]["model"], fluxes["fluxes"]["group"])) \
+                        if not get_model_level else fluxes["fluxes"]["group"]
+            data = fluxes["fluxes"].drop(columns=["model", "group"] if get_model_level else ["group"]).values
+        else:
+            raise ValueError()
+
+        data = pd.DataFrame(data=similarity_method[similarity](data),
+                            columns=model_names,
+                            index=model_names)
+        print(data)
+        # xticklabels = model_names,
+        # yticklabels = model_names,
+        plot_clustermap(data=data,
+                        cbar_label=f'{similarity} similarity',
+                        cmap='magma',
+                        square=True,
+                        fig_size=fig_size,
+                        **kwargs
+                        )
+
 
     def plot_expr_cluster(self):
+        pass
+
+    def plot_expr_heatmap(self):
         pass
 
     def plot_model_heatmap(self,

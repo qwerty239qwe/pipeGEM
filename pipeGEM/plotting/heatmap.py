@@ -65,7 +65,7 @@ def plot_clustermap(data,
                     model_groups=None,
                     group_list=None,
                     row_category=None,
-                    c_bar_label=None,
+                    cbar_label=None,
                     top_ele_ratio=0.1,
                     row_cluster=False,
                     row_dendrogram=True,
@@ -98,7 +98,7 @@ def plot_clustermap(data,
                        cbar_pos=(0, 1-top_ele_ratio+0.01, 0.05, top_ele_ratio-0.01),
                        dendrogram_ratio=top_ele_ratio,
                        colors_ratio=(0.02, 0.4 / fig_size[1]),
-                       cbar_kws={"label": c_bar_label},
+                       cbar_kws={"label": cbar_label},
                        **kwargs)
     plt.title(fig_title)
     if row_colors is not None and not row_cluster:

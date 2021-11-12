@@ -1,5 +1,7 @@
 from pathlib import Path
 from typing import Dict, List, Union
+import requests
+
 import pandas as pd
 from biodbs.HPA import HPAdb
 
@@ -45,3 +47,24 @@ def load_HPA_data(data_path,
 
     return {"data_df": data_df,
             "gene_names": list(set(data_df[gene_col].to_list()))}
+
+
+def list_bigg_model(url="http://bigg.ucsd.edu/api/v2/models"):
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+        return pd.DataFrame(data["results"])
+        # Code here will only run if the request is successful
+    except requests.exceptions.HTTPError as errh:
+        print(errh)
+    except requests.exceptions.ConnectionError as errc:
+        print(errc)
+    except requests.exceptions.Timeout as errt:
+        print(errt)
+    except requests.exceptions.RequestException as err:
+        print(err)
+
+
+def download_bigg_model(model_id, file_path, format="mat"):
+    url = f"http://bigg.ucsd.edu/static/models/{model_id}.{format}"
