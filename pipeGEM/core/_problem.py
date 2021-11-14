@@ -18,9 +18,9 @@ class Problem:
 
     def __init__(self, model = None):
         if isinstance(model, Model):
-            self._model = model.cobra_model
+            self._model: cobra.Model = model.cobra_model
         else:
-            self._model = model
+            self._model: cobra.Model = model
         self.S, self.v, self.lbs, self.ubs, self.b, self.c, self.objs, self.col_names, self.row_names = \
             self.prepare_problem(model)
 
@@ -37,18 +37,24 @@ class Problem:
         self.S, self.v, self.lbs, self.ubs, self.b, self.c, self.objs, self.col_names, self.row_names = \
             self.prepare_problem(model)
 
-    def _check_matrix(self, S, v_lbs, v_ubs, b, csense, objs, var_types, col_names=None, row_names=None):
-        assert col_names is None or len(col_names) == S.shape[1], "number of column names does not match S.shape[1]"
-        assert row_names is None or len(row_names) == S.shape[0], "number of row names does not match S.shape[0]"
-        assert var_types is None or len(var_types) == S.shape[1], "number of var types does not match S.shape[1]"
-        assert all([v in self.var_type_dict for v in var_types]), \
-            f"all of the var types should be one of the {self.var_type_dict.keys()}"
-        assert S.shape[1] == len(v_lbs) == len(v_ubs) == len(objs), \
-            "number of v's lower bounds, number of upper bounds or the len of c vector does not equal to S.shape[1]"
-        assert S.shape[0] == len(csense) == len(b), \
-            "number of csense or the len of b vector does not equal to S.shape[0]"
+    def _check_matrix(self):
+        assert self.col_names is None or len(self.col_names) == self.S.shape[1], \
+            f"number of column names ({len(self.col_names)}) does not match S.shape[1] ({self.S.shape[1]})"
+        assert self.row_names is None or len(self.row_names) == self.S.shape[0], \
+            f"number of row names ({len(self.row_names)}) does not match S.shape[0] ({self.S.shape[0]})"
+        assert self.v is None or len(self.v) == self.S.shape[1], \
+            f"number of var types ({len(self.v)}) does not match S.shape[1] ({self.S.shape[1]})"
+        if self.v is not None:
+            assert all([v in self.var_type_dict for v in self.v]), \
+                f"all of the var types should be one of the {self.var_type_dict.keys()}"
+        assert self.S.shape[1] == len(self.lbs) == len(self.ubs) == len(self.objs), \
+            f"number of v's lower bounds: {len(self.lbs)}, number of upper bounds: {len(self.ubs)} " \
+            f"or the len of c vector: {len(self.c)} does not equal to S.shape[1] {self.S.shape[1]}"
+        assert self.S.shape[0] == len(self.c) == len(self.b), \
+            f"number of csense: {len(self.c)} or the len of b vector: {len(self.b)} does not equal to " \
+            f"S.shape[0]: {self.S.shape[0]}"
         assert all(
-            [c in self.CSENSE for c in csense]), \
+            [c in self.CSENSE for c in self.c]), \
             f"All of the csense should be one of the: {self.CSENSE.keys()}"
 
     @staticmethod
@@ -63,7 +69,8 @@ class Problem:
     @staticmethod
     def _check_extend_vertical(e_S, e_b, e_c, e_names=None):
         if not (e_S.shape[0] == e_b.shape[0] == e_c.shape[0]):
-            raise DimensionMismatchedError("")
+            raise DimensionMismatchedError(f"S shape[0]: {e_S.shape[0]}, b shape: {e_b.shape[0]}, "
+                                           f"c shape: {e_c.shape[0]} should be matched with each other")
         if e_names is not None and len(e_names) != e_b.shape[0]:
             raise DimensionMismatchedError("")
         if e_c is not None and len(e_c) != e_b.shape[0]:
@@ -81,7 +88,17 @@ class Problem:
         cols, rows = np.array([r.id for r in model.reactions]), np.array([m.id for m in model.metabolites])
         return S, v, lbs, ubs, b, c, objs, cols, rows
 
-    def modify_problem(self):
+    def get_rev(self):
+        return (self.lbs != 0) & (self.ubs != 0)
+
+    def modify_problem(self) -> None:
+        """
+        The modification of all problem components, subclass of Problem should change this to create a new problem
+
+        Returns
+        -------
+        None
+        """
         raise NotImplementedError()
 
     def extend_horizontal(self, e_S, e_v, e_v_lb, e_v_ub, e_objs=None, e_names=None, at_right=True):
@@ -112,9 +129,10 @@ class Problem:
         -------
 
         """
+        self.modify_problem()
         S, v, v_lbs, v_ubs, b, csense = self.S, self.v, self.lbs, self.ubs, self.b, self.c
         objs, col_names, row_names = self.objs, self.col_names, self.row_names
-        self._check_matrix(S, v_lbs, v_ubs, b, csense, objs, v, col_names, row_names)
+        self._check_matrix()
         new_model = cobra.Model()
         prob = new_model.problem
         variables = []
