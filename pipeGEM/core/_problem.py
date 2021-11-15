@@ -24,6 +24,12 @@ class Problem:
         self.S, self.v, self.lbs, self.ubs, self.b, self.c, self.objs, self.col_names, self.row_names = \
             self.prepare_problem(model)
 
+    def copy(self):
+        new_prob = Problem(model=self._model)
+        for prop in ["S", "v", "lbs", "ubs", "b", "c", "objs", "col_names", "row_names"]:
+            setattr(new_prob, prop, getattr(self, prop))
+        return new_prob
+
     @property
     def model(self):
         return self._model
