@@ -1,12 +1,14 @@
 import numpy as np
+import numpy.ma as ma
 import cobra
 from scipy.linalg import qr, norm
 
 from ._LP import BlockedProblem, Problem
 
 
-def swiftcc(model, tol = 2.2204e-16, return_model=False):
-
+def swiftcc(model,
+            tol = 2.2204e-16,
+            return_model=False):
     blk_p = BlockedProblem(model=model)
     rev = blk_p.get_rev().copy()
     S: np.ndarray = blk_p.S.copy()
