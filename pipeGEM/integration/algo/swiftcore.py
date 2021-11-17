@@ -2,6 +2,8 @@ import numpy as np
 import numpy.ma as ma
 import cobra
 from scipy.linalg import qr, norm
+from scipy.sparse import csr_matrix
+from scipy.sparse.linalg import svds
 
 from ._LP import BlockedProblem, Problem
 
@@ -31,37 +33,52 @@ def swiftcc(model,
 
 
 class CoreProblem(Problem):
-    def __init__(self, model, consistent, weights, reduction):
+    def __init__(self, model, consistent, core_index, weights, do_flip, do_reduction):
         super().__init__(model)
         self.consistent, self.weights = consistent, weights
-        self.reduction = reduction
+        self.core_index = core_index
+        self.do_reduction = do_reduction
+        self.do_flip = do_flip
+        self.original_S_shape = None
 
-    def _reduction(self, rev):
+    def _reduction(self, rev, couplings, react_num, core_index, weights):
         S = self.S
         m, n = S.shape
         reduction = True
+        col_mask = np.array([True for _ in range(S.shape[1])])
+        row_mask = np.array([True for _ in range(S.shape[0])])
         while reduction:
             reduction = False
-            for i in range(m - 1, -1, -1):
-                if i < S.shape[1]:
-                    non_zero_cols = np.argwhere(S[i, :] > 0).flatten()
-                    if len(non_zero_cols) == 2:
-                        c = S[i, non_zero_cols[0]] / S[i, non_zero_cols[1]]
-                        if c < 0:
-                            if rev[non_zero_cols[1]] != 1:
-                                rev[non_zero_cols[0]] = rev[non_zero_cols[1]]
-                        else:
-                            if rev[non_zero_cols[1]] != 1:
-                                rev[non_zero_cols[0]] = -1 - rev[non_zero_cols[1]]
-                        self.lbs[non_zero_cols[0]] = max([self.lbs[non_zero_cols[0]], -self.lbs[non_zero_cols[1]] / c])
-                        self.ubs[non_zero_cols[0]] = max([self.ubs[non_zero_cols[0]], -self.ubs[non_zero_cols[1]] / c])
-                        rev = np.delete(rev, non_zero_cols[1])
-                        self.lbs = np.delete(self.lbs, non_zero_cols[1])
-                        self.ubs = np.delete(self.ubs, non_zero_cols[1])
-                        self.S[:, non_zero_cols[0]] = self.S[:, non_zero_cols[0]] - c * self.S[:, non_zero_cols[1]]
-                        self.S = np.delete(self.S, non_zero_cols[1], 1)
-                        # TODO: delete S rows with zeros only, mod coupling, weights, ...etc, maybe use maskarray
+            for i in range(m):
+                if not row_mask[i]:
+                    continue
+                non_zero_cols = np.argwhere(S[i, :][:, col_mask] > 0).flatten()
+                if len(non_zero_cols) == 2:
+                    c = S[i, non_zero_cols[0]] / S[i, non_zero_cols[1]]
+                    if c < 0:
+                        if rev[non_zero_cols[1]] != 1:
+                            rev[non_zero_cols[0]] = rev[non_zero_cols[1]]
+                    else:
+                        if rev[non_zero_cols[1]] != 1:
+                            rev[non_zero_cols[0]] = -1 - rev[non_zero_cols[1]]
+                    self.lbs[non_zero_cols[0]] = max([self.lbs[non_zero_cols[0]], -self.lbs[non_zero_cols[1]] / c])
+                    self.ubs[non_zero_cols[0]] = max([self.ubs[non_zero_cols[0]], -self.ubs[non_zero_cols[1]] / c])
+                    col_mask[non_zero_cols[1]] = False
+                    S[row_mask, non_zero_cols[0]] = S[row_mask, non_zero_cols[0]] - c * S[row_mask, non_zero_cols[1]]
+                    row_mask &= (S[:, col_mask].sum(axis=1) > 0)
+                    couplings[couplings == react_num[non_zero_cols[1]]] = react_num[non_zero_cols[0]]
+                    core_index[react_num[non_zero_cols[0]]] |= core_index[react_num[non_zero_cols[1]]]
+                    # core_index[core_index == react_num[non_zero_cols[1]]] = react_num[non_zero_cols[0]]
+                    weights[non_zero_cols[0]] += weights[non_zero_cols[1]]
+                    reduction = True
+        self._couple_rxns(col_mask, row_mask, react_num, core_index, weights)
 
+    def _couple_rxns(self, col_mask, row_mask, react_num, core_index, weights):
+        self.S = self.S[row_mask, :][:, col_mask]
+        self.weights = weights[col_mask]
+        self.lbs, self.ubs = self.lbs[col_mask], self.ubs[col_mask]
+        self.react_num = react_num[col_mask]
+        self.core_index = core_index[col_mask]
 
     def _flip(self):
         rev = np.ones(self.S.shape[1])
@@ -70,12 +87,23 @@ class CoreProblem(Problem):
         self.lbs[rev == -1] = 0
         self.ubs /= np.norm(self.ubs)
         self.lbs /= np.norm(self.lbs)
+        react_num = np.arange(self.S.shape[1])
+        couplings = np.arange(self.S.shape[1])
+        if self.do_reduction:
+            self._reduction(rev,
+                            couplings,
+                            react_num,
+                            core_index=self.core_index,
+                            weights=self.weights)
         self.S[:, rev == -1] = -self.S[:, rev == -1]
         self.temp_rev = rev
 
     def modify_problem(self) -> None:
-        self._flip()
+        if self.do_flip:
+            self._flip()
+
         m, n = self.S.shape
+        self.original_S_shape = (m, n)
         rev = self.get_rev()
         dense = np.zeros(shape=(n,))
         dense[~self.consistent] = np.random.rand(n)
@@ -84,6 +112,8 @@ class CoreProblem(Problem):
         self.objs = dense
         self.lbs = np.where(self.consistent, -np.inf, self.lbs)
         self.lbs[l_v] = 0
+        self.v = np.array(["C" for _ in range(n)])
+        self.b = np.array(["E" for _ in range(m)])
         if all(self.consistent):
             self.lbs[(self.weights == 0) & (~rev)] = 1
         self.ubs = np.where(self.consistent, np.inf, self.ubs)
@@ -100,41 +130,30 @@ class CoreProblem(Problem):
                              e_names=[f"ext_var_{i}" for i in range(2 * k + l)])
 
 
-def _core(prob: Problem, consistent, weights):
-    # TODO: delete this
-    prob = prob.copy()
-    m, n = prob.S.shape
-    rev = prob.get_rev()
-    dense = np.zeros(shape=(n,))
-    dense[~consistent] = np.random.rand(n)
-    k_v, l_v = (weights != 0) & rev, (weights != 0) & ~rev
-    k, l = np.sum(k_v), np.sum(l_v)
-    prob.objs = dense
-    prob.lbs = np.where(consistent, -np.inf, prob.lbs)
-    prob.lbs[l_v] = 0
-    if all(consistent):
-        prob.lbs[(weights == 0) & (~rev)] = 1
-    prob.ubs = np.where(consistent, np.inf, prob.ubs)
-    prob.extend_horizontal(np.zeros(shape=(m, k+l)), e_v=np.array(["C" for _ in range(k + l)]),
-                           e_v_lb=-np.ones(shape=(k+l)) * np.inf, e_v_ub=np.ones(shape=(k+l)) * np.inf,
-                           e_objs=np.concatenate([weights[k_v], weights[l_v]]),
-                           e_names=[f"ext_const_{i}" for i in range(m + l)])
-    temp1, temp2 = np.eyes(n), np.eyes(k+l)
-    btm_ext_S_1 = np.concatenate([temp1[k_v, :], temp2[k_v, :]], axis=1)
-    btm_ext_S_2 = np.concatenate([-temp1[weights != 0, :], temp2], axis=1)
-    csense = np.array(["G" for _ in range(2 * k + l)])
-    b = np.zeros(2 * k + l)
-    prob.extend_vertical(e_S=np.concatenate([btm_ext_S_1, btm_ext_S_2], axis=0), e_b=b, e_c=csense,
-                         e_names=[f"ext_var_{i}" for i in range(2 * k + l)])
-    return prob
-
-
-def swiftcore(model, core_index, weights=None, reduction=False):
+def swiftcore(model, core_index, weights=None, reduction=False, k=10, tol=1e-6):
     if weights is None:
         weights = np.ones(shape=(len(model.reactions),))
     consistent = swiftcc(model)
-    react_num = np.arange(len(model.reactions))
-    couplings = np.arange(len(model.reactions))
-    problem = CoreProblem(model=model, consistent=consistent, weights=weights, reduction=reduction)
+    is_core = np.array([(i in core_index) for i in range(len(model.reactions))])
+    m, n = len(model.metabolites), len(model.reactions)
+    problem = CoreProblem(model=model,
+                          consistent=consistent,
+                          weights=weights,
+                          core_index=is_core,
+                          do_flip=True,
+                          do_reduction=reduction)
     flux = problem.to_model("core").get_problem_fluxes()
+    weights = problem.weights
+    weights[problem.core_index] = 0
+    m_, n_ = problem.original_S_shape
+    flux = flux[:n_]
+    weights[abs(flux) > tol] = 0
+    blocked = np.array([False for _ in range(n_)])
+    if n == n_:
+        blocked = problem.core_index.copy()
+        blocked[abs(flux) > tol] = False
+    else:
+        _, D, Vt = svds(csr_matrix(problem.S[:m_, :n_][:, weights == 0]), k=k, which="SM")
+        Vt = Vt[np.diag(D) < np.norm()]
+
     # TODO: finish this
