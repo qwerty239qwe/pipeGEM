@@ -6,14 +6,15 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import svds
 
 from ._LP import BlockedProblem, Problem
+from pipeGEM.utils import get_rev_arr
 
 
 def swiftcc(model,
             tol = 2.2204e-16,
             return_model=False):
     blk_p = BlockedProblem(model=model)
-    rev = blk_p.get_rev().copy()
-    S: np.ndarray = blk_p.S.copy()
+    rev = get_rev_arr(model)
+    S = cobra.util.create_stoichiometric_matrix(model)
     blk = blk_p.to_model("block")
     blk.optimize()
     consistent = np.array([True for _ in range(model.n_rxns)])
@@ -130,7 +131,7 @@ class CoreProblem(Problem):
                              e_names=[f"ext_var_{i}" for i in range(2 * k + l)])
 
 
-def swiftcore(model, core_index, weights=None, reduction=False, k=10, tol=1e-6):
+def swiftcore(model, core_index, weights=None, reduction=False, k=10, tol=2.2204e-16):
     if weights is None:
         weights = np.ones(shape=(len(model.reactions),))
     consistent = swiftcc(model)
@@ -142,7 +143,8 @@ def swiftcore(model, core_index, weights=None, reduction=False, k=10, tol=1e-6):
                           core_index=is_core,
                           do_flip=True,
                           do_reduction=reduction)
-    flux = problem.to_model("core").get_problem_fluxes()
+    core_model = problem.to_model("core")
+    flux = core_model.get_problem_fluxes()
     weights = problem.weights
     weights[problem.core_index] = 0
     m_, n_ = problem.original_S_shape
@@ -154,6 +156,11 @@ def swiftcore(model, core_index, weights=None, reduction=False, k=10, tol=1e-6):
         blocked[abs(flux) > tol] = False
     else:
         _, D, Vt = svds(csr_matrix(problem.S[:m_, :n_][:, weights == 0]), k=k, which="SM")
-        Vt = Vt[np.diag(D) < np.norm()]
+        Vt = Vt[np.diag(D) < tol * norm(problem.S[:m_, :n_][:, weights == 0]), :]
+        blocked[weights == 0] = np.all(abs(Vt) < tol, 0)
+
+    while np.any(blocked):
+        blocked_size = sum(blocked)
+        flux = 0
 
     # TODO: finish this

@@ -1,6 +1,7 @@
 import re
 from typing import List
 
+import numpy as np
 import pandas as pd
 import cobra
 
@@ -111,3 +112,9 @@ def merge_irrevs_in_df(sol_df: pd.DataFrame,
                                                                   left_index=True, right_index=True).fillna(0)
     sol_df["fluxes"] = sol_df["fluxes"] + sol_df["forward"] - sol_df["backward"]
     return sol_df
+
+
+def get_rev_arr(model):
+    lbs = np.array([r.lower_bound for r in model.reactions])
+    ubs = np.array([r.upper_bound for r in model.reactions])
+    return (lbs != 0) & (ubs != 0)

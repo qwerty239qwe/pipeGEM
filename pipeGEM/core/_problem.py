@@ -15,6 +15,7 @@ class DimensionMismatchedError(ValueError):
 class Problem:
     CSENSE = {"E": "equals to", "L": "lower than", "G": "greater than"}
     var_type_dict = {"C": "continuous", "B": "binary", "I": "integer"}
+    req_args = ("S",)
 
     def __init__(self, model = None):
         if isinstance(model, Model):
@@ -23,12 +24,24 @@ class Problem:
             self._model: cobra.Model = model
         self.S, self.v, self.lbs, self.ubs, self.b, self.c, self.objs, self.col_names, self.row_names = \
             self.prepare_problem(model)
+        self.anchor_m, self.anchor_n = self.S.shape
+        self.modify_problem()
 
     def copy(self):
         new_prob = Problem(model=self._model)
         for prop in ["S", "v", "lbs", "ubs", "b", "c", "objs", "col_names", "row_names"]:
             setattr(new_prob, prop, getattr(self, prop))
         return new_prob
+
+    def _parse_s_shape(self, s_shape) -> np.ndarray:
+        if "m" in s_shape[0]:
+            pass
+
+    @classmethod
+    def from_problem(cls, old_problem, s_shape=("m", "n"), **kwargs):
+        new_problem = old_problem.copy()
+        new_problem._parse_s_shape(s_shape)
+
 
     @property
     def model(self):
@@ -120,7 +133,7 @@ class Problem:
         self.col_names = np.concatenate([self.col_names, e_names] if at_right else [e_names, self.col_names])
 
     def extend_vertical(self, e_S, e_b, e_c=None, e_names=None, at_bottom=True):
-        e_c = e_c if e_c is not None else np.array(["C" for _ in range(e_S.shape[0])])
+        e_c = e_c if e_c is not None else np.array(["E" for _ in range(e_S.shape[0])])
         e_names = e_names if e_names is not None else np.array(
             [f"const_{i}" for i in range(len(self.row_names), len(self.row_names) + e_S.shape[0])])
         self._check_extend_vertical(e_S, e_b, e_c, e_names)
@@ -135,7 +148,6 @@ class Problem:
         -------
 
         """
-        self.modify_problem()
         S, v, v_lbs, v_ubs, b, csense = self.S, self.v, self.lbs, self.ubs, self.b, self.c
         objs, col_names, row_names = self.objs, self.col_names, self.row_names
         self._check_matrix()
