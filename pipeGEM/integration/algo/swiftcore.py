@@ -34,8 +34,8 @@ def swiftcc(model,
 
 
 class CoreProblem(Problem):
-    def __init__(self, model, consistent, core_index, weights, do_flip, do_reduction):
-        super().__init__(model)
+    def __init__(self, model, consistent, core_index, weights, do_flip, do_reduction, **kwargs):
+        super().__init__(model, **kwargs)
         self.consistent, self.weights = consistent, weights
         self.core_index = core_index
         self.do_reduction = do_reduction
@@ -72,6 +72,7 @@ class CoreProblem(Problem):
                     # core_index[core_index == react_num[non_zero_cols[1]]] = react_num[non_zero_cols[0]]
                     weights[non_zero_cols[0]] += weights[non_zero_cols[1]]
                     reduction = True
+        self.couplings = couplings
         self._couple_rxns(col_mask, row_mask, react_num, core_index, weights)
 
     def _couple_rxns(self, col_mask, row_mask, react_num, core_index, weights):
@@ -143,6 +144,8 @@ def swiftcore(model, core_index, weights=None, reduction=False, k=10, tol=2.2204
                           core_index=is_core,
                           do_flip=True,
                           do_reduction=reduction)
+
+    rxn_num, coupling = problem.react_num, problem.couplings
     core_model = problem.to_model("core")
     flux = core_model.get_problem_fluxes()
     weights = problem.weights
@@ -161,8 +164,20 @@ def swiftcore(model, core_index, weights=None, reduction=False, k=10, tol=2.2204
 
     while np.any(blocked):
         blocked_size = sum(blocked)
-        problem = CoreProblem.from_problem(problem, s_shape=("m", "n"))
+        problem = CoreProblem.from_problem(problem,
+                                           s_shape=("m", "n"),
+                                           consistent=consistent,
+                                           weights=weights,
+                                           core_index=is_core,
+                                           do_flip=False,
+                                           do_reduction=False)
         core_model = problem.to_model("core")
         flux = core_model.get_problem_fluxes()
+        weights[abs(flux) > tol] = 0
+        blocked[abs(flux) > tol] = 0
 
-    # TODO: finish this
+        if 2 * sum(blocked) > blocked_size:
+            weights /= 2
+    kept_rxns = rxn_num[(weights == 0)]
+    rxns_to_remove = [r.id for r in model.reactions if r in kept_rxns]
+    return model.copy().remove_reactions(rxns_to_remove, remove_orphans=True)

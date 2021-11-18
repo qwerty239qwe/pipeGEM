@@ -225,8 +225,8 @@ def LP9(K,
 
 
 class BlockedProblem(Problem):
-    def __init__(self, model):
-        super().__init__(model=model)
+    def __init__(self, model, **kwargs):
+        super().__init__(model=model, **kwargs)
 
     def _transpose_S(self):
         m, n = self.S.shape

@@ -48,19 +48,26 @@ class Problem:
         else:
             return int(s)
 
-    def parse_s_shape(self, s_shape) -> np.ndarray:
+    def parse_s_shape(self, s_shape) -> dict:
         S = self.S.copy()
+        reconstruct_attr = False
         if "m" in s_shape[1] or "n" in s_shape[0]:
+            reconstruct_attr = True
             s_shape = s_shape[1], s_shape[0]
             S = S.T
-            reconstruct_attr = True
 
         if "m" in s_shape[1] or "n" in s_shape[0]:
             raise ValueError("No such reshape option provided")
 
+        row_indexer, col_indexer = np.array([False for _ in range(S.shape[0])]), \
+                                   np.array([False for _ in range(S.shape[1])])
         for i, dim in enumerate(["m", "n"]):
             if s_shape[i] == dim:
                 S = S[:self.anchor_m, :] if i == 0 else S[:, :self.anchor_n]
+                if i == 0 and reconstruct_attr:
+                    row_indexer[:self.anchor_m] = True
+                elif i == 1 and reconstruct_attr:
+                    col_indexer[:self.anchor_n] = True
             elif ":" in s_shape[i]:
                 if ":" == s_shape[i]:
                     pass
@@ -70,15 +77,31 @@ class Problem:
                 else:
                     s, t, i = [self._to_slicer(s) for s in slicer]
                 S = S[s:i:t, :] if i == 0 else S[:, s:i:t]
+                if i == 0 and reconstruct_attr:
+                    row_indexer[s:i:t] = True
+                elif i == 1 and reconstruct_attr:
+                    col_indexer[s:i:t] = True
             elif "," in s_shape[i]:
                 index = [self._to_slicer(s) for s in s_shape[i].split(",")]
                 S = S[index, :] if i == 0 else S[:, index]
-        return S
+                if i == 0 and reconstruct_attr:
+                    row_indexer[index] = True
+                elif i == 1 and reconstruct_attr:
+                    col_indexer[index] = True
+
+        if reconstruct_attr:
+            v, b = self.v.copy()[col_indexer], self.b.copy()[row_indexer]
+            lbs, ubs = self.lbs.copy()[col_indexer], self.ubs.copy()[col_indexer]
+            c, objs = self.c.copy()[row_indexer], self.objs.copy()[col_indexer]
+            col_names, row_names = self.col_names.copy()[col_indexer], self.row_names.copy()[row_indexer]
+            return {"S": S, "v": v, "b": b, "c": c, "lbs": lbs, "ubs": ubs, "objs": objs,
+                    "col_names": col_names, "row_names": row_names}
+        return {"S": S}
 
     @classmethod
     def from_problem(cls, old_problem, s_shape=("m", "n"), **kwargs):
-        S = old_problem.parse_s_shape(s_shape)
-
+        elements = old_problem.parse_s_shape(s_shape)
+        return cls(**dict(**elements, **kwargs))
 
     @property
     def model(self):
