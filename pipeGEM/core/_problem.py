@@ -17,13 +17,20 @@ class Problem:
     var_type_dict = {"C": "continuous", "B": "binary", "I": "integer"}
     req_args = ("S",)
 
-    def __init__(self, model = None):
-        if isinstance(model, Model):
-            self._model: cobra.Model = model.cobra_model
+    def __init__(self, model = None, **kwargs):
+        if model is None:
+            self._model = model
+            infered = self._infer_attr(**kwargs)
+            for k, v in infered.items():
+                setattr(self, k, v)
         else:
-            self._model: cobra.Model = model
-        self.S, self.v, self.lbs, self.ubs, self.b, self.c, self.objs, self.col_names, self.row_names = \
-            self.prepare_problem(model)
+            if isinstance(model, Model):
+                self._model: cobra.Model = model.cobra_model
+            else:
+                self._model: cobra.Model = model
+            self.S, self.v, self.lbs, self.ubs, self.b, self.c, self.objs, self.col_names, self.row_names = \
+                self.prepare_problem(model)
+        self._check_matrix()
         self.anchor_m, self.anchor_n = self.S.shape
         self.modify_problem()
 
@@ -33,14 +40,44 @@ class Problem:
             setattr(new_prob, prop, getattr(self, prop))
         return new_prob
 
-    def _parse_s_shape(self, s_shape) -> np.ndarray:
-        if "m" in s_shape[0]:
-            pass
+    def _to_slicer(self, s):
+        if s == "n":
+            return self.anchor_n
+        elif s == "m":
+            return self.anchor_m
+        else:
+            return int(s)
+
+    def parse_s_shape(self, s_shape) -> np.ndarray:
+        S = self.S.copy()
+        if "m" in s_shape[1] or "n" in s_shape[0]:
+            s_shape = s_shape[1], s_shape[0]
+            S = S.T
+            reconstruct_attr = True
+
+        if "m" in s_shape[1] or "n" in s_shape[0]:
+            raise ValueError("No such reshape option provided")
+
+        for i, dim in enumerate(["m", "n"]):
+            if s_shape[i] == dim:
+                S = S[:self.anchor_m, :] if i == 0 else S[:, :self.anchor_n]
+            elif ":" in s_shape[i]:
+                if ":" == s_shape[i]:
+                    pass
+                slicer = s_shape[i].split(":")
+                if len(slicer) == 2:
+                    (s, t), i = [self._to_slicer(s) for s in slicer], 1
+                else:
+                    s, t, i = [self._to_slicer(s) for s in slicer]
+                S = S[s:i:t, :] if i == 0 else S[:, s:i:t]
+            elif "," in s_shape[i]:
+                index = [self._to_slicer(s) for s in s_shape[i].split(",")]
+                S = S[index, :] if i == 0 else S[:, index]
+        return S
 
     @classmethod
     def from_problem(cls, old_problem, s_shape=("m", "n"), **kwargs):
-        new_problem = old_problem.copy()
-        new_problem._parse_s_shape(s_shape)
+        S = old_problem.parse_s_shape(s_shape)
 
 
     @property
@@ -106,6 +143,29 @@ class Problem:
         objs = np.array([r.objective_coefficient for r in model.reactions])
         cols, rows = np.array([r.id for r in model.reactions]), np.array([m.id for m in model.metabolites])
         return S, v, lbs, ubs, b, c, objs, cols, rows
+
+    def _infer_attr(self, **kwargs):
+        dic = dict()
+        dic.update(kwargs)
+        if "S" not in dic:
+            raise ValueError("")
+        if "v" not in dic:
+            dic["v"] = np.array(["C" for _ in range(len(dic["S"].shape[1]))])
+        if "c" not in dic:
+            dic["c"] = np.array(["E" for _ in range(len(dic["S"].shape[0]))])
+        if "lbs" not in dic:
+            dic["lbs"] = np.zeros(dic["S"].shape[1])
+        if "ubs" not in dic:
+            dic["ubs"] = np.ones(dic["S"].shape[1])
+        if "objs" not in dic:
+            dic["objs"] = np.zeros(dic["S"].shape[1])
+        if "objs" not in dic:
+            dic["objs"] = np.zeros(dic["S"].shape[0])
+        if "cols" not in dic:
+            dic["cols"] = np.array([f"r_{i}" for i in range(dic["S"].shape[1])])
+        if "rows" not in dic:
+            dic["rows"] = np.array([f"m_{i}" for i in range(dic["S"].shape[0])])
+        return dic
 
     def get_rev(self):
         return (self.lbs != 0) & (self.ubs != 0)

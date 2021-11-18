@@ -161,6 +161,8 @@ def swiftcore(model, core_index, weights=None, reduction=False, k=10, tol=2.2204
 
     while np.any(blocked):
         blocked_size = sum(blocked)
-        flux = 0
+        problem = CoreProblem.from_problem(problem, s_shape=("m", "n"))
+        core_model = problem.to_model("core")
+        flux = core_model.get_problem_fluxes()
 
     # TODO: finish this
