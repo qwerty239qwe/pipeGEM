@@ -1,6 +1,7 @@
 from pipeGEM.pipeline import Pipeline
 from pipeGEM.integration.algo.fastcore import fastCore
-from .consistent import FastCC
+from pipeGEM.integration.algo.swiftcore import swiftcore
+from .consistent import FastCC, SwiftCC
 
 
 class FastCoreAlgo(Pipeline):

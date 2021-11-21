@@ -101,6 +101,7 @@ class Problem:
     @classmethod
     def from_problem(cls, old_problem, s_shape=("m", "n"), **kwargs):
         elements = old_problem.parse_s_shape(s_shape)
+        kwargs.update({"model": None})
         return cls(**dict(**elements, **kwargs))
 
     @property
@@ -173,21 +174,21 @@ class Problem:
         if "S" not in dic:
             raise ValueError("")
         if "v" not in dic:
-            dic["v"] = np.array(["C" for _ in range(len(dic["S"].shape[1]))])
+            dic["v"] = np.array(["C" for _ in range(dic["S"].shape[1])])
         if "c" not in dic:
-            dic["c"] = np.array(["E" for _ in range(len(dic["S"].shape[0]))])
+            dic["c"] = np.array(["E" for _ in range(dic["S"].shape[0])])
         if "lbs" not in dic:
             dic["lbs"] = np.zeros(dic["S"].shape[1])
         if "ubs" not in dic:
             dic["ubs"] = np.ones(dic["S"].shape[1])
         if "objs" not in dic:
             dic["objs"] = np.zeros(dic["S"].shape[1])
-        if "objs" not in dic:
-            dic["objs"] = np.zeros(dic["S"].shape[0])
-        if "cols" not in dic:
-            dic["cols"] = np.array([f"r_{i}" for i in range(dic["S"].shape[1])])
-        if "rows" not in dic:
-            dic["rows"] = np.array([f"m_{i}" for i in range(dic["S"].shape[0])])
+        if "b" not in dic:
+            dic["b"] = np.zeros(dic["S"].shape[0])
+        if "col_names" not in dic:
+            dic["col_names"] = np.array([f"r_{i}" for i in range(dic["S"].shape[1])])
+        if "row_names" not in dic:
+            dic["row_names"] = np.array([f"m_{i}" for i in range(dic["S"].shape[0])])
         return dic
 
     def get_rev(self):
