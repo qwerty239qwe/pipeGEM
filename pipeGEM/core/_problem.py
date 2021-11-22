@@ -226,7 +226,7 @@ class Problem:
         self.c = np.concatenate([self.c, e_c] if at_bottom else [e_c, self.c])
         self.row_names = np.concatenate([self.row_names, e_names] if at_bottom else [e_names, self.row_names])
 
-    def to_model(self, name_tag):
+    def to_model(self, name_tag, direction="max"):
         """
         Returns
         -------
@@ -238,19 +238,38 @@ class Problem:
         new_model = cobra.Model()
         prob = new_model.problem
         variables = []
+        r_variables = []
         constraints = []
         if v is None:
             v = ["C" for _ in range(S.shape[1])]
 
         for i, (v_lb, v_ub, v_type) in enumerate(zip(v_lbs, v_ubs, v)):
+            if v_lb > 0:
+                a_lb_f, a_ub_f = None if np.isinf(v_lb) else v_lb, None if np.isinf(v_ub) else v_ub
+                a_lb_r, a_ub_r = 0, 0
+            elif v_ub < 0:
+                a_lb_f, a_ub_f = 0, 0
+                a_lb_r, a_ub_r = None if np.isinf(v_ub) else -v_ub, None if np.isinf(v_lb) else -v_lb
+            else:
+                a_lb_f, a_ub_f = 0, None if np.isinf(v_ub) else v_ub
+                a_lb_r, a_ub_r = 0, None if np.isinf(v_lb) else -v_lb
+
             m = prob.Variable(name=f"var_{i}" if col_names is None else col_names[i],
                               type=self.var_type_dict[v_type],
-                              lb=v_lb,
-                              ub=v_ub)
+                              lb=a_lb_f,
+                              ub=a_ub_f)
+            m_r = prob.Variable(name=f"var_{i}_r" if col_names is None else col_names[i] + "_r",
+                                type=self.var_type_dict[v_type],
+                                lb=a_lb_r,
+                                ub=a_ub_r)
+
             variables.append(m)
+            r_variables.append(m_r)
 
-        objs = {variables[i]: c for i, c in enumerate(objs)}
+        print(objs[objs != 0])
 
+        obj_vars = {variables[i]: c for i, c in enumerate(objs)}
+        obj_vars.update({r_variables[i]: -c for i, c in enumerate(objs)})
         for i, (b_bound, b_type) in enumerate(zip(b, csense)):
             non_zero_idx = np.nonzero(S[i])[0]
             constr_data = {"name": f"const_{i}" if row_names is None else row_names[i]}
@@ -260,17 +279,19 @@ class Problem:
                 constr_data.update({"ub": b_bound})
             if b_bound != 0:
                 n = prob.Constraint(
-                    sum([float(S[i][j]) * variables[i] for j in non_zero_idx]),
+                    sum([float(S[i][j]) * variables[i] for j in non_zero_idx] +
+                        [-float(S[i][j]) * r_variables[i] for j in non_zero_idx]),
                     **constr_data
                 )
             else:
                 n = prob.Constraint(
-                    Zero,
+                    sum([float(S[i][j]) * variables[i] for j in non_zero_idx] +
+                        [-float(S[i][j]) * r_variables[i] for j in non_zero_idx]),
                     **constr_data
                 )
             constraints.append(n)
 
-        new_model.add_cons_vars(variables + constraints)
-        new_model.objective = prob.Objective(Zero, sloppy=True)
-        new_model.objective.set_linear_coefficients(objs)
+        new_model.add_cons_vars(variables + r_variables + constraints)
+        new_model.objective = prob.Objective(Zero, sloppy=True, direction=direction)
+        new_model.objective.set_linear_coefficients(obj_vars)
         return Model(new_model, name_tag=name_tag)

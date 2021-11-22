@@ -23,6 +23,24 @@ class TestProblem(Problem):
         self.extend_vertical(e_S, e_b)
 
 
+class TestProblem2(Problem):
+    def __init__(self, model):
+        super().__init__(model)
+
+    def modify_problem(self) -> None:
+        pass
+
+
+def test_problem_consistent(ecoli):
+    p = TestProblem2(model=ecoli)
+    mod = p.to_model("new")
+    sol = ecoli.optimize().to_frame()
+    new_sol = mod.get_problem_fluxes()["fluxes"].values
+    print(sol[sol["fluxes"] != 0]["fluxes"].values)
+    print(new_sol[new_sol != 0])
+    assert np.equal(ecoli.optimize().to_frame()["fluxes"].values, new_sol)
+
+
 def test_problem_extension(ecoli):
     p = TestProblem(model=ecoli)
     mod = p.to_model("new")

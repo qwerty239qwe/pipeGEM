@@ -97,46 +97,49 @@ class CoreProblem(Problem):
                             self.react_num,
                             core_index=self.core_index,
                             weights=self.weights)
+        print(f"rev : #{sum(rev == -1)}")
         self.S[:, rev == -1] = -self.S[:, rev == -1]
         self.temp_rev = rev
 
     def modify_problem(self) -> None:
         m, n = self.S.shape
-        print(m, n)
         self.original_S_shape = (m, n)
         if self.do_flip:
             self._flip()
 
         rev = self.get_rev()
         dense = np.zeros(shape=(n,))
-        dense[~self.consistent] = np.random.rand(sum(~self.consistent))
+        # dense[~self.consistent] = np.random.rand(sum(~self.consistent))
+        dense[self.consistent] = np.random.rand(sum(self.consistent))
         k_v, l_v = (self.weights != 0) & rev, (self.weights != 0) & (~rev)
-        print(len(k_v), len(l_v), len(rev), len(self.weights))
         k, l = np.sum(k_v), np.sum(l_v)
-        self.objs = dense
-        self.lbs = np.where(self.consistent, -np.inf, self.lbs)
-        self.lbs[l_v] = 0
-        self.v = np.array(["C" for _ in range(n)])
-        self.c = np.array(["E" for _ in range(m)])
-        self.b = np.zeros(m)
+        # self.objs = dense
+        # self.lbs = np.where(self.consistent, -np.inf, self.lbs)
+        # self.lbs[l_v] = 0
+        # self.v = np.array(["C" for _ in range(n)])
+        # self.c = np.array(["E" for _ in range(m)])
+        # self.b = np.zeros(m)
+
         if all(self.consistent):
             self.lbs[(self.weights == 0) & (~rev)] = 1
-        self.ubs = np.where(self.consistent, np.inf, self.ubs)
-        self.extend_horizontal(np.zeros(shape=(m, k + l)),
-                               e_v=np.array(["C" for _ in range(k + l)]),
-                               e_v_lb=-np.ones(shape=(k + l)) * np.inf,
-                               e_v_ub=np.ones(shape=(k + l)) * np.inf,
-                               e_objs=np.concatenate([self.weights[k_v], self.weights[l_v]]),
-                               e_names=[f"ext_const_{i}" for i in range(k + l)])
-        temp1, temp2 = np.eye(n), np.eye(k + l)
-        btm_ext_S_1 = np.concatenate([temp1[k_v, :], temp2[rev[self.weights!=0] == 1, :]], axis=1)
-        btm_ext_S_2 = np.concatenate([-temp1[self.weights != 0, :], temp2], axis=1)
-        csense = np.array(["G" for _ in range(2 * k + l)])
-        b = np.zeros(2 * k + l)
-        self.extend_vertical(e_S=np.concatenate([btm_ext_S_1, btm_ext_S_2], axis=0),
-                             e_b=b,
-                             e_c=csense,
-                             e_names=[f"ext_var_{i}" for i in range(2 * k + l)])
+        # self.ubs = np.where(self.consistent, np.inf, self.ubs)
+
+        print(self.ubs[self.consistent], self.lbs[self.consistent])
+        # self.extend_horizontal(np.zeros(shape=(m, k + l)),
+        #                        e_v=np.array(["C" for _ in range(k + l)]),
+        #                        e_v_lb=-np.ones(shape=(k + l)) * np.inf,
+        #                        e_v_ub=np.ones(shape=(k + l)) * np.inf,
+        #                        e_objs=np.concatenate([self.weights[k_v], self.weights[l_v]]),
+        #                        e_names=[f"ext_const_{i}" for i in range(k + l)])
+        # temp1, temp2 = np.eye(n), np.eye(k + l)
+        # btm_ext_S_1 = np.concatenate([temp1[k_v, :], temp2[rev[self.weights!=0] == 1, :]], axis=1)
+        # btm_ext_S_2 = np.concatenate([-temp1[self.weights != 0, :], temp2], axis=1)
+        # csense = np.array(["G" for _ in range(2 * k + l)])
+        # b = np.zeros(2 * k + l)
+        # self.extend_vertical(e_S=np.concatenate([btm_ext_S_1, btm_ext_S_2], axis=0),
+        #                      e_b=b,
+        #                      e_c=csense,
+        #                      e_names=[f"ext_var_{i}" for i in range(2 * k + l)])
 
 
 def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-10):
@@ -187,9 +190,12 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-10)
         flux = core_model.get_problem_fluxes()[:n_]
         weights[abs(flux["fluxes"].values) > tol] = 0
         assert len(weights) == __w
-        blocked[abs(flux["fluxes"].values) > tol] = 0
+        blocked[abs(flux["fluxes"].values) > tol] = False
+        print(f"Remove {blocked_size - sum(blocked)} blocked rxns")
+
         if 2 * sum(blocked) > blocked_size:
             weights /= 2
+            raise ValueError(sum(blocked), blocked_size)
     kept_rxns = rxn_num[(weights == 0)]
     rxns_to_remove = [r.id for r in model.reactions if r in kept_rxns]
     return model.copy().remove_reactions(rxns_to_remove, remove_orphans=True)
