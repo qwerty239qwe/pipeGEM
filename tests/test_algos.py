@@ -24,9 +24,9 @@ def test_swiftProblem(ecoli):
                           consistent=consistent,
                           weights=weights,
                           core_index=is_core,
-                          do_flip=False,
+                          do_flip=True,
                           do_reduction=False)
-    core_model = problem.to_model("core", direction="max")
+    core_model = problem.to_model("core", direction="min")
     print(problem.objs[problem.objs != 0])
     flux = core_model.get_problem_fluxes()
     print(flux[flux["fluxes"] != 0])

@@ -243,6 +243,19 @@ class Problem:
         if v is None:
             v = ["C" for _ in range(S.shape[1])]
 
+        for i, (b_bound, b_type) in enumerate(zip(b, csense)):
+            constr_data = {"name": f"const_{i}" if row_names is None else row_names[i]}
+            if b_type in ("E", "G"):
+                constr_data.update({"lb": b_bound})
+            if b_type in ("E", "L"):
+                constr_data.update({"ub": b_bound})
+            n = prob.Constraint(
+                Zero,
+                **constr_data
+            )
+            constraints.append(n)
+        new_model.solver.add(constraints, sloppy=True)
+        reverse_dic = {v.name: r.name for v, r in zip(variables, r_variables)}
         for i, (v_lb, v_ub, v_type) in enumerate(zip(v_lbs, v_ubs, v)):
             if v_lb > 0:
                 a_lb_f, a_ub_f = None if np.isinf(v_lb) else v_lb, None if np.isinf(v_ub) else v_ub
@@ -253,7 +266,6 @@ class Problem:
             else:
                 a_lb_f, a_ub_f = 0, None if np.isinf(v_ub) else v_ub
                 a_lb_r, a_ub_r = 0, None if np.isinf(v_lb) else -v_lb
-
             m = prob.Variable(name=f"var_{i}" if col_names is None else col_names[i],
                               type=self.var_type_dict[v_type],
                               lb=a_lb_f,
@@ -262,36 +274,22 @@ class Problem:
                                 type=self.var_type_dict[v_type],
                                 lb=a_lb_r,
                                 ub=a_ub_r)
+            new_model.solver.add([m, m_r], sloppy=True)
+            non_zero_idx = np.nonzero(S[:, i])[0]
+            for j in non_zero_idx:
+                new_model.solver.constraints[f"const_{j}" if row_names is None else row_names[j]].set_linear_coefficients({
+                    m: float(S[j, i]),
+                    m_r: -float(S[j, i])
+                })
 
             variables.append(m)
             r_variables.append(m_r)
-
-        print(objs[objs != 0])
+            reverse_dic[m_r.name] = m.name
 
         obj_vars = {variables[i]: c for i, c in enumerate(objs)}
         obj_vars.update({r_variables[i]: -c for i, c in enumerate(objs)})
-        for i, (b_bound, b_type) in enumerate(zip(b, csense)):
-            non_zero_idx = np.nonzero(S[i])[0]
-            constr_data = {"name": f"const_{i}" if row_names is None else row_names[i]}
-            if b_type in ("E", "G"):
-                constr_data.update({"lb": b_bound})
-            if b_type in ("E", "L"):
-                constr_data.update({"ub": b_bound})
-            if b_bound != 0:
-                n = prob.Constraint(
-                    sum([float(S[i][j]) * variables[i] for j in non_zero_idx] +
-                        [-float(S[i][j]) * r_variables[i] for j in non_zero_idx]),
-                    **constr_data
-                )
-            else:
-                n = prob.Constraint(
-                    sum([float(S[i][j]) * variables[i] for j in non_zero_idx] +
-                        [-float(S[i][j]) * r_variables[i] for j in non_zero_idx]),
-                    **constr_data
-                )
-            constraints.append(n)
-
-        new_model.add_cons_vars(variables + r_variables + constraints)
         new_model.objective = prob.Objective(Zero, sloppy=True, direction=direction)
         new_model.objective.set_linear_coefficients(obj_vars)
-        return Model(new_model, name_tag=name_tag)
+        new_model.solver.update()
+
+        return Model(new_model, name_tag=name_tag, reverse_dic=reverse_dic)

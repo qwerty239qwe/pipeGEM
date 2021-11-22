@@ -31,14 +31,12 @@ class TestProblem2(Problem):
         pass
 
 
-def test_problem_consistent(ecoli):
-    p = TestProblem2(model=ecoli)
+def test_problem_consistent(ecoli_core):
+    p = TestProblem2(model=ecoli_core)
     mod = p.to_model("new")
-    sol = ecoli.optimize().to_frame()
-    new_sol = mod.get_problem_fluxes()["fluxes"].values
-    print(sol[sol["fluxes"] != 0]["fluxes"].values)
-    print(new_sol[new_sol != 0])
-    assert np.equal(ecoli.optimize().to_frame()["fluxes"].values, new_sol)
+    sol = ecoli_core.optimize().to_frame()
+    new_sol = mod.get_problem_fluxes()
+    assert np.equal(sol["fluxes"], new_sol["fluxes"])
 
 
 def test_problem_extension(ecoli):

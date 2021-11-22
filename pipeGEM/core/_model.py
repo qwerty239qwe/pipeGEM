@@ -15,6 +15,7 @@ class Model(GEMComposite):
                  model,
                  name_tag = None,
                  solver = "glpk",
+                 reverse_dic = None,
                  data = None):
         super().__init__(name_tag=name_tag)
         self._model = model
@@ -26,7 +27,7 @@ class Model(GEMComposite):
         self._analyzer = FluxAnalyzer(model=self._model,
                                       solver=solver,
                                       rxn_expr_score=self.expression)
-
+        self._reverse_dic = reverse_dic
     def __getattr__(self, item):
         return getattr(self._model, item)
 
@@ -97,9 +98,21 @@ class Model(GEMComposite):
         path = Path(file_dir_path)
         self._analyzer.load_analysis(path)
 
-    def get_problem_fluxes(self) -> pd.DataFrame:
-        index, vals = [], []
+    def get_problem_fluxes(self, direction="max") -> pd.DataFrame:
+        self._model.solver.objective.direction = direction
+        self._model.solver.optimize()
+        print(self._model.solver.primal_values)
+        vals = {}
+        _skips = []
         for var_name, val in self._model.solver.primal_values.items():
-            index.append(var_name)
-            vals.append(val)
-        return pd.DataFrame({"fluxes": vals}, index=index)
+            if var_name in self._reverse_dic:
+                if self._reverse_dic[var_name] in vals:
+                    vals[self._reverse_dic[var_name]] -= val
+                else:
+                    vals[self._reverse_dic[var_name]] = -val
+            else:
+                if var_name in vals:
+                    vals[var_name] += val
+                else:
+                    vals[var_name] = val
+        return pd.DataFrame({"fluxes": vals})
