@@ -28,7 +28,7 @@ def test_swiftProblem(ecoli):
                           do_reduction=False)
     core_model = problem.to_model("core", direction="min")
     print(problem.objs[problem.objs != 0])
-    flux = core_model.get_problem_fluxes()
+    flux = core_model.get_problem_fluxes("min")
     print(flux[flux["fluxes"] != 0])
 
 

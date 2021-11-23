@@ -257,37 +257,47 @@ class Problem:
         new_model.solver.add(constraints, sloppy=True)
         reverse_dic = {v.name: r.name for v, r in zip(variables, r_variables)}
         for i, (v_lb, v_ub, v_type) in enumerate(zip(v_lbs, v_ubs, v)):
-            if v_lb > 0:
-                a_lb_f, a_ub_f = None if np.isinf(v_lb) else v_lb, None if np.isinf(v_ub) else v_ub
-                a_lb_r, a_ub_r = 0, 0
-            elif v_ub < 0:
-                a_lb_f, a_ub_f = 0, 0
-                a_lb_r, a_ub_r = None if np.isinf(v_ub) else -v_ub, None if np.isinf(v_lb) else -v_lb
+            added_vars = []
+            if i < self.anchor_n:
+                if v_lb > 0:
+                    a_lb_f, a_ub_f = None if np.isinf(v_lb) else v_lb, None if np.isinf(v_ub) else v_ub
+                    a_lb_r, a_ub_r = 0, 0
+                elif v_ub < 0:
+                    a_lb_f, a_ub_f = 0, 0
+                    a_lb_r, a_ub_r = None if np.isinf(v_ub) else -v_ub, None if np.isinf(v_lb) else -v_lb
+                else:
+                    a_lb_f, a_ub_f = 0, None if np.isinf(v_ub) else v_ub
+                    a_lb_r, a_ub_r = 0, None if np.isinf(v_lb) else -v_lb
+                m_r = prob.Variable(name=f"var_{i}_r" if col_names is None else col_names[i] + "_r",
+                                    type=self.var_type_dict[v_type],
+                                    lb=a_lb_r,
+                                    ub=a_ub_r)
+                added_vars.append(m_r)
             else:
-                a_lb_f, a_ub_f = 0, None if np.isinf(v_ub) else v_ub
-                a_lb_r, a_ub_r = 0, None if np.isinf(v_lb) else -v_lb
+                a_lb_f, a_ub_f = v_lb,  v_ub
             m = prob.Variable(name=f"var_{i}" if col_names is None else col_names[i],
                               type=self.var_type_dict[v_type],
                               lb=a_lb_f,
                               ub=a_ub_f)
-            m_r = prob.Variable(name=f"var_{i}_r" if col_names is None else col_names[i] + "_r",
-                                type=self.var_type_dict[v_type],
-                                lb=a_lb_r,
-                                ub=a_ub_r)
-            new_model.solver.add([m, m_r], sloppy=True)
+            added_vars.append(m)
+            new_model.solver.add(added_vars, sloppy=True)
             non_zero_idx = np.nonzero(S[:, i])[0]
             for j in non_zero_idx:
-                new_model.solver.constraints[f"const_{j}" if row_names is None else row_names[j]].set_linear_coefficients({
+                new_model.solver.constraints[f"const_{j}" if row_names is None
+                else row_names[j]].set_linear_coefficients({
                     m: float(S[j, i]),
                     m_r: -float(S[j, i])
+                } if i < self.anchor_n else {
+                    m: float(S[j, i])
                 })
 
             variables.append(m)
-            r_variables.append(m_r)
-            reverse_dic[m_r.name] = m.name
+            if i < self.anchor_n:
+                r_variables.append(m_r)
+                reverse_dic[m_r.name] = m.name
 
         obj_vars = {variables[i]: c for i, c in enumerate(objs)}
-        obj_vars.update({r_variables[i]: -c for i, c in enumerate(objs)})
+        obj_vars.update({v: -objs[i] for i, v in enumerate(r_variables)})
         new_model.objective = prob.Objective(Zero, sloppy=True, direction=direction)
         new_model.objective.set_linear_coefficients(obj_vars)
         new_model.solver.update()

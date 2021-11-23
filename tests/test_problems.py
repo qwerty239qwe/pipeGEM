@@ -11,14 +11,14 @@ class TestProblem(Problem):
     def modify_problem(self) -> None:
         m, n = len(self.model.metabolites), len(self.model.reactions)
         e_S = np.zeros(shape=(m, n))
-        np.fill_diagonal(e_S, 1)
+        #np.fill_diagonal(e_S, 1)
         e_v = np.array(["C" for _ in range(n)])
-        e_lbs = np.zeros((n,))
-        e_ubs = np.ones((n,))
-        self.extend_horizontal(e_S, e_v, e_lbs, e_ubs)
+        e_lbs = -np.ones((n,)) * np.inf
+        e_ubs = np.ones((n,)) * np.inf
+        self.extend_horizontal(e_S, e_v, e_lbs, e_ubs, e_objs=np.ones(n,))
 
         e_S = np.zeros(shape=(m, 2 * n))
-        np.fill_diagonal(e_S, 1)
+        #np.fill_diagonal(e_S, 1)
         e_b = np.zeros((m,))
         self.extend_vertical(e_S, e_b)
 
@@ -39,11 +39,14 @@ def test_problem_consistent(ecoli_core):
     assert np.equal(sol["fluxes"], new_sol["fluxes"])
 
 
-def test_problem_extension(ecoli):
-    p = TestProblem(model=ecoli)
+def test_problem_extension(ecoli_core):
+    p = TestProblem(model=ecoli_core)
+    p2 = TestProblem2(model=ecoli_core)
+    n = len([r for r in ecoli_core.reactions])
+
     mod = p.to_model("new")
-    print(mod.optimize())
-    print(mod.get_problem_fluxes())
+    mod2 = p2.to_model("new2")
+    np.equal(mod.get_problem_fluxes()[:n], mod2.get_problem_fluxes()[:n])
 
 
 def test_BlockedProblem(ecoli):

@@ -28,6 +28,7 @@ class Model(GEMComposite):
                                       solver=solver,
                                       rxn_expr_score=self.expression)
         self._reverse_dic = reverse_dic
+
     def __getattr__(self, item):
         return getattr(self._model, item)
 
@@ -101,7 +102,6 @@ class Model(GEMComposite):
     def get_problem_fluxes(self, direction="max") -> pd.DataFrame:
         self._model.solver.objective.direction = direction
         self._model.solver.optimize()
-        print(self._model.solver.primal_values)
         vals = {}
         _skips = []
         for var_name, val in self._model.solver.primal_values.items():

@@ -1,5 +1,4 @@
 import numpy as np
-import numpy.ma as ma
 import cobra
 from scipy.linalg import qr, norm
 from scipy.sparse import csr_matrix
@@ -21,7 +20,7 @@ def swiftcc(model,
     sol = blk.get_problem_fluxes()
     sol = sol.iloc[model.n_mets:, :]
     consistent[sol["fluxes"] < -0.5] = False
-    tol = tol * norm(S[:, consistent])
+    tol = tol * norm(S[:, consistent], ord='fro')
     q, r = qr(a=S[:, consistent].T)
     z = q[rev[consistent], np.sum(np.abs(np.diag(r)) > tol):]
     consistent[rev & consistent] = np.diag(z @ z.T) > (tol ** 2)
@@ -87,8 +86,8 @@ class CoreProblem(Problem):
         rev[self.lbs == 0], rev[self.ubs == 0] = 0, -1
         self.ubs[rev == -1] = -self.lbs[rev == -1]
         self.lbs[rev == -1] = 0
-        self.ubs /= norm(self.ubs)
-        self.lbs /= norm(self.lbs)
+        self.ubs /= norm(self.ubs, ord=np.inf)
+        self.lbs /= norm(self.lbs, ord=np.inf)
         self.react_num = np.arange(self.S.shape[1])
         self.couplings = np.arange(self.S.shape[1])
         if self.do_reduction:
@@ -124,13 +123,15 @@ class CoreProblem(Problem):
         self.ubs = np.where(self.consistent, np.inf, self.ubs)
         self.extend_horizontal(np.zeros(shape=(m, k + l)),
                                e_v=np.array(["C" for _ in range(k + l)]),
-                               e_v_lb=-np.ones(shape=(k + l)) * np.inf,
-                               e_v_ub=np.ones(shape=(k + l)) * np.inf,
+                               e_v_lb=-np.ones(shape=(k + l)) * 1e6,
+                               e_v_ub=np.ones(shape=(k + l)) * 1e6,
                                e_objs=np.concatenate([self.weights[k_v], self.weights[l_v]]),
                                e_names=[f"ext_const_{i}" for i in range(k + l)])
         temp1, temp2 = np.eye(n), np.eye(k + l)
         btm_ext_S_1 = np.concatenate([temp1[k_v, :], temp2[rev[self.weights!=0] == 1, :]], axis=1)
         btm_ext_S_2 = np.concatenate([-temp1[self.weights != 0, :], temp2], axis=1)
+        print(np.sum(btm_ext_S_1), 2 * k + l, 2* k, l)
+        print(np.sum(btm_ext_S_2))
         csense = np.array(["G" for _ in range(2 * k + l)])
         b = np.zeros(2 * k + l)
         self.extend_vertical(e_S=np.concatenate([btm_ext_S_1, btm_ext_S_2], axis=0),
@@ -156,7 +157,7 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-10)
 
     rxn_num, coupling = problem.react_num, problem.couplings
     core_model = problem.to_model("core")
-    flux = core_model.get_problem_fluxes()
+    flux = core_model.get_problem_fluxes("min")
     weights = problem.weights
     assert len(weights) == __w
     weights[problem.core_index] = 0
@@ -171,9 +172,8 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-10)
         blocked[abs(flux["fluxes"].values) > tol] = False
     else:
         _, D, Vt = svds(csr_matrix(problem.S[:m_, :n_][:, weights == 0]), k=k, which="SM")
-        Vt = Vt[np.diag(D) < tol * norm(problem.S[:m_, :n_][:, weights == 0]), :]
+        Vt = Vt[np.diag(D) < tol * norm(problem.S[:m_, :n_][:, weights == 0], ord='fro'), :]
         blocked[weights == 0] = np.all(abs(Vt) < tol, 0)
-
     while np.any(blocked):
         blocked_size = sum(blocked)
         problem = CoreProblem.from_problem(problem,
@@ -184,12 +184,11 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-10)
                                            do_flip=False,
                                            do_reduction=False)
         core_model = problem.to_model("core")
-        flux = core_model.get_problem_fluxes()[:n_]
+        flux = core_model.get_problem_fluxes("min")[:n_]
         weights[abs(flux["fluxes"].values) > tol] = 0
         assert len(weights) == __w
         blocked[abs(flux["fluxes"].values) > tol] = False
         print(f"Remove {blocked_size - sum(blocked)} blocked rxns")
-
         if 2 * sum(blocked) > blocked_size:
             weights /= 2
             raise ValueError(sum(blocked), blocked_size)
