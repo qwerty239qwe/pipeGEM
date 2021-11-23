@@ -192,7 +192,7 @@ class Problem:
         return dic
 
     def get_rev(self):
-        return (self.lbs != 0) & (self.ubs != 0)
+        return (self.lbs <= 0) & (self.ubs >= 0)
 
     def modify_problem(self) -> None:
         """

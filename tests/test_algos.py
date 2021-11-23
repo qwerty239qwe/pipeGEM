@@ -9,34 +9,38 @@ def test_swiftcc(ecoli):
     print(len(ecoli.reactions), sum(swiftcc(Model(ecoli, "ecoli"))))
 
 
-def test_swiftProblem(ecoli):
-    ecoli = Model(ecoli, "ecoli")
+def test_swiftProblem(ecoli_core):
+    ecoli = Model(ecoli_core, "ecoli")
     weights = np.ones(shape=(len(ecoli.reactions),))
-    consistent = swiftcc(ecoli)
-    core_index = np.random.choice(len(ecoli.reactions), 500, replace=False)
+    core_index = np.random.choice(len(ecoli.reactions), 50, replace=False)
     is_core = np.array([(i in core_index) for i in range(len(ecoli.reactions))])
-    __w = len(is_core)
-    print(len(is_core))
-    print(sum(consistent))
     m, n = len(ecoli.metabolites), len(ecoli.reactions)
+    blocked = np.array([False for _ in range(n)])
+
     assert sum(ecoli.optimize().to_frame()["fluxes"].values) != 0, sum(ecoli.optimize().to_frame()["fluxes"].values)
     problem = CoreProblem(model=ecoli,
-                          consistent=consistent,
+                          blocked=blocked,
                           weights=weights,
                           core_index=is_core,
                           do_flip=True,
                           do_reduction=False)
+    rxn_ids = np.array([rxn.id for rxn in ecoli.reactions if not rxn.reversibility])
     core_model = problem.to_model("core", direction="min")
-    print(problem.objs[problem.objs != 0])
     flux = core_model.get_problem_fluxes("min")
-    print(flux[flux["fluxes"] != 0])
+    print(flux.iloc[:n, :][flux.iloc[:n, :]["fluxes"] != 0])
+    print(sorted(rxn_ids))
 
 
 def test_q(ecoli):
     return ecoli.optimize().to_frame()["fluxes"].values
 
 
-def test_swiftCore(ecoli):
-    core_index = np.random.choice(len(ecoli.reactions), 100, replace=False)
-    result = swiftCore(Model(ecoli, "ecoli"), core_index=core_index)
+def test_swiftCore(ecoli_core):
+    consis = swiftcc(Model(ecoli_core, "ecoli"), return_model=True)
+    core_index = np.random.choice(len(consis.reactions), 50, replace=False)
+    core_rxns = np.array([rxn.id for rxn in consis.reactions])[core_index]
+    result = swiftCore(Model(consis, "ecoli"), core_index=core_index)
     assert result.optimize()
+    print(result.optimize())
+    assert len(set(core_rxns) - set([r.id for r in result.reactions])) == 0
+    assert len(set([r.id for r in result.reactions])) < len(consis.reactions)

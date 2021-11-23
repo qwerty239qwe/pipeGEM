@@ -33,8 +33,8 @@ def swiftcc(model,
 
 
 class CoreProblem(Problem):
-    def __init__(self, model, consistent, core_index, weights, do_flip, do_reduction, **kwargs):
-        self.consistent, self.weights = consistent, weights
+    def __init__(self, model, blocked, core_index, weights, do_flip, do_reduction, **kwargs):
+        self.blocked, self.weights = blocked, weights
         self.core_index = core_index
         self.do_reduction = do_reduction
         self.do_flip = do_flip
@@ -83,9 +83,9 @@ class CoreProblem(Problem):
 
     def _flip(self):
         rev = np.ones(self.S.shape[1])
-        rev[self.lbs == 0], rev[self.ubs == 0] = 0, -1
+        rev[self.lbs >= 0], rev[self.ubs <= 0] = 0, -1
         self.ubs[rev == -1] = -self.lbs[rev == -1]
-        self.lbs[rev == -1] = 0
+        self.lbs[rev == -1] = -self.ubs[rev == -1]
         self.ubs /= norm(self.ubs, ord=np.inf)
         self.lbs /= norm(self.lbs, ord=np.inf)
         self.react_num = np.arange(self.S.shape[1])
@@ -108,19 +108,19 @@ class CoreProblem(Problem):
 
         rev = self.get_rev()
         dense = np.zeros(shape=(n,))
-        dense[~self.consistent] = np.random.rand(sum(~self.consistent))
+        dense[self.blocked] = np.random.normal(0, 1, size=sum(self.blocked))
         k_v, l_v = (self.weights != 0) & rev, (self.weights != 0) & (~rev)
         k, l = np.sum(k_v), np.sum(l_v)
         self.objs = dense
-        self.lbs = np.where(self.consistent, -np.inf, self.lbs)
+        self.lbs = np.where(self.blocked, self.lbs, -np.inf)
         self.lbs[l_v] = 0
         self.v = np.array(["C" for _ in range(n)])
         self.c = np.array(["E" for _ in range(m)])
         self.b = np.zeros(m)
 
-        if all(self.consistent):
+        if not any(self.blocked):
             self.lbs[(self.weights == 0) & (~rev)] = 1
-        self.ubs = np.where(self.consistent, np.inf, self.ubs)
+        self.ubs = np.where(self.blocked, self.ubs, np.inf)
         self.extend_horizontal(np.zeros(shape=(m, k + l)),
                                e_v=np.array(["C" for _ in range(k + l)]),
                                e_v_lb=-np.ones(shape=(k + l)) * 1e6,
@@ -130,8 +130,6 @@ class CoreProblem(Problem):
         temp1, temp2 = np.eye(n), np.eye(k + l)
         btm_ext_S_1 = np.concatenate([temp1[k_v, :], temp2[rev[self.weights!=0] == 1, :]], axis=1)
         btm_ext_S_2 = np.concatenate([-temp1[self.weights != 0, :], temp2], axis=1)
-        print(np.sum(btm_ext_S_1), 2 * k + l, 2* k, l)
-        print(np.sum(btm_ext_S_2))
         csense = np.array(["G" for _ in range(2 * k + l)])
         b = np.zeros(2 * k + l)
         self.extend_vertical(e_S=np.concatenate([btm_ext_S_1, btm_ext_S_2], axis=0),
@@ -140,16 +138,17 @@ class CoreProblem(Problem):
                              e_names=[f"ext_var_{i}" for i in range(2 * k + l)])
 
 
-def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-10):
+def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16):
     if weights is None:
         weights = np.ones(shape=(len(model.reactions),))
-    consistent = swiftcc(model)
     is_core = np.array([(i in core_index) for i in range(len(model.reactions))])
     __w = len(is_core)
     print(len(is_core))
     m, n = len(model.metabolites), len(model.reactions)
+
+    blocked = np.array([False for _ in range(n)])
     problem = CoreProblem(model=model,
-                          consistent=consistent,
+                          blocked=blocked,
                           weights=weights,
                           core_index=is_core,
                           do_flip=True,
@@ -159,14 +158,12 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-10)
     core_model = problem.to_model("core")
     flux = core_model.get_problem_fluxes("min")
     weights = problem.weights
-    assert len(weights) == __w
     weights[problem.core_index] = 0
-    assert len(weights) == __w
     m_, n_ = problem.original_S_shape
     flux = flux[:n_]
+    print([r.id for i, r in enumerate(model.reactions)])
+    print(flux)
     weights[abs(flux["fluxes"].values) > tol] = 0
-    assert len(weights) == __w
-    blocked = np.array([False for _ in range(n_)])
     if n == n_:
         blocked = problem.core_index.copy()
         blocked[abs(flux["fluxes"].values) > tol] = False
@@ -174,24 +171,34 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-10)
         _, D, Vt = svds(csr_matrix(problem.S[:m_, :n_][:, weights == 0]), k=k, which="SM")
         Vt = Vt[np.diag(D) < tol * norm(problem.S[:m_, :n_][:, weights == 0], ord='fro'), :]
         blocked[weights == 0] = np.all(abs(Vt) < tol, 0)
+
+    assert len(set(rxn_num[blocked]) - set(rxn_num[weights != 0])) == 0, f"{rxn_num[blocked]}, {rxn_num[weights != 0]}"
+    n_lps = 1
     while np.any(blocked):
         blocked_size = sum(blocked)
         problem = CoreProblem.from_problem(problem,
                                            s_shape=("m", "n"),
-                                           consistent=consistent,
+                                           blocked=blocked,
                                            weights=weights,
                                            core_index=is_core,
                                            do_flip=False,
                                            do_reduction=False)
+        n_lps += 1
         core_model = problem.to_model("core")
         flux = core_model.get_problem_fluxes("min")[:n_]
         weights[abs(flux["fluxes"].values) > tol] = 0
         assert len(weights) == __w
         blocked[abs(flux["fluxes"].values) > tol] = False
         print(f"Remove {blocked_size - sum(blocked)} blocked rxns")
+        assert len(
+            set(rxn_num[blocked]) - set(rxn_num[weights != 0])) == 0, f"{rxn_num[blocked]}, {rxn_num[weights != 0]}"
         if 2 * sum(blocked) > blocked_size:
             weights /= 2
-            raise ValueError(sum(blocked), blocked_size)
+            assert n_lps < 150, f"{n_lps}, {blocked_size}, {rxn_num[blocked == True]}, {rxn_num[(weights != 0)]}"
+    print(n_lps)
     kept_rxns = rxn_num[(weights == 0)]
-    rxns_to_remove = [r.id for r in model.reactions if r in kept_rxns]
-    return model.copy().remove_reactions(rxns_to_remove, remove_orphans=True)
+    rxns_to_remove = [r.id for i, r in enumerate(model.reactions) if i not in kept_rxns]
+    output = model.copy()
+    print(rxns_to_remove)
+    output.remove_reactions(rxns_to_remove, remove_orphans=True)
+    return output
