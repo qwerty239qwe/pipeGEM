@@ -37,10 +37,12 @@ def test_q(ecoli):
 
 def test_swiftCore(ecoli_core):
     consis = swiftcc(Model(ecoli_core, "ecoli"), return_model=True)
-    core_index = np.random.choice(len(consis.reactions), 50, replace=False)
+    core_index = np.random.choice(len(consis.reactions), 10, replace=False)
     core_rxns = np.array([rxn.id for rxn in consis.reactions])[core_index]
+    print(core_rxns)
     result = swiftCore(Model(consis, "ecoli"), core_index=core_index)
     assert result.optimize()
-    print(result.optimize())
     assert len(set(core_rxns) - set([r.id for r in result.reactions])) == 0
+    print(len(result.reactions))
+    print(result.optimize())
     assert len(set([r.id for r in result.reactions])) < len(consis.reactions)

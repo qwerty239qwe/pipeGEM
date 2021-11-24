@@ -143,7 +143,6 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
         weights = np.ones(shape=(len(model.reactions),))
     is_core = np.array([(i in core_index) for i in range(len(model.reactions))])
     __w = len(is_core)
-    print(len(is_core))
     m, n = len(model.metabolites), len(model.reactions)
 
     blocked = np.array([False for _ in range(n)])
@@ -165,14 +164,15 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
     print(flux)
     weights[abs(flux["fluxes"].values) > tol] = 0
     if n == n_:
-        blocked = problem.core_index.copy()
+        blocked = np.array([False for _ in range(n)])
+        blocked[problem.core_index] = True
         blocked[abs(flux["fluxes"].values) > tol] = False
     else:
         _, D, Vt = svds(csr_matrix(problem.S[:m_, :n_][:, weights == 0]), k=k, which="SM")
         Vt = Vt[np.diag(D) < tol * norm(problem.S[:m_, :n_][:, weights == 0], ord='fro'), :]
         blocked[weights == 0] = np.all(abs(Vt) < tol, 0)
 
-    assert len(set(rxn_num[blocked]) - set(rxn_num[weights != 0])) == 0, f"{rxn_num[blocked]}, {rxn_num[weights != 0]}"
+    assert len(set(rxn_num[blocked]) - set(rxn_num[weights == 0])) == 0, f"{rxn_num[blocked]}, {rxn_num[weights != 0]}"
     n_lps = 1
     while np.any(blocked):
         blocked_size = sum(blocked)
@@ -191,10 +191,10 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
         blocked[abs(flux["fluxes"].values) > tol] = False
         print(f"Remove {blocked_size - sum(blocked)} blocked rxns")
         assert len(
-            set(rxn_num[blocked]) - set(rxn_num[weights != 0])) == 0, f"{rxn_num[blocked]}, {rxn_num[weights != 0]}"
+            set(rxn_num[blocked]) - set(rxn_num[weights == 0])) == 0, f"{rxn_num[blocked]}, {rxn_num[weights == 0]}"
         if 2 * sum(blocked) > blocked_size:
             weights /= 2
-            assert n_lps < 150, f"{n_lps}, {blocked_size}, {rxn_num[blocked == True]}, {rxn_num[(weights != 0)]}"
+            assert n_lps < 400, f"{n_lps}, {blocked_size}, {rxn_num[blocked]}, {rxn_num[(weights == 0)]}"
     print(n_lps)
     kept_rxns = rxn_num[(weights == 0)]
     rxns_to_remove = [r.id for i, r in enumerate(model.reactions) if i not in kept_rxns]

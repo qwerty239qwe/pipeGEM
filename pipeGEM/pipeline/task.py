@@ -5,7 +5,6 @@ import cobra
 
 from ._base import Pipeline
 from pipeGEM.analysis.tasks import TaskTester, TASKS_FILE_PATH
-from pipeGEM.plotting.heatmap import plot_clustermap
 
 
 class ReactionTester(Pipeline):
@@ -34,25 +33,6 @@ class ReactionTester(Pipeline):
         self.model_tester.test()
         self.model_tester.map_expr_to_tasks()
         return self.model_tester.get_all_passed_rxns(), self.model_tester.tasks_scores
-
-
-class TestScorePlotter(Pipeline):
-    def __init__(self, model_tester):
-        super().__init__()
-        self.model_tester = model_tester
-
-    def run(self,
-            task_scores: List[str],
-            file_name=None,
-            z_score=1) -> None:
-        score_data = pd.DataFrame(task_scores).fillna(-1)
-        subsystem_dict = {ID: task.subsystem
-                          for ID, task in self.model_tester.tasks.items()}
-        plot_clustermap(score_data,
-                        row_category=subsystem_dict,  # TODO rename plot_clustermap's arg
-                        file_name=file_name,
-                        z_score=z_score,
-                        )
 
 # add validator
 

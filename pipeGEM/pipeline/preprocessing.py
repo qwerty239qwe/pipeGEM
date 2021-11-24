@@ -70,7 +70,7 @@ class GeneData(Pipeline):
 
     def run(self, data, model, *args, **kwargs):
         self._expression = Expression(data, model, *args, **kwargs)
-        self.output = {"expression": self._expression}
+        self.output = self._expression
         return self.output
 
 
@@ -92,7 +92,7 @@ class GeneDataSet(Pipeline):
             self._expression_dict[c] = job(data=self.data_df[c],
                                            model=model[c] if isinstance(model, dict) else model,
                                            *args, **kwargs)
-        self.output = {"expression_dict": self._expression_dict}
+        self.output = self._expression_dict
         return self.output
 
 

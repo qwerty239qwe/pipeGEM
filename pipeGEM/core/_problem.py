@@ -50,9 +50,9 @@ class Problem:
 
     def parse_s_shape(self, s_shape) -> dict:
         S = self.S.copy()
-        reconstruct_attr = False
+        reconstruct_attr = True
         if "m" in s_shape[1] or "n" in s_shape[0]:
-            reconstruct_attr = True
+            reconstruct_attr = False
             s_shape = s_shape[1], s_shape[0]
             S = S.T
 
@@ -196,7 +196,8 @@ class Problem:
 
     def modify_problem(self) -> None:
         """
-        The modification of all problem components, subclass of Problem should change this to create a new problem
+        The modification of all problem components,
+        subclass of Problem should change this to create a new problem
 
         Returns
         -------

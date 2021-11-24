@@ -151,9 +151,14 @@ class Expression:
         if not self._rxn_scores:
             raise ValueError("rxn_scores is somewhat missing. Please recalculate it using cal_rxn_scores")
 
-        subsystem_score = {subsystem: method_dict[statistics]([d for d in data if not np.isnan(d)])
-                           for subsystem, data in self.rxn_score_in_subsystem.items() if subsystem in subsystems}
-
+        subsystem_score = {}
+        for subsystem, data in self.rxn_score_in_subsystem.items():
+            if subsystem in subsystems:
+                not_na_data = [d for d in data if not np.isnan(d)]
+                if len(not_na_data) == 0:
+                    subsystem_score[subsystem] = 0
+                else:
+                    subsystem_score[subsystem] = method_dict[statistics](not_na_data)
         not_exist_subsystems = [err for err in subsystems if err not in self.subsystems]
         if not_exist_subsystems:
             warn(f"{not_exist_subsystems} are not model's subsystems!")

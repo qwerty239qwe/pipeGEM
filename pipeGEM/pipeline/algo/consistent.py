@@ -22,5 +22,5 @@ class SwiftCC(Pipeline):
     def run(self, model, return_model=True, *args, **kwargs):
         if isinstance(model, cobra.Model):
             model = Model(model, name_tag="swiftcc")
-        self.output = {"model": swiftcc(model, return_model=return_model, **kwargs)}
+        self.output = swiftcc(model, return_model=return_model, **kwargs)
         return self.output
