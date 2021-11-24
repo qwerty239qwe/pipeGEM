@@ -84,8 +84,7 @@ class CoreProblem(Problem):
     def _flip(self):
         rev = np.ones(self.S.shape[1])
         rev[self.lbs >= 0], rev[self.ubs <= 0] = 0, -1
-        self.ubs[rev == -1] = -self.lbs[rev == -1]
-        self.lbs[rev == -1] = -self.ubs[rev == -1]
+        self.ubs[rev == -1], self.lbs[rev == -1] = -self.lbs[rev == -1], -self.ubs[rev == -1]
         self.ubs /= norm(self.ubs, ord=np.inf)
         self.lbs /= norm(self.lbs, ord=np.inf)
         self.react_num = np.arange(self.S.shape[1])
@@ -112,7 +111,8 @@ class CoreProblem(Problem):
         k_v, l_v = (self.weights != 0) & rev, (self.weights != 0) & (~rev)
         k, l = np.sum(k_v), np.sum(l_v)
         self.objs = dense
-        self.lbs = np.where(self.blocked, self.lbs, -np.inf)
+
+        self.lbs = np.where(self.blocked, self.lbs, -1e6)
         self.lbs[l_v] = 0
         self.v = np.array(["C" for _ in range(n)])
         self.c = np.array(["E" for _ in range(m)])
@@ -120,7 +120,7 @@ class CoreProblem(Problem):
 
         if not any(self.blocked):
             self.lbs[(self.weights == 0) & (~rev)] = 1
-        self.ubs = np.where(self.blocked, self.ubs, np.inf)
+        self.ubs = np.where(self.blocked, self.ubs, 1e6)
         self.extend_horizontal(np.zeros(shape=(m, k + l)),
                                e_v=np.array(["C" for _ in range(k + l)]),
                                e_v_lb=-np.ones(shape=(k + l)) * 1e6,

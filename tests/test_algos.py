@@ -37,7 +37,8 @@ def test_q(ecoli):
 
 def test_swiftCore(ecoli_core):
     consis = swiftcc(Model(ecoli_core, "ecoli"), return_model=True)
-    core_index = np.random.choice(len(consis.reactions), 10, replace=False)
+    # core_index = np.random.choice(len(consis.reactions), 30, replace=False)
+    core_index = [i for i, r in enumerate(consis.reactions) if r.id == "ATPM"]
     core_rxns = np.array([rxn.id for rxn in consis.reactions])[core_index]
     print(core_rxns)
     result = swiftCore(Model(consis, "ecoli"), core_index=core_index)
