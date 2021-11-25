@@ -3,6 +3,7 @@ import pandas as pd
 import pipeGEM as pg
 from pipeGEM.plotting._prep import prep_fva_plotting_data
 from pipeGEM.plotting._flux import plot_fva
+from pipeGEM.utils import random_perturb
 
 
 def test_prep_FVA():
@@ -75,12 +76,19 @@ def test_plot_model_emb(ecoli_core):
 
 def test_plot_flux_heatmap(ecoli_core):
     ecoli_2 = ecoli_core.copy()
-    ecoli_2.reactions.get_by_id('PFK').knock_out()
+    ecoli_2 = random_perturb(ecoli_2, structure_ratio=0.98, constr_ratio=0.9)
     ecoli_3 = ecoli_2.copy()
-    ecoli_3.reactions.get_by_id("PGM").knock_out()
+    ecoli_3 = random_perturb(ecoli_3, structure_ratio=1, constr_ratio=0.9)
 
-    g = pg.Group({"ecoli": {"mod1_1": ecoli_core, "mod2_1": ecoli_core},
-                  "ecoli2": {"mod1_2": ecoli_2, "mod2_2": ecoli_2},
-                  "ecoli3": {"mod1_3": ecoli_3, "mod2_3": ecoli_3} })
+    g = pg.Group({"ecoli": {"mod1_1": ecoli_core, "mod2_1": random_perturb(ecoli_core,
+                                                                           in_place=False,
+                                                                           structure_ratio=0.98,
+                                                                           constr_ratio=0.9)},
+                  "ecoli2": {"mod1_2": ecoli_2, "mod2_2": random_perturb(ecoli_2, in_place=False,
+                                                                         structure_ratio=1,
+                                                                         constr_ratio=0.4)},
+                  "ecoli3": {"mod1_3": ecoli_3, "mod2_3": random_perturb(ecoli_3, in_place=False,
+                                                                         structure_ratio=1,
+                                                                         constr_ratio=0.55)} })
     g.do_analysis(method="FBA", constr="default")
     g.plot_flux_heatmap(method="FBA", constr="default", get_model_level=True)

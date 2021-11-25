@@ -137,12 +137,12 @@ def random_perturb(model,
         n = len(model.reactions)
         objs = get_objective_rxn(model)
         removed = rng.choice([r.id for r in model.reactions if r.id not in objs],
-                             size=(int(n * (1 - structure_ratio)),))
+                             size=(int(n * (1 - structure_ratio)),), replace=False)
         model.remove_reactions(removed, remove_orphans=True)
 
     if on_constr:
         n = len(model.reactions)
-        magnitudes = rng.uniform(low=0, high=constr_ratio, size=(n,))
+        magnitudes = rng.uniform(low=constr_ratio, high=1, size=(n,))
         for i, rxn in enumerate(model.reactions):
             rxn.lower_bound, rxn.upper_bound = rxn.lower_bound * magnitudes[i], rxn.upper_bound * magnitudes[i]
     return model

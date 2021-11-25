@@ -518,6 +518,7 @@ class Group(GEMComposite):
                           get_model_level=True,
                           aggregation_method="mean",
                           fig_size=(10, 10),
+                          file_name=None,
                           **kwargs
                           ):
 
@@ -532,7 +533,7 @@ class Group(GEMComposite):
             model_names = fluxes["fluxes"]["model"] if not get_model_level else fluxes["fluxes"]["group"]
             comp_info = dict(zip(fluxes["fluxes"]["model"], fluxes["fluxes"]["group"])) \
                         if not get_model_level else fluxes["fluxes"]["group"]
-            data = fluxes["fluxes"].drop(columns=["model", "group"] if get_model_level else ["group"]).values
+            data = fluxes["fluxes"].drop(columns=["model", "group"] if get_model_level else ["group"]).fillna(0).values
         else:
             raise ValueError()
 
@@ -547,14 +548,27 @@ class Group(GEMComposite):
                         cmap='magma',
                         square=True,
                         fig_size=fig_size,
+                        file_name=file_name,
                         **kwargs
                         )
 
-    def plot_expr_cluster(self):
-        pass
-
-    def plot_expr_heatmap(self):
-        pass
+    def plot_expr_heatmap(self,
+                          tags: Union[str, List[str]] = "all",
+                          get_model_level=True,
+                          aggregation_method="mean",
+                          fig_size=(10, 10),
+                          file_name=None,
+                          **kwargs
+                          ):
+        data = self.data
+        plot_clustermap(data=data,
+                        cbar_label=f'expression',
+                        cmap='magma',
+                        square=True,
+                        fig_size=fig_size,
+                        file_name=file_name,
+                        **kwargs
+                        )
 
     def plot_model_heatmap(self,
                            tags: Union[str, List[str]] = "all",
@@ -611,7 +625,8 @@ class Group(GEMComposite):
                      annotate=annotate,
                      file_name=file_name,
                      prefix=prefix,
-                     dpi=dpi, **kwargs)
+                     dpi=dpi,
+                     **kwargs)
 
 
 

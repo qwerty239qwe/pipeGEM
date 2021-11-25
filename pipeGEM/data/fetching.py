@@ -1,5 +1,7 @@
 from pathlib import Path
 from typing import Dict, List, Union
+
+import cobra.io
 import requests
 
 import numpy as np
@@ -146,7 +148,11 @@ def list_models(databases=["metabolic atlas", "BiGG"],
 
 def load_model(model_id):
     model_list = list_models()
+    if model_id in model_list[model_list["database"]=="BiGG"]["id"]:
+        return cobra.io.load_model(model_id)
+    raise NotImplementedError("haven't finished")
 
 
 def download_model(model_id, file_path, format="mat"):
     url = f"http://bigg.ucsd.edu/static/models/{model_id}.{format}"
+    raise NotImplementedError("haven't finished")
