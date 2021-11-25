@@ -412,8 +412,12 @@ class Group(GEMComposite):
                       tags,
                       get_model_level,
                       aggregation_method,
+                      show_groups = False
                       ) -> Dict[str, pd.DataFrame]:
-        compos: List[GEMComposite] = self._get_by_tags(tags, get_model_level)
+        if show_groups:
+            compos: List[GEMComposite] = self._get_by_tags(tags, False)
+        else:
+            compos: List[GEMComposite] = self._get_by_tags(tags, get_model_level)
         # TODO: add more model info to fluxes result
         # compo_info = self.get_info(tags=tags if tags is not "all" else None)
         fluxes: Dict[str, Dict[str, pd.DataFrame]] = {}
@@ -424,7 +428,7 @@ class Group(GEMComposite):
                                   as_dict=True,
                                   keep_rc=False)
             else:
-                flux = c.get_flux(aggregate=aggregation_method,
+                flux = c.get_flux(aggregate=aggregation_method if not show_groups else "concat",
                                   as_dict=True,
                                   method=method,
                                   constr=constr,
@@ -436,7 +440,6 @@ class Group(GEMComposite):
                 processed["model"] = processed.index
                 processed["group"] = c.name_tag
                 fluxes[k][c.name_tag] = processed
-                print(c.name_tag)
         return {fname: pd.concat(list(fdfs.values()), axis=0).fillna(0) for fname, fdfs in fluxes.items() }
 
     def plot_flux(self,
@@ -455,14 +458,14 @@ class Group(GEMComposite):
 
         Parameters
         ----------
-        method
-        constr
-        rxn_ids
-        rxn_index
-        subsystems
-        tags
-        get_model_level
-        aggregation_method
+        method: str
+        constr: str
+        rxn_ids: optional, list of str
+        rxn_index: optional, list of str
+        subsystems: optional, str of list of str
+        tags: str or a list of str
+        get_model_level: bool, default = True
+        aggregation_method: str, default = 'mean'
         kwargs
 
         Returns
@@ -491,22 +494,23 @@ class Group(GEMComposite):
                       rxn_ids="all",
                       rxn_index=None,
                       subsystems=None,
+                      show_groups = True,
+                      get_model_level = False,
                       tags: Union[str, List[str]] = "all",
                       aggregation_method="mean",
                       **kwargs
                       ):
-        get_model_level = True
         # rxn_ids = rxn_ids if rxn_ids is not None else []
         # rxn_ids += self._check_rxn_id(self.tget(tags if tags != "all" else None)[0], rxn_index, subsystems)
-        fluxes = self._process_flux(method, constr, tags, get_model_level, aggregation_method)
+        fluxes = self._process_flux(method, constr, tags, get_model_level, aggregation_method, show_groups)
         if method in ["FBA", "pFBA"]:
             df: pd.DataFrame = fluxes["fluxes"]
         elif method == "sampling":
             df: pd.DataFrame = pd.concat(list(fluxes.values()), axis=0)
         else:
             raise NotImplementedError()
-        print(df.columns)
         groups = dict(df["group"].to_frame().reset_index(drop=True).reset_index().groupby("group")["index"].apply(list).iteritems())
+
         df = df.drop(columns=["model", "group"]).reset_index(drop=True)
         if dr_method == "PCA":
             plot_PCA(df=df.T, groups=groups, **kwargs)
@@ -544,8 +548,6 @@ class Group(GEMComposite):
         data = pd.DataFrame(data=similarity_method[similarity](data),
                             columns=model_names,
                             index=model_names)
-        # xticklabels = model_names,
-        # yticklabels = model_names,
         plot_clustermap(data=data,
                         cbar_label=f'{similarity} similarity',
                         cmap='magma',

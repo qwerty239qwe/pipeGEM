@@ -107,13 +107,13 @@ def plot_one_sampling(flux_df,
                       fig_title="Flux Sampling: {r}",
                       prefix: str = "FS_",
                       **kwargs):
-    facet: sns.FacetGrid = getattr(sns, plotting_style)(data=flux_df,
-                                                        x=r,
-                                                        y=group_layer if plotting_style == "catplot" else None,
-                                                        hue=group_layer if plotting_style == "displot" else None,
-                                                        kind=plotting_kind,
-                                                        palette=color_maps,
-                                                        **kwargs)
+    facet = getattr(sns, plotting_style)(data=flux_df,
+                                         x=r if plotting_style != "catplot" else group_layer,
+                                         y= None if plotting_style != "catplot" else r,
+                                         hue=group_layer if plotting_style == "displot" else None,
+                                         kind=plotting_kind,
+                                         palette=color_maps,
+                                         **kwargs)
     ax = facet.ax
     ax.set_title(fig_title.format(r=r))
     if plotting_kind in ["kde", "hist"]:
@@ -124,14 +124,14 @@ def plot_one_sampling(flux_df,
                        label=f'median ({grp})')
     elif plotting_style == "catplot":
         if plot_significance:
-            grp_df = flux_df[[r, group_layer]]
-            grp_df["n"] = grp_df.index
-            grp_df.pivot(index="n", columns=group_layer)
+            grp_df = flux_df[[r, group_layer, "n"]]
+            grp_df = grp_df.pivot(index="n", columns=group_layer).T.reset_index().set_index("group").drop(columns=["level_0"]).T
             stat = StatisticAnalyzer(grp_df)
             do_comp = True
             num_significance = 0
             if grp_df.shape[1] >= 3:
                 stat_value, p_value = stat.kruskal_test()
+                print(f"Kruskal Wallis test result: stat: {stat_value}, p-value {p_value}")
                 do_comp = (p_value < stat.alpha_list[0])  # p < 0.05
             if do_comp:
                 post_hoc_df = stat.post_hocs()
@@ -139,14 +139,14 @@ def plot_one_sampling(flux_df,
                     stars = sum([post_hoc_df.iloc[i, j] < alpha for alpha in stat.alpha_list])
                     if stars >= 1:
                         draw_significance(ax, [i, j],
-                                          [max(grp_df[r]) +
+                                          [grp_df.values.max() +
                                            (ax.get_ylim()[1] - ax.get_ylim()[0]) *
                                            (num_significance + 1) * 0.08
                                            for _ in range(2)],
                                           stars)
                         num_significance += 1
     plot_kws = {
-                "g": facet.figure,
+                "g": facet.fig,
                } # TODO: fix saving function (add name_format)
     return plot_kws
 
@@ -162,11 +162,16 @@ def plot_sampling(sampling_flux_df: Dict[str, pd.DataFrame],  # n_samples: (n_mo
                   file_dir="./sampling",
                   prefix: str = "FS_",
                   **kwargs):
-    flux_df = pd.concat(list(sampling_flux_df.values()), axis=0, ignore_index=True)
+    dfs = []
+    for n, df in sampling_flux_df.items():
+        df["n"] = n
+        dfs.append(df)
+
+    flux_df = pd.concat(dfs, axis=0, ignore_index=True)
     if isinstance(rxn_ids, dict):
         flux_df = flux_df.rename(columns=rxn_ids)
         rxn_ids = list(rxn_ids.values())
-    flux_df = flux_df.loc[:, rxn_ids + [group_layer]]
+    flux_df = flux_df.reindex(columns=rxn_ids + [group_layer, "n"])
     grps = flux_df[group_layer].unique()
     pl = sns.color_palette(palette, n_colors=len(grps))
     color_maps = {g: pl[i] for i, g in enumerate(grps)}
