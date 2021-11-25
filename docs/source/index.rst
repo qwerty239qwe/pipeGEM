@@ -12,6 +12,10 @@ Welcome to pipeGEM's documentation!
 
    quickstart
    api
+   1_basic
+   2_data
+   3_tasks
+   4_pipelines
 
 
 Indices and tables

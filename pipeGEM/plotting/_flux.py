@@ -147,8 +147,6 @@ def plot_one_sampling(flux_df,
                         num_significance += 1
     plot_kws = {
                 "g": facet.figure,
-                 # "file_dir": str(file_dir),
-                 # "rxn_id": r,
                } # TODO: fix saving function (add name_format)
     return plot_kws
 

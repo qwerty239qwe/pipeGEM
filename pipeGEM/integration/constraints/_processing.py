@@ -13,6 +13,4 @@ def follow_up(constraint_details, constr, **kwargs):
 def post_process(sol_df, constr, **kwargs):
     if constr == "GIMME":
         return _GIMME_post_process(sol_df, **kwargs)
-
-    print("No post processing method found, an identical frame was returned")
     return sol_df

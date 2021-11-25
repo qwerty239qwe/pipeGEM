@@ -10,28 +10,31 @@ from pipeGEM.utils import get_rev_arr
 
 def swiftcc(model,
             tol = 2.2204e-16,
-            return_model=False):
+            return_model=False,
+            return_rxn_ids=True):
     blk_p = BlockedProblem(model=model)
     rev = get_rev_arr(model)
     S = cobra.util.create_stoichiometric_matrix(model)
     blk = blk_p.to_model("block")
-    consistent = np.array([True for _ in range(model.n_rxns)])
+    consistent = np.array([True for _ in range(len(model.reactions))])
     sol = blk.get_problem_fluxes("min")
-    sol = sol.iloc[model.n_mets:, :]
+    sol = sol.iloc[len(model.metabolites):, :]
     consistent[sol["fluxes"] < -0.5] = False
 
     tol = tol * norm(S[:, consistent], ord='fro')
     q, r, _ = qr(a=S[:, consistent].T, pivoting=True)
-    print(q)
-    print(r)
     z = q[rev[consistent], np.sum(np.abs(np.diag(r)) > tol):]
     consistent[rev & consistent] = np.diag(z @ z.T) > (tol ** 2)
+    output_dic = {}
+
     if return_model:
         output_model = model.copy()
         rxns = np.array([r.id for r in model.reactions])
         output_model.remove_reactions(rxns[~consistent], remove_orphans=True)
-        return output_model
-    return consistent
+        output_dic["model"] = output_model
+    if return_rxn_ids:
+        output_dic["rxn_ids"] = np.array([r.id for r in model.reactions])[consistent]
+    return output_dic
 
 
 class CoreProblem(Problem):

@@ -239,9 +239,6 @@ class BlockedProblem(Problem):
         self.c = np.array(["E" for _ in range(n)])
         self.c[self._irrev] = "L"
         self.v = np.array(["C" for _ in range(m)])
-        print(self.col_names)
-        print(self.row_names)
-        print(self.model.reactions.index)
         self.col_names, self.row_names = self.row_names, self.col_names
         self._check_matrix()
 

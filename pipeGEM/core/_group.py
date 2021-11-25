@@ -41,7 +41,16 @@ class Group(GEMComposite):
         return self.__str__()
 
     def __str__(self):
-        return f"Group [{self._name_tag}]"
+        return f"Group [{self._name_tag}]" + self._next_layer_tree()
+
+    def _next_layer_tree(self):
+        comps = [f"{comp.name_tag} ({'Model)' if comp.is_leaf else 'Group) ── ' + str(comp.size)}"
+                 for comp in self._group]
+        result = "\n├── "
+        if len(comps) > 1:
+            result += "\n├── ".join(comps[:-1])
+        result += "\n└── " + comps[-1]
+        return result
 
     def __len__(self):
         return len(self._group)
@@ -357,7 +366,7 @@ class Group(GEMComposite):
         return result
 
     def plot_components(self,
-                        group_order,
+                        group_order = None,
                         file_name: str = None) -> pd.DataFrame:
         """
         Plot number of models' components and return the used df
@@ -386,19 +395,14 @@ class Group(GEMComposite):
         if group_order is None:
             group_order = list([g.name_tag for g in self._group])
         comp_df = self.get_info(features=["n_rxns", "n_mets", "n_genes"])
-        found_objs: Dict[str, pd.Series] = {g: self._find_by_nametag(comp_df, g) for g in group_order}
-        obj_parents = {name: g.iloc[g[g == name].index[0]-1] for name, g in found_objs.items()}
-        comp_df["obj"] = group_order
-        comp_df["groups"] = [obj_parents[n] for n in comp_df["obj"].to_list()]
-        sample_grps = dict(zip(comp_df["obj"], comp_df["groups"]))
+        comp_df = comp_df.rename(columns={"group_0": "group", "group_1": "obj"})
         new_comp_df = pd.concat(
-            (pd.melt(comp_df, id_vars="obj", value_vars="n_rxns", var_name="component", value_name="number"),
-             pd.melt(comp_df, id_vars="obj", value_vars="n_mets", var_name="component", value_name="number"),
-             pd.melt(comp_df, id_vars="obj", value_vars="n_genes", var_name="component", value_name="number")),
+            (pd.melt(comp_df, id_vars=["group", "obj"], value_vars="n_rxns", var_name="component", value_name="number"),
+             pd.melt(comp_df, id_vars=["group", "obj"], value_vars="n_mets", var_name="component", value_name="number"),
+             pd.melt(comp_df, id_vars=["group", "obj"], value_vars="n_genes", var_name="component", value_name="number")),
             ignore_index=True
         )
         new_comp_df["number"] = new_comp_df["number"].astype(dtype=int)
-        new_comp_df["group"] = new_comp_df["obj"].apply(lambda x: sample_grps[x])
         plot_model_components(new_comp_df, group_order, file_name=file_name)
         return new_comp_df
 
@@ -432,7 +436,8 @@ class Group(GEMComposite):
                 processed["model"] = processed.index
                 processed["group"] = c.name_tag
                 fluxes[k][c.name_tag] = processed
-        return {fname: pd.concat(list(fdfs.values()), axis=0) for fname, fdfs in fluxes.items() }
+                print(c.name_tag)
+        return {fname: pd.concat(list(fdfs.values()), axis=0).fillna(0) for fname, fdfs in fluxes.items() }
 
     def plot_flux(self,
                   method,
@@ -500,6 +505,7 @@ class Group(GEMComposite):
             df: pd.DataFrame = pd.concat(list(fluxes.values()), axis=0)
         else:
             raise NotImplementedError()
+        print(df.columns)
         groups = dict(df["group"].to_frame().reset_index(drop=True).reset_index().groupby("group")["index"].apply(list).iteritems())
         df = df.drop(columns=["model", "group"]).reset_index(drop=True)
         if dr_method == "PCA":
@@ -528,7 +534,6 @@ class Group(GEMComposite):
         # rxn_ids = rxn_ids if rxn_ids is not None else []
         # rxn_ids += self._check_rxn_id(self.tget(tags if tags != "all" else None)[0], rxn_index, subsystems)
         fluxes = self._process_flux(method, constr, tags, get_model_level, aggregation_method)
-        print(fluxes["fluxes"])
         if method in ["FBA", "pFBA"]:
             model_names = fluxes["fluxes"]["model"] if not get_model_level else fluxes["fluxes"]["group"]
             comp_info = dict(zip(fluxes["fluxes"]["model"], fluxes["fluxes"]["group"])) \
@@ -536,11 +541,9 @@ class Group(GEMComposite):
             data = fluxes["fluxes"].drop(columns=["model", "group"] if get_model_level else ["group"]).fillna(0).values
         else:
             raise ValueError()
-
         data = pd.DataFrame(data=similarity_method[similarity](data),
                             columns=model_names,
                             index=model_names)
-        print(data)
         # xticklabels = model_names,
         # yticklabels = model_names,
         plot_clustermap(data=data,

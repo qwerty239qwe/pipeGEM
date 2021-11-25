@@ -142,33 +142,3 @@ def transform_HPA_data(data_df,
     sample_df = data_df.pivot(index=gene_id_col, columns="sample", values=score_col_name)
     return {"data_df": sample_df}
 
-
-def get_uniform_expr_threshold_dic(data_df,
-                                   sample_names,
-                                   expr_threshold,
-                                   non_expr_threshold
-                                   ):
-    valid_sample_names = data_df.columns.to_list()
-    if sample_names is None:
-        sample_names = valid_sample_names
-    else:
-        sample_names = list(set(valid_sample_names) & set(sample_names))
-
-    expr_threshold_dic = {s: expr_threshold for s in sample_names}
-    non_expr_threshold_dic = {s: non_expr_threshold for s in sample_names}
-    return {"_sample_names": sample_names,
-            "_expr_threshold_dic": expr_threshold_dic,
-            "_non_expr_threshold_dic": non_expr_threshold_dic}
-
-
-def get_discretize_data(sample_names,
-                        data_df,
-                        expr_threshold_dic,
-                        non_expr_threshold_dic):
-    disc_data = data_df.copy()
-    for sample_name in sample_names:
-        exp_thres, nexp_thres = expr_threshold_dic[sample_name], non_expr_threshold_dic[sample_name]
-        disc_data[sample_name] = disc_data[sample_name].apply(lambda x: 1
-                                                              if x >= exp_thres else -1 if x <= nexp_thres else 0)
-
-    return {"data_df": disc_data}

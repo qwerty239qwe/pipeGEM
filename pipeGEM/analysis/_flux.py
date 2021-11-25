@@ -74,7 +74,8 @@ class FluxAnalyzer:
         else:
             self.rxn_expr_score = rxn_expr_score.rxn_scores
         self._df = {constr: {name: None
-                             for name, method in self.method_dicts.items()} for constr, _ in constraint_dict.items()}
+                             for name, method in self.method_dicts.items()}
+                    for constr, _ in constraint_dict.items()}
 
     @add_constraint
     def do_analysis(self,
@@ -95,7 +96,8 @@ class FluxAnalyzer:
     def get_flux(self,
                  method: str,
                  constr: str = "default",
-                 keep_rc: bool = False) -> pd.DataFrame:
+                 keep_rc: bool = False,
+                 **kwargs) -> pd.DataFrame:
         """
         Get stored flux analysis result.
         If the result is not found, do the flux analysis and return the result.
@@ -119,7 +121,7 @@ class FluxAnalyzer:
                 samping: [0, 1, ..., n] (n = number of samples)
         """
         if self._df[constr][method] is None:
-            self.do_analysis(method=method, constr=constr)
+            self.do_analysis(method=method, constr=constr, **kwargs)
         df = self._df[constr][method].to_frame() \
             if not isinstance(self._df[constr][method], pd.DataFrame) else self._df[constr][method]
         return df if keep_rc or "reduced_costs" not in df.columns else df.drop(columns=["reduced_costs"])

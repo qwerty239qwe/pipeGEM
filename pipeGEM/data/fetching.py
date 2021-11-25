@@ -148,7 +148,7 @@ def list_models(databases=["metabolic atlas", "BiGG"],
 
 def load_model(model_id):
     model_list = list_models()
-    if model_id in model_list[model_list["database"]=="BiGG"]["id"]:
+    if model_id in model_list[model_list["database"]=="BiGG"]["id"].to_list():
         return cobra.io.load_model(model_id)
     raise NotImplementedError("haven't finished")
 

@@ -5,7 +5,8 @@ import pandas as pd
 
 from ._base import Pipeline
 from pipeGEM.data.preprocessing import (get_gene_id_map, translate_gene_id, unify_score_column,
-                                        transform_HPA_data, get_discretize_data)
+                                        transform_HPA_data, )
+
 from pipeGEM.data.fetching import fetch_HPA_data, load_HPA_data
 from pipeGEM.integration.mapping import Expression
 
@@ -51,11 +52,13 @@ class GeneDataDiscretizer(Pipeline):
         super().__init__()
         self.data_df = data_df
 
+
     def run(self,
             sample_names,
             expr_threshold_dic,
             non_expr_threshold_dic
             ) -> pd.DataFrame:
+        from pipeGEM.integration.utils import get_discretize_data
         output = get_discretize_data(sample_names=sample_names,
                                      data_df=self.data_df,
                                      expr_threshold_dic=expr_threshold_dic,

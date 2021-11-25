@@ -136,8 +136,10 @@ def random_perturb(model,
     if on_structure:
         n = len(model.reactions)
         objs = get_objective_rxn(model)
-        removed = rng.choice([r.id for r in model.reactions if r.id not in objs],
-                             size=(int(n * (1 - structure_ratio)),), replace=False)
+        amptitude = rng.uniform(low=structure_ratio, high=1)
+        exchanges = [ex.id for ex in model.exchanges]
+        removed = rng.choice([r.id for r in model.reactions if r.id not in objs+exchanges],
+                             size=(int(n * (1 - structure_ratio * amptitude)),), replace=False)
         model.remove_reactions(removed, remove_orphans=True)
 
     if on_constr:
