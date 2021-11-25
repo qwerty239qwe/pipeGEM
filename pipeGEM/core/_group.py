@@ -507,19 +507,6 @@ class Group(GEMComposite):
         else:
             plot_embedding(df=df.T, reducer=dr_method, groups=groups, **kwargs)
 
-    def plot_flux_cluster(self,
-                          method,
-                          constr,
-                          dr_method="PCA",
-                          rxn_ids="all",
-                          rxn_index=None,
-                          subsystems=None,
-                          tags: Union[str, List[str]] = "all",
-                          aggregation_method="mean",
-                          **kwargs
-                          ):
-        pass
-
     def plot_flux_heatmap(self,
                           method,
                           constr,
@@ -562,7 +549,6 @@ class Group(GEMComposite):
                         fig_size=fig_size,
                         **kwargs
                         )
-
 
     def plot_expr_cluster(self):
         pass

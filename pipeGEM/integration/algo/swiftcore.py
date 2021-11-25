@@ -21,7 +21,7 @@ def swiftcc(model,
     consistent[sol["fluxes"] < -0.5] = False
 
     tol = tol * norm(S[:, consistent], ord='fro')
-    q, r = qr(a=S[:, consistent].T)
+    q, r, _ = qr(a=S[:, consistent].T, pivoting=True)
     print(q)
     print(r)
     z = q[rev[consistent], np.sum(np.abs(np.diag(r)) > tol):]

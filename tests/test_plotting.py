@@ -58,7 +58,6 @@ def test_plot_sampling(ecoli_core):
 
 def test_plot_model_heatmap(ecoli_core):
     g = pg.Group({"ecoli": ecoli_core, "ecoli2": ecoli_core.copy(), "ecoli3": ecoli_core.copy()})
-
     g.plot_model_heatmap()
 
 

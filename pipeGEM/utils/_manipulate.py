@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import cobra
 
+from pipeGEM.utils._selection import get_objective_rxn
+
 
 def _join_str(main_list, glue_pos, glue_str='and'):
     """
@@ -118,3 +120,29 @@ def get_rev_arr(model):
     lbs = np.array([r.lower_bound for r in model.reactions])
     ubs = np.array([r.upper_bound for r in model.reactions])
     return (lbs < 0) & (ubs > 0)
+
+
+def random_perturb(model,
+                   in_place=True,
+                   on_constr=True,
+                   on_structure=True,
+                   structure_ratio=0.8,
+                   constr_ratio=0.8,
+                   random_state: int = 34):
+    if not in_place:
+        model = model.copy()
+
+    rng = np.random.default_rng(random_state)
+    if on_structure:
+        n = len(model.reactions)
+        objs = get_objective_rxn(model)
+        removed = rng.choice([r.id for r in model.reactions if r.id not in objs],
+                             size=(int(n * (1 - structure_ratio)),))
+        model.remove_reactions(removed, remove_orphans=True)
+
+    if on_constr:
+        n = len(model.reactions)
+        magnitudes = rng.uniform(low=0, high=constr_ratio, size=(n,))
+        for i, rxn in enumerate(model.reactions):
+            rxn.lower_bound, rxn.upper_bound = rxn.lower_bound * magnitudes[i], rxn.upper_bound * magnitudes[i]
+    return model

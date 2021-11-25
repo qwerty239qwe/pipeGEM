@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Dict, List, Union
 import requests
 
+import numpy as np
 import pandas as pd
 from biodbs.HPA import HPAdb
 
@@ -120,8 +121,12 @@ class AtlasDataBaseFetcher(DataBaseFetcher):
 
 
 def list_models(databases=["metabolic atlas", "BiGG"],
+                organism=None,
+                max_n_rxns=np.inf,
+                max_n_mets=np.inf,
+                max_n_genes=np.inf,
                 **kwargs):
-    fetchers = DataBaseFetcherIniter()
+    fetchers = DataBaseFetcherIniter(**kwargs)
     fetchers.register("BiGG", BiggDataBaseFetcher)
     fetchers.register("metabolic atlas", AtlasDataBaseFetcher)
     all_dfs = []
@@ -129,8 +134,14 @@ def list_models(databases=["metabolic atlas", "BiGG"],
         df = fetchers.init_fetcher(database).fetch_data()
         df["database"] = database
         all_dfs.append(df)
-
-    return pd.concat(all_dfs, axis=0)
+    mg_df = pd.concat(all_dfs, axis=0)
+    if organism is not None:
+        organism = _format_organism_name(organism)
+        mg_df = mg_df[mg_df["organism"].str.contains(organism)]
+    mg_df = mg_df.query(f"gene_count <= {max_n_genes} and "
+                        f"reaction_count <= {max_n_rxns} and "
+                        f"metabolite_count <= {max_n_mets}")
+    return mg_df
 
 
 def load_model(model_id):

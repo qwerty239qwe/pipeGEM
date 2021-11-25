@@ -50,3 +50,5 @@ class GeneDataSetHeatmap(Pipeline):
                 raise ValueError("choose from subsystems or rxns")
             dfs.append(pd.Series(scores).to_frame().rename(columns={0: sample_name}))
         plot_clustermap(pd.concat(dfs, axis=1), **plotting_kws)
+
+
