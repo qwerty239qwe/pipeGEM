@@ -15,13 +15,15 @@ def swiftcc(model,
     rev = get_rev_arr(model)
     S = cobra.util.create_stoichiometric_matrix(model)
     blk = blk_p.to_model("block")
-    blk.optimize()
     consistent = np.array([True for _ in range(model.n_rxns)])
-    sol = blk.get_problem_fluxes()
+    sol = blk.get_problem_fluxes("min")
     sol = sol.iloc[model.n_mets:, :]
     consistent[sol["fluxes"] < -0.5] = False
+
     tol = tol * norm(S[:, consistent], ord='fro')
     q, r = qr(a=S[:, consistent].T)
+    print(q)
+    print(r)
     z = q[rev[consistent], np.sum(np.abs(np.diag(r)) > tol):]
     consistent[rev & consistent] = np.diag(z @ z.T) > (tol ** 2)
     if return_model:

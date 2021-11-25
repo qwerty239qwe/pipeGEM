@@ -16,6 +16,7 @@ class Model(GEMComposite):
                  name_tag = None,
                  solver = "glpk",
                  reverse_dic = None,
+                 problem_flux_order = None,
                  data = None):
         super().__init__(name_tag=name_tag)
         self._model = model
@@ -28,6 +29,7 @@ class Model(GEMComposite):
                                       solver=solver,
                                       rxn_expr_score=self.expression)
         self._reverse_dic = reverse_dic
+        self._problem_flux_order = problem_flux_order
 
     def __getattr__(self, item):
         return getattr(self._model, item)
@@ -115,4 +117,4 @@ class Model(GEMComposite):
                     vals[var_name] += val
                 else:
                     vals[var_name] = val
-        return pd.DataFrame({"fluxes": vals})
+        return pd.DataFrame({"fluxes": vals}).loc[self._problem_flux_order, :]

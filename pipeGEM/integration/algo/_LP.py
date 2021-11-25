@@ -233,12 +233,15 @@ class BlockedProblem(Problem):
         self._irrev = ~self.get_rev()
         self.S = self.S.T
         self.objs = np.zeros((m,))
-        self.lbs = np.array([-np.inf for _ in range(m)])
-        self.ubs = np.array([np.inf for _ in range(m)])
+        self.lbs = np.array([-1e7 for _ in range(m)])
+        self.ubs = np.array([1e7 for _ in range(m)])
         self.b = np.zeros((n,))
         self.c = np.array(["E" for _ in range(n)])
         self.c[self._irrev] = "L"
         self.v = np.array(["C" for _ in range(m)])
+        print(self.col_names)
+        print(self.row_names)
+        print(self.model.reactions.index)
         self.col_names, self.row_names = self.row_names, self.col_names
         self._check_matrix()
 

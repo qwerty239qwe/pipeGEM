@@ -192,7 +192,7 @@ class Problem:
         return dic
 
     def get_rev(self):
-        return (self.lbs <= 0) & (self.ubs >= 0)
+        return (self.lbs < 0) & (self.ubs > 0)
 
     def modify_problem(self) -> None:
         """
@@ -303,4 +303,4 @@ class Problem:
         new_model.objective.set_linear_coefficients(obj_vars)
         new_model.solver.update()
 
-        return Model(new_model, name_tag=name_tag, reverse_dic=reverse_dic)
+        return Model(new_model, name_tag=name_tag, reverse_dic=reverse_dic, problem_flux_order=col_names)

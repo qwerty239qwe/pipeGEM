@@ -5,8 +5,8 @@ from pipeGEM.integration.algo.swiftcore import swiftcc, swiftCore
 from pipeGEM.integration.algo.swiftcore import CoreProblem
 
 
-def test_swiftcc(ecoli):
-    print(len(ecoli.reactions), sum(swiftcc(Model(ecoli, "ecoli"))))
+def test_swiftcc(ecoli_core):
+    print(len(ecoli_core.reactions), sum(swiftcc(Model(ecoli_core, "ecoli"))))
 
 
 def test_swiftProblem(ecoli_core):

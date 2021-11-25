@@ -49,9 +49,9 @@ def test_problem_extension(ecoli_core):
     np.equal(mod.get_problem_fluxes()[:n], mod2.get_problem_fluxes()[:n])
 
 
-def test_BlockedProblem(ecoli):
-    bp = BlockedProblem(ecoli)
+def test_BlockedProblem(ecoli_core):
+    bp = BlockedProblem(ecoli_core)
     b = bp.to_model("bp")
-    b.optimize()
-    sol = b.get_problem_fluxes()
+    sol = b.get_problem_fluxes("min")
+    print(sol[sol["fluxes"] != 0])
     print(sol[sol == -1].index)

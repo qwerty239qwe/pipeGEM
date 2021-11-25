@@ -117,4 +117,4 @@ def merge_irrevs_in_df(sol_df: pd.DataFrame,
 def get_rev_arr(model):
     lbs = np.array([r.lower_bound for r in model.reactions])
     ubs = np.array([r.upper_bound for r in model.reactions])
-    return (lbs != 0) & (ubs != 0)
+    return (lbs < 0) & (ubs > 0)
