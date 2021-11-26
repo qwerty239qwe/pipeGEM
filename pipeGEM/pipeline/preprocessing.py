@@ -46,24 +46,53 @@ class GeneDataIDConverter(Pipeline):
         return self.output["data_df"]
 
 
-class GeneDataDiscretizer(Pipeline):
+class GeneDataLengthGetter(Pipeline):
     def __init__(self,
-                 data_df):
+                 gene_names: List[str],
+                 from_id: str,
+                 df_path: str,
+                 ds_kws: Dict[str, Any],
+                 map_type: str = "df",
+                 drop_unused: bool = False,
+                 ref_model: Optional[cobra.Model] = None
+                 ):
         super().__init__()
-        self.data_df = data_df
-
+        self.map_df = get_gene_id_map(gene_names=gene_names,
+                                      from_id=from_id,
+                                      to_id="transcript_length",
+                                      df_path=df_path,
+                                      ds_kws=ds_kws,
+                                      map_type=map_type,
+                                      drop_unused=drop_unused,
+                                      ref_model=ref_model)["map_df"]
 
     def run(self,
+            data_df: pd.DataFrame,
+            gene_col: str
+            ) -> pd.DataFrame:
+        self.output = translate_gene_id(data_df=data_df,
+                                        map_df=self.map_df,
+                                        gene_col=gene_col,
+                                        to_id="transcript_length")
+        return self.output["data_df"]
+
+
+class GeneDataDiscretizer(Pipeline):
+    def __init__(self):
+        super().__init__()
+
+    def run(self,
+            data_df,
             sample_names,
             expr_threshold_dic,
             non_expr_threshold_dic
             ) -> pd.DataFrame:
         from pipeGEM.integration.utils import get_discretize_data
         output = get_discretize_data(sample_names=sample_names,
-                                     data_df=self.data_df,
+                                     data_df=data_df,
                                      expr_threshold_dic=expr_threshold_dic,
                                      non_expr_threshold_dic=non_expr_threshold_dic)
-        return output["data_df"]
+        return output
 
 
 class GeneData(Pipeline):
@@ -72,14 +101,14 @@ class GeneData(Pipeline):
         self._expression = None
 
     def run(self, data, model, *args, **kwargs):
-        self._expression = Expression(data, model, *args, **kwargs)
+        self._expression = Expression(model, data, *args, **kwargs)
         self.output = self._expression
         return self.output
 
 
 class GeneDataSet(Pipeline):
     def __init__(self, data_df: pd.DataFrame):
-        super(GeneDataSet, self).__init__()
+        super().__init__()
         self.data_df = data_df
         self.jobs = {c: GeneData() for c in data_df.columns}
         self._expression_dict = {}
@@ -104,8 +133,8 @@ class ProteinDataLoader(Pipeline):
                  data_name,
                  data_path):
         super().__init__()
-        self.data_df = pd.read_csv(fetch_HPA_data(data_name,
-                                                  data_path)["data_path"])
+        self.data_name = data_name
+        self.data_path = data_path
 
     def run(self,
             cancer_query="all",
@@ -113,6 +142,9 @@ class ProteinDataLoader(Pipeline):
             cell_type_query="all",
             cluster_query="all",
             reliability_query="default") -> pd.DataFrame:
+        self.data_df = pd.read_csv(fetch_HPA_data(self.data_name,
+                                                  self.data_path)["data_path"])
+
         if reliability_query == "default":
             reliability_query = ["Enhanced", "Approved", "Supported"]
 
@@ -157,3 +189,34 @@ class ProteinDataTransformer(Pipeline):
         self.output = output
         self.output["used_rxn_thres"] = u_output["used_rxn_thres"]
         return output
+
+
+class HPADataFetcher(Pipeline):
+    def __init__(self,
+                 data_name,
+                 data_path,
+                 level_dic=None,
+                 categories=None,
+                 score_col_name="score",
+                 *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ptn_loader = ProteinDataLoader(data_name=data_name,
+                                            data_path=data_path)
+        self.ptn_transformer = ProteinDataTransformer(level_dic=level_dic,
+                                                 categories=categories,
+                                                 score_col_name=score_col_name)
+
+    def run(self,
+            cancer_query="all",
+            tissue_query="all",
+            cell_type_query="all",
+            cluster_query="all",
+            reliability_query="default",
+            *args, **kwargs):
+        loaded = self.ptn_loader(cancer_query=cancer_query,
+                                 tissue_query=tissue_query,
+                                 cell_type_query=cell_type_query,
+                                 cluster_query=cluster_query,
+                                 reliability_query=reliability_query)
+        self.output = self.ptn_transformer(loaded)
+        return self.output

@@ -182,4 +182,4 @@ def get_discretize_data(sample_names,
         disc_data[sample_name] = disc_data[sample_name].apply(lambda x: 1
                                                               if x >= exp_thres else -1 if x <= nexp_thres else 0)
 
-    return {"data_df": disc_data}
+    return disc_data

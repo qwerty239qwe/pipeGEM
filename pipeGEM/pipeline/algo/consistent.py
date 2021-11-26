@@ -10,8 +10,19 @@ class FastCC(Pipeline):
     def __init__(self):
         super().__init__()
 
-    def run(self, model, *args, **kwargs):
-        self.output = fastcc(model, **kwargs)
+    def run(self,
+            model,
+            tol=1e-6,
+            return_model=True,
+            return_rxn_ids=True,
+            return_removed_rxn_ids=True,
+            *args,
+            **kwargs):
+        self.output = fastcc(model,
+                             epsilon=tol,
+                             return_model=return_model,
+                             return_rxn_ids=return_rxn_ids,
+                             return_removed_rxn_ids=return_removed_rxn_ids, **kwargs)
         return self.output
 
 

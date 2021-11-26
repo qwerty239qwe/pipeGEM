@@ -13,4 +13,9 @@ def get_syn_gene_data(model,
         used_genes = genes[:n_genes]
         if len(used_genes) < n_genes:
             used_genes += [f"not_metabolic_gene_{i + 1}" for i in range(n_genes - used_genes)]
-    rng.negative_binomial(2000, 0.98, (n_genes, n_sample))
+    else:
+        n_genes = len(genes)
+        used_genes = genes
+    return pd.DataFrame(data=rng.negative_binomial(200000, 0.98, (n_genes, n_sample)),
+                        columns=[f"sample_{i}" for i in range(n_sample)],
+                        index=used_genes)

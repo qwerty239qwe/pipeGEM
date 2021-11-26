@@ -200,6 +200,9 @@ class TaskContainer:
     def __getitem__(self, item):
         return self.tasks[item]
 
+    def __setitem__(self, key, value):
+        self.tasks[key] = value
+
     def __add__(self, other):
         assert len(set(other.tasks.keys()) & set(self.tasks.keys())) == 0, \
             f"task id collision: {set(other.tasks.keys()) & set(self.tasks.keys())}"
@@ -241,12 +244,13 @@ class TaskHandler:
                  method: str = 'pFBA',
                  constr: str = 'GIMME',
                  method_kwargs: dict = None,
-                 constr_kwargs: dict = None
+                 constr_kwargs: dict = None,
+                 solver="glpk"
                  ):
         self.model = model
         self.tasks = self._init_task_container(tasks_path_or_container,
                                                compartment_patenthesis=model_compartment_parenthesis)
-        self.analyzer = FluxAnalyzer(model=self.model)
+        self.analyzer = FluxAnalyzer(model=self.model, solver=solver)
 
         self._method = method
         self._method_kwargs = {} if method_kwargs is None else method_kwargs

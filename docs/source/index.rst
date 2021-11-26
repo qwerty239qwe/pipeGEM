@@ -15,7 +15,8 @@ Welcome to pipeGEM's documentation!
    1_basic
    2_data
    3_tasks
-   4_pipelines
+   5_constraints
+   6_pruning
 
 
 Indices and tables

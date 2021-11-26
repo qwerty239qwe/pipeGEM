@@ -3,6 +3,7 @@ from pipeGEM.integration.algo.fastcore import fastCore
 from pipeGEM.integration.algo.swiftcore import swiftCore
 from pipeGEM.pipeline.algo import FastCC, SwiftCC
 from pipeGEM.pipeline.threshold import BimodalThreshold
+from pipeGEM.pipeline.preprocessing import GeneDataDiscretizer
 
 
 class FastCoreAlgo(Pipeline):
@@ -73,21 +74,26 @@ class rFastCormics(Pipeline):
             self.consist_cc = SwiftCC()
 
         self.threshold = BimodalThreshold()
+        self.disc = GeneDataDiscretizer()
 
     def run(self,
             model,
             data,
-            cc_return_rxn_ids = True,
             *args,
             **kwargs):
         # get consistent model
         c_model = self.consist_cc(model,
                                   return_model=True,
-                                  return_rxn_ids=cc_return_rxn_ids,
                                   **kwargs)["model"]
 
         # get expression threshold for each samples
-        get_expression_thresholds(data, )
+        expr_tol_dict, nexpr_tol_dict = {}, {}
+        for sample in data.columns:
+            expr_tol_dict[sample], nexpr_tol_dict[sample] = self.threshold(data=data[sample], sample_name=sample)
+
+        discreted_df = self.disc(data=data, sample_names=data.columns,
+                                 expr_threshold_dic=expr_tol_dict,
+                                 non_expr_threshold_dic=nexpr_tol_dict)
 
 
 class CORDA(Pipeline):

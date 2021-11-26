@@ -29,9 +29,15 @@ class Group(GEMComposite):
 
         Parameters
         ----------
-        group
-        name_tag
-        data
+        group: a list of pg.Model or a dict of dicts
+            The name_tag and models used to build the pg.Group object,
+            Possible inputs are: {name_tag of subgroup: [pg.Models]} and
+            {name_tag of subgroup: {name_tag of model: cobra.Model}}
+        name_tag: optional, str
+            The name of this object
+        data: pd.DataFrame
+            A dataframe contains all the samples corresponds to the models in the group,
+            the columns of this dataframe should be exact names of the models' name_tags
         """
         super().__init__(name_tag=name_tag)
         self.data = data
@@ -49,7 +55,8 @@ class Group(GEMComposite):
         result = "\n├── "
         if len(comps) > 1:
             result += "\n├── ".join(comps[:-1])
-        result += "\n└── " + comps[-1]
+        if len(comps) != 0:
+            result += "\n└── " + comps[-1]
         return result
 
     def __len__(self):
@@ -83,6 +90,12 @@ class Group(GEMComposite):
 
     @property
     def reaction_ids(self):
+        """
+
+        Returns
+        -------
+
+        """
         return list(reduce(set.union, [set(g.reaction_ids) for g in self._group]))
 
     @property
@@ -257,9 +270,12 @@ class Group(GEMComposite):
                 g = Group(group=comp, name_tag=name, data=self.data)
                 max_g = max(max_g, g.tree_level)
                 group_lis.append(g)
+            elif isinstance(comp, list):
+                group_lis.extend(comp)
+                max_g = max([c.tree_level for c in group_lis])
             else:
                 group_lis.append(Model(model=comp, name_tag=name, data=self.data))
-                max_g = max(max_g, 0)
+                max_g = max(group_lis[-1].tree_level, 0)
         self._lvl = max_g + 1
         return group_lis
 

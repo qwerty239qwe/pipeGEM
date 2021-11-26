@@ -12,7 +12,7 @@ class GIMME(Pipeline):
         self.data_df = data_df
 
     def run(self, model, **kwargs):
-        expr_dict = self.gene_dataset()
+        expr_dict = self.gene_dataset(model)
 
         self.output = {}
         for c in self.data_df.columns:
@@ -26,12 +26,12 @@ class GIMME(Pipeline):
 
 class Eflux(Pipeline):
     def __init__(self, data_df):
-        super(Eflux, self).__init__()
+        super().__init__()
         self.gene_dataset = GeneDataSet(data_df)
         self.data_df = data_df
 
-    def run(self, model: cobra.Model, **kwargs):
-        expr_dict = self.gene_dataset()
+    def run(self, model: cobra.Model, *args, **kwargs):
+        expr_dict = self.gene_dataset(model)
 
         self.output = {}
         for c in self.data_df.columns:

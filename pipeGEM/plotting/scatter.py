@@ -10,7 +10,7 @@ from pipeGEM.analysis import prepare_PCA_dfs, prepare_embedding_dfs
 
 
 def plot_PCA(df,
-             groups,
+             groups = None,
              title=None,
              transform_func=None,
              standardize=True,
@@ -21,6 +21,10 @@ def plot_PCA(df,
              sheet_file_name=None,
              **kwargs):
     pca_df, exp_var_df, component_df = prepare_PCA_dfs(df, transform_func=transform_func, standardize=standardize)
+
+    if groups is None:
+        groups = {m: [m] for m in pca_df.columns}
+
     if sheet_file_name is not None:
         sh_path = Path(sheet_file_name)
         pca_path = (sh_path.parent / Path(str(sh_path.stem) + "_PCA")).with_suffix(sh_path.suffix)
@@ -53,7 +57,7 @@ def plot_PCA(df,
 
 @save_fig(prefix="", dpi=150)
 def plot_embedding(df,
-                   groups: dict,
+                   groups: dict = None,
                    title=None,
                    palette="muted",
                    transform_func=None,
@@ -64,12 +68,14 @@ def plot_embedding(df,
                    sheet_file_name=None,
                    **kwargs
                    ):
-    plotting_kws = {k: v for k, v in kwargs.items() if k in ["file_name", "dpi", "prefix"]}
+    plotting_kws = {k: v for k, v in kwargs.items()
+                    if k in ["file_name", "dpi", "prefix"]} if kwargs is not None else {}
     for k in ["file_name", "dpi", "prefix"]:
         if k in kwargs:
             del kwargs[k]
     colors = sns.color_palette(palette)
     fig, ax = plt.subplots(figsize=figsize)
+    kwargs = kwargs if kwargs is not None else {}
     embedding_df = prepare_embedding_dfs(df,
                                          reducer=reducer,
                                          n_components=2 if plot_2D else 3,
@@ -78,6 +84,9 @@ def plot_embedding(df,
                                          **kwargs)
     if sheet_file_name is not None:
         embedding_df.to_csv(sheet_file_name)
+
+    if groups is None:
+        groups = {m: [m] for m in embedding_df.columns}
 
     for i, (group_name, model_names) in enumerate(groups.items()):
         em1, em2 = np.array([embedding_df.loc['embedding 1', name] for name in model_names]), \

@@ -123,7 +123,6 @@ def transform_HPA_data(data_df,
                        score_col_name: str = "score"):
     # groupby (merge data in interested cols)
     data_df = data_df.copy()
-    print(data_df)
     if gene_id_col == "index":
         data_df["index_"] = data_df.index
         gene_id_col = "index_"

@@ -20,6 +20,23 @@ class Pipeline:
         self._post_hooks = OrderedDict()
         self._jobs = OrderedDict()
 
+    def __str__(self):
+        return self.__class__.__name__ + self._next_layer_tree()
+
+    def _next_layer_tree(self):
+        pipelines = [getattr(self, name) for name in dir(self)
+                     if name not in ['__weakref__'] and isinstance(getattr(self, name), Pipeline)]
+        result = ""
+        if len(pipelines) > 1:
+            result = "\n├── "
+            result += "\n├── ".join(str(pipelines[:-1]))
+        if len(pipelines) ==1:
+            result = "\n├── "
+            result += "\n└── " + str(pipelines[-1])
+        elif len(pipelines) > 0:
+            result += "\n└── " + str(pipelines[-1])
+        return result
+
     def __call__(self, *args, **kwargs):
         if len(self._pre_hooks) == 0 and len(self._post_hooks) == 0:
             self.run(*args, **kwargs)
