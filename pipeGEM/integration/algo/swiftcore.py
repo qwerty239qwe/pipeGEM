@@ -5,6 +5,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import svds
 
 from ._LP import BlockedProblem, Problem
+from pipeGEM.analysis import ProblemAnalyzer
 from pipeGEM.utils import get_rev_arr
 
 
@@ -15,9 +16,9 @@ def swiftcc(model,
     blk_p = BlockedProblem(model=model)
     rev = get_rev_arr(model)
     S = cobra.util.create_stoichiometric_matrix(model)
-    blk = blk_p.to_model("block")
+    blk = ProblemAnalyzer(blk_p)
     consistent = np.array([True for _ in range(len(model.reactions))])
-    sol = blk.get_problem_fluxes("min")
+    sol = blk.get_fluxes("min")
     sol = sol.iloc[len(model.metabolites):, :]
     consistent[sol["fluxes"] < -0.5] = False
 
@@ -159,8 +160,8 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
                           do_reduction=reduction)
 
     rxn_num, coupling = problem.react_num, problem.couplings
-    core_model = problem.to_model("core")
-    flux = core_model.get_problem_fluxes("min")
+    analyzer = ProblemAnalyzer(problem)
+    flux = analyzer.get_fluxes("min")
     weights = problem.weights
     weights[problem.core_index] = 0
     m_, n_ = problem.original_S_shape
@@ -176,7 +177,6 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
         _, D, Vt = svds(csr_matrix(problem.S[:m_, :n_][:, weights == 0]), k=k, which="SM")
         Vt = Vt[np.diag(D) < tol * norm(problem.S[:m_, :n_][:, weights == 0], ord='fro'), :]
         blocked[weights == 0] = np.all(abs(Vt) < tol, 0)
-
     assert len(set(rxn_num[blocked]) - set(rxn_num[weights == 0])) == 0, f"{rxn_num[blocked]}, {rxn_num[weights != 0]}"
     n_lps = 1
     while np.any(blocked):
@@ -189,8 +189,8 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
                                            do_flip=False,
                                            do_reduction=False)
         n_lps += 1
-        core_model = problem.to_model("core")
-        flux = core_model.get_problem_fluxes("min")[:n_]
+        core_model = ProblemAnalyzer(problem)
+        flux = core_model.get_fluxes("min")[:n_]
         weights[abs(flux["fluxes"].values) > tol] = 0
         assert len(weights) == __w
         blocked[abs(flux["fluxes"].values) > tol] = False

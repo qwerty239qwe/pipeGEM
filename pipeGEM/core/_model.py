@@ -18,6 +18,21 @@ class Model(GEMComposite):
                  reverse_dic = None,
                  problem_flux_order = None,
                  data = None):
+        """
+        Main model used to store cobra.Model and its name, omics data, and analyzer
+
+        Parameters
+        ----------
+        model: cobra.Model
+            The encapsulated cobra model
+        name_tag: str
+            The name of this object, it will be used in a pg.Group object
+        solver: str
+            The name of used LP solver
+        reverse_dic: optional, the
+        problem_flux_order
+        data
+        """
         super().__init__(name_tag=name_tag)
         self._model = model
         if data is not None:
@@ -101,20 +116,3 @@ class Model(GEMComposite):
         path = Path(file_dir_path)
         self._analyzer.load_analysis(path)
 
-    def get_problem_fluxes(self, direction="max") -> pd.DataFrame:
-        self._model.solver.objective.direction = direction
-        self._model.solver.optimize()
-        vals = {}
-        _skips = []
-        for var_name, val in self._model.solver.primal_values.items():
-            if var_name in self._reverse_dic:
-                if self._reverse_dic[var_name] in vals:
-                    vals[self._reverse_dic[var_name]] -= val
-                else:
-                    vals[self._reverse_dic[var_name]] = -val
-            else:
-                if var_name in vals:
-                    vals[var_name] += val
-                else:
-                    vals[var_name] = val
-        return pd.DataFrame({"fluxes": vals}).loc[self._problem_flux_order, :]

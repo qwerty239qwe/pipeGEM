@@ -3,10 +3,12 @@ from functools import wraps
 from typing import Union, Dict
 
 import pandas as pd
+import numpy as np
 import cobra
 from cobra.flux_analysis.variability import flux_variability_analysis
 from cobra.flux_analysis.parsimonious import pfba
 from cobra.sampling import sampling
+from optlang.symbolics import Zero
 
 from pipeGEM.integration.constraints import add_constraint, add_constraint_f, constraint_dict, post_process
 
@@ -173,3 +175,103 @@ class FluxAnalyzer:
             biom = model.problem.Constraint(model.objective.expression, obj_lb)
             model.solver.add(biom)
             return sampling.sample(model, n=n, **kwargs).T
+
+
+class ProblemAnalyzer:
+    def __init__(self,
+                 problem,
+                 solver: str = 'gurobi'):
+        self.S, self.v, self.v_lbs, self.v_ubs, self.b, self.csense = problem.S, problem.v, \
+                                                                      problem.lbs, problem.ubs, problem.b, problem.c
+        self.objs, self.col_names, self.row_names = problem.objs, problem.col_names, problem.row_names
+        self.anchor_n = problem.anchor_n
+        self.new_model = cobra.Model()
+        self.prob = self.new_model.problem
+        self.variables = []
+        self.r_variables = []
+        self.constraints = []
+        if self.v is None:
+            self.v = ["C" for _ in range(self.S.shape[1])]
+        self.setup_constrs()
+        self.setup_variables()
+
+
+    def setup_constrs(self):
+        for i, (b_bound, b_type) in enumerate(zip(self.b, self.csense)):
+            constr_data = {"name": f"const_{i}" if self.row_names is None else self.row_names[i]}
+            if b_type in ("E", "G"):
+                constr_data.update({"lb": b_bound})
+            if b_type in ("E", "L"):
+                constr_data.update({"ub": b_bound})
+            n = self.prob.Constraint(
+                Zero,
+                **constr_data
+            )
+            self.constraints.append(n)
+        self.new_model.solver.add(self.constraints, sloppy=True)
+        self.reverse_dic = {v.name: r.name for v, r in zip(self.variables, self.r_variables)}
+
+    def setup_variables(self):
+        for i, (v_lb, v_ub, v_type) in enumerate(zip(self.v_lbs, self.v_ubs, self.v)):
+            added_vars = []
+            if i < self.anchor_n:
+                if v_lb > 0:
+                    a_lb_f, a_ub_f = None if np.isinf(v_lb) else v_lb, None if np.isinf(v_ub) else v_ub
+                    a_lb_r, a_ub_r = 0, 0
+                elif v_ub < 0:
+                    a_lb_f, a_ub_f = 0, 0
+                    a_lb_r, a_ub_r = None if np.isinf(v_ub) else -v_ub, None if np.isinf(v_lb) else -v_lb
+                else:
+                    a_lb_f, a_ub_f = 0, None if np.isinf(v_ub) else v_ub
+                    a_lb_r, a_ub_r = 0, None if np.isinf(v_lb) else -v_lb
+                m_r = self.prob.Variable(name=f"var_{i}_r" if self.col_names is None else self.col_names[i] + "_r",
+                                         type=self.var_type_dict[v_type],
+                                         lb=a_lb_r,
+                                         ub=a_ub_r)
+                added_vars.append(m_r)
+            else:
+                a_lb_f, a_ub_f = v_lb, v_ub
+            m = self.prob.Variable(name=f"var_{i}" if self.col_names is None else self.col_names[i],
+                                   type=self.var_type_dict[v_type],
+                                   lb=a_lb_f,
+                                   ub=a_ub_f)
+            added_vars.append(m)
+            self.new_model.solver.add(added_vars, sloppy=True)
+            non_zero_idx = np.nonzero(self.S[:, i])[0]
+            for j in non_zero_idx:
+                self.new_model.solver.constraints[f"const_{j}" if self.row_names is None
+                else self.row_names[j]].set_linear_coefficients({
+                                                               m: float(self.S[j, i]),
+                                                               m_r: -float(self.S[j, i])
+                                                           } if i < self.anchor_n else {
+                    m: float(self.S[j, i])
+                })
+
+            self.variables.append(m)
+            if i < self.anchor_n:
+                self.r_variables.append(m_r)
+                self.reverse_dic[m_r.name] = m.name
+
+        obj_vars = {self.variables[i]: c for i, c in enumerate(self.objs)}
+        obj_vars.update({v: -self.objs[i] for i, v in enumerate(self.r_variables)})
+        self.new_model.objective = self.prob.Objective(Zero, sloppy=True)
+        self.new_model.objective.set_linear_coefficients(obj_vars)
+        self.new_model.solver.update()
+
+    def get_fluxes(self, direction="max") -> pd.DataFrame:
+        self.new_model.solver.objective.direction = direction
+        self.new_model.solver.optimize()
+        vals = {}
+        _skips = []
+        for var_name, val in self.new_model.solver.primal_values.items():
+            if var_name in self.reverse_dic:
+                if self.reverse_dic[var_name] in vals:
+                    vals[self.reverse_dic[var_name]] -= val
+                else:
+                    vals[self.reverse_dic[var_name]] = -val
+            else:
+                if var_name in vals:
+                    vals[var_name] += val
+                else:
+                    vals[var_name] = val
+        return pd.DataFrame({"fluxes": vals}).loc[self.col_names, :]

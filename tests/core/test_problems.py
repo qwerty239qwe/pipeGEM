@@ -16,7 +16,6 @@ class TestProblem(Problem):
         e_lbs = -np.ones((n,)) * np.inf
         e_ubs = np.ones((n,)) * np.inf
         self.extend_horizontal(e_S, e_v, e_lbs, e_ubs, e_objs=np.ones(n,))
-
         e_S = np.zeros(shape=(m, 2 * n))
         #np.fill_diagonal(e_S, 1)
         e_b = np.zeros((m,))
