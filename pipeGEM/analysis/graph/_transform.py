@@ -6,7 +6,11 @@ from pipeGEM.core._problem import LP_Problem
 
 
 class ModelGraph:
-    def __init__(self, model, occur_ratio=0.1, met_color="blue", rxn_color="red"):
+    def __init__(self,
+                 model,
+                 occur_ratio=0.1,
+                 met_color="blue",
+                 rxn_color="red"):
         self.lp = LP_Problem(model)
         self.cofactor_index = self._check_cofactors(self.lp.S, occur_ratio=occur_ratio)
         self.met_color, self.rxn_color = met_color, rxn_color
@@ -40,4 +44,3 @@ class ModelGraph:
 
     def plot_shortest(self, g, s, t):
         shortest_path = nx.shortest_path(g, weight="weight", source=s, target=t)
-        # TODO: finish

@@ -114,7 +114,24 @@ class Task:
         cp = self.compartment_parenthesis
         return met_id + cp.format(compr)
 
-    def mets_in_model(self, model, all_mets_in_model = None) -> bool:
+    def mets_in_model(self,
+                      model,
+                      all_mets_in_model = None) -> bool:
+        """
+        A function to check if all the tasks' metabolites are in the model
+
+        Parameters
+        ----------
+        model: cobra.Model or pg.Model
+            Checked metabolic model
+        all_mets_in_model: optional, list of str
+            All the metabolites' ID. Input to prevent to traverse the metabolite list in the model repeatedly.
+        Returns
+        -------
+        are_in_model: bool
+            A bool indicates if the metabolites are all in the model
+
+        """
         if not all_mets_in_model:
             all_mets_in_model = [m.id for m in model.metabolites]
         all_fine = True
@@ -130,6 +147,23 @@ class Task:
                all_mets_in_model = None,
                loose_input=False,
                loose_output=False):
+        """
+        Assign this task to a model and do the test
+
+        Parameters
+        ----------
+        model: cobra.Model or pg.Model
+            Assigned metabolic model
+        all_mets_in_model: optional, list of str
+            All the metabolites in the model
+        loose_input: bool, default: False
+            To loose the input constraints to the maximum (0, 1000)
+        loose_output: bool, default: False
+            To loose the output constraints to the maximum (0, 1000)
+        Returns
+        -------
+
+        """
         if not all_mets_in_model:
             all_mets_in_model = [m.id for m in model.metabolites]
         dummy_rxn_list, obj_rxn_list = [], []
