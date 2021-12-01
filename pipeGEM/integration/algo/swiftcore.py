@@ -116,6 +116,7 @@ class CoreProblem(Problem):
         dense[self.blocked] = np.random.normal(0, 1, size=sum(self.blocked))
         k_v, l_v = (self.weights != 0) & rev, (self.weights != 0) & (~rev)
         k, l = np.sum(k_v), np.sum(l_v)
+        print(k, l)
         self.objs = dense
 
         self.lbs = np.where(self.blocked, self.lbs, -1e6)
@@ -136,6 +137,8 @@ class CoreProblem(Problem):
         temp1, temp2 = np.eye(n), np.eye(k + l)
         btm_ext_S_1 = np.concatenate([temp1[k_v, :], temp2[rev[self.weights!=0] == 1, :]], axis=1)
         btm_ext_S_2 = np.concatenate([-temp1[self.weights != 0, :], temp2], axis=1)
+        print(btm_ext_S_1)
+        print(btm_ext_S_2)
         csense = np.array(["G" for _ in range(2 * k + l)])
         b = np.zeros(2 * k + l)
         self.extend_vertical(e_S=np.concatenate([btm_ext_S_1, btm_ext_S_2], axis=0),

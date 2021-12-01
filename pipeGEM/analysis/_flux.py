@@ -11,6 +11,7 @@ from cobra.sampling import sampling
 from optlang.symbolics import Zero
 
 from pipeGEM.integration.constraints import add_constraint, add_constraint_f, constraint_dict, post_process
+from .._constant import var_type_dict
 
 
 ANALYSIS_METHODS = {}
@@ -225,14 +226,14 @@ class ProblemAnalyzer:
                     a_lb_f, a_ub_f = 0, None if np.isinf(v_ub) else v_ub
                     a_lb_r, a_ub_r = 0, None if np.isinf(v_lb) else -v_lb
                 m_r = self.prob.Variable(name=f"var_{i}_r" if self.col_names is None else self.col_names[i] + "_r",
-                                         type=self.var_type_dict[v_type],
+                                         type=var_type_dict[v_type],
                                          lb=a_lb_r,
                                          ub=a_ub_r)
                 added_vars.append(m_r)
             else:
                 a_lb_f, a_ub_f = v_lb, v_ub
             m = self.prob.Variable(name=f"var_{i}" if self.col_names is None else self.col_names[i],
-                                   type=self.var_type_dict[v_type],
+                                   type=var_type_dict[v_type],
                                    lb=a_lb_f,
                                    ub=a_ub_f)
             added_vars.append(m)
@@ -257,10 +258,13 @@ class ProblemAnalyzer:
         self.new_model.objective = self.prob.Objective(Zero, sloppy=True)
         self.new_model.objective.set_linear_coefficients(obj_vars)
         self.new_model.solver.update()
+        print(self.new_model.objective)
 
     def get_fluxes(self, direction="max") -> pd.DataFrame:
         self.new_model.solver.objective.direction = direction
         self.new_model.solver.optimize()
+        print(self.new_model.solver.status)
+        print(self.new_model.solver.objective.value)
         vals = {}
         _skips = []
         for var_name, val in self.new_model.solver.primal_values.items():
