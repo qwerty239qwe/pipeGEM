@@ -89,29 +89,58 @@ class Group(GEMComposite):
             raise TypeError("Inputted value should be a dict, list, Model, or a cobra.model")
 
     @property
-    def reaction_ids(self):
+    def reaction_ids(self) -> List[str]:
         """
+        All the reaction ID inside this object
 
         Returns
         -------
-
+        rxn_ids: list of str
         """
         return list(reduce(set.union, [set(g.reaction_ids) for g in self._group]))
 
     @property
     def metabolite_ids(self):
+        """
+        All the metabolites ID inside this object
+
+        Returns
+        -------
+        met_ids: list of str
+        """
         return list(reduce(set.union, [set(g.metabolite_ids) for g in self._group]))
 
     @property
     def gene_ids(self):
+        """
+        All the genes ID inside this object
+
+        Returns
+        -------
+        gene_ids: list of str
+        """
         return list(reduce(set.union, [set(g.gene_ids) for g in self._group]))
 
     @property
-    def size(self):
+    def size(self) -> int:
+        """
+        The size of models in this object
+
+        Returns
+        -------
+        size: int
+        """
         return sum([g.size for g in self._group])
 
     @property
-    def members(self):
+    def members(self) -> str:
+        """
+        Show all of the members in this objects
+
+        Returns
+        -------
+        members: str
+        """
         return "\n".join([str(g) for g in self._group])
 
     @property
@@ -127,7 +156,24 @@ class Group(GEMComposite):
             subs[g] = set(rxns)
         return subs
 
-    def do_analysis(self, **kwargs):
+    def do_analysis(self, **kwargs) -> None:
+        """
+        Perform analysis on all the objects in this group
+
+        Parameters
+        ----------
+        kwargs: dict
+            Keyword arguments of the analysis,
+
+            basic inputs-
+            method: str
+                The name of performed analysis
+            constr: str
+                The name of applied constraints
+        Returns
+        -------
+        None
+        """
         for g in self._group:
             g.do_analysis(**kwargs)
 
@@ -325,18 +371,30 @@ class Group(GEMComposite):
 
         return data
 
-    def get_info(self, tag=None, index=None, features=None, **kwargs) -> pd.DataFrame:
+    def get_info(self,
+                 tag=None,
+                 index=None,
+                 features=None,
+                 **kwargs) -> pd.DataFrame:
         """
+        Get a information table by traversing the object structure
 
         Parameters
         ----------
-        tag
-        index
-        features
-        kwargs
+        tag: optional, str
+            The name tag of the root object, if None, use this object as the root.
+            Cannot input with index simultaneously
+        index: optional, int
+            The index of the root object, if None, use this object as the root.
+            Cannot input with tag simultaneously
+        features: optional, list of str
+            The features to be obtained while the traverse
+        kwargs: dict
+            Keyword args used while traversing
 
         Returns
         -------
+        information_table: pd.DataFrame
 
         """
         data = self._traverse(tag, index, features, **kwargs)
