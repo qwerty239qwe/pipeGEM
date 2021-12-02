@@ -1,6 +1,7 @@
 import numpy as np
 
 from pipeGEM import Model
+from pipeGEM.analysis import ProblemAnalyzer
 from pipeGEM.integration.algo.swiftcore import swiftcc, swiftCore
 from pipeGEM.integration.algo.swiftcore import CoreProblem
 
@@ -25,8 +26,8 @@ def test_swiftProblem(ecoli_core):
                           do_flip=True,
                           do_reduction=False)
     rxn_ids = np.array([rxn.id for rxn in ecoli.reactions if not rxn.reversibility])
-    core_model = problem.to_model("core", direction="min")
-    flux = core_model.get_problem_fluxes("min")
+    core_model = ProblemAnalyzer(problem)
+    flux = core_model.get_fluxes("min")
     print(flux.iloc[:n, :][flux.iloc[:n, :]["fluxes"] != 0])
     print(sorted(rxn_ids))
 

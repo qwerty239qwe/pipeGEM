@@ -2,7 +2,7 @@ from typing import Optional, Sequence, Union
 
 import numpy as np
 import cobra
-from optlang.symbolics import Zero
+
 
 from . import Model
 
@@ -227,80 +227,10 @@ class Problem:
         self.c = np.concatenate([self.c, e_c] if at_bottom else [e_c, self.c])
         self.row_names = np.concatenate([self.row_names, e_names] if at_bottom else [e_names, self.row_names])
 
-    def to_model(self, name_tag, direction="max"):
-        """
-        Returns
-        -------
 
-        """
-        S, v, v_lbs, v_ubs, b, csense = self.S, self.v, self.lbs, self.ubs, self.b, self.c
-        objs, col_names, row_names = self.objs, self.col_names, self.row_names
-        self._check_matrix()
-        new_model = cobra.Model()
-        prob = new_model.problem
-        variables = []
-        r_variables = []
-        constraints = []
-        if v is None:
-            v = ["C" for _ in range(S.shape[1])]
+class LP_Problem(Problem):
+    def __init__(self, model, **kwargs):
+        super().__init__(model = model, **kwargs)
 
-        for i, (b_bound, b_type) in enumerate(zip(b, csense)):
-            constr_data = {"name": f"const_{i}" if row_names is None else row_names[i]}
-            if b_type in ("E", "G"):
-                constr_data.update({"lb": b_bound})
-            if b_type in ("E", "L"):
-                constr_data.update({"ub": b_bound})
-            n = prob.Constraint(
-                Zero,
-                **constr_data
-            )
-            constraints.append(n)
-        new_model.solver.add(constraints, sloppy=True)
-        reverse_dic = {v.name: r.name for v, r in zip(variables, r_variables)}
-        for i, (v_lb, v_ub, v_type) in enumerate(zip(v_lbs, v_ubs, v)):
-            added_vars = []
-            if i < self.anchor_n:
-                if v_lb > 0:
-                    a_lb_f, a_ub_f = None if np.isinf(v_lb) else v_lb, None if np.isinf(v_ub) else v_ub
-                    a_lb_r, a_ub_r = 0, 0
-                elif v_ub < 0:
-                    a_lb_f, a_ub_f = 0, 0
-                    a_lb_r, a_ub_r = None if np.isinf(v_ub) else -v_ub, None if np.isinf(v_lb) else -v_lb
-                else:
-                    a_lb_f, a_ub_f = 0, None if np.isinf(v_ub) else v_ub
-                    a_lb_r, a_ub_r = 0, None if np.isinf(v_lb) else -v_lb
-                m_r = prob.Variable(name=f"var_{i}_r" if col_names is None else col_names[i] + "_r",
-                                    type=self.var_type_dict[v_type],
-                                    lb=a_lb_r,
-                                    ub=a_ub_r)
-                added_vars.append(m_r)
-            else:
-                a_lb_f, a_ub_f = v_lb,  v_ub
-            m = prob.Variable(name=f"var_{i}" if col_names is None else col_names[i],
-                              type=self.var_type_dict[v_type],
-                              lb=a_lb_f,
-                              ub=a_ub_f)
-            added_vars.append(m)
-            new_model.solver.add(added_vars, sloppy=True)
-            non_zero_idx = np.nonzero(S[:, i])[0]
-            for j in non_zero_idx:
-                new_model.solver.constraints[f"const_{j}" if row_names is None
-                else row_names[j]].set_linear_coefficients({
-                    m: float(S[j, i]),
-                    m_r: -float(S[j, i])
-                } if i < self.anchor_n else {
-                    m: float(S[j, i])
-                })
-
-            variables.append(m)
-            if i < self.anchor_n:
-                r_variables.append(m_r)
-                reverse_dic[m_r.name] = m.name
-
-        obj_vars = {variables[i]: c for i, c in enumerate(objs)}
-        obj_vars.update({v: -objs[i] for i, v in enumerate(r_variables)})
-        new_model.objective = prob.Objective(Zero, sloppy=True, direction=direction)
-        new_model.objective.set_linear_coefficients(obj_vars)
-        new_model.solver.update()
-
-        return Model(new_model, name_tag=name_tag, reverse_dic=reverse_dic, problem_flux_order=col_names)
+    def modify_problem(self) -> None:
+        pass
