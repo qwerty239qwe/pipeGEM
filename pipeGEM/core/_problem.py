@@ -5,6 +5,7 @@ import cobra
 
 
 from . import Model
+from .._constant import var_type_dict, csense_dict
 
 
 class DimensionMismatchedError(ValueError):
@@ -13,8 +14,6 @@ class DimensionMismatchedError(ValueError):
 
 
 class Problem:
-    CSENSE = {"E": "equals to", "L": "lower than", "G": "greater than"}
-    var_type_dict = {"C": "continuous", "B": "binary", "I": "integer"}
     req_args = ("S",)
 
     def __init__(self, model = None, **kwargs):
@@ -125,8 +124,8 @@ class Problem:
         assert self.v is None or len(self.v) == self.S.shape[1], \
             f"number of var types ({len(self.v)}) does not match S.shape[1] ({self.S.shape[1]})"
         if self.v is not None:
-            assert all([v in self.var_type_dict for v in self.v]), \
-                f"all of the var types should be one of the {self.var_type_dict.keys()}"
+            assert all([v in var_type_dict for v in self.v]), \
+                f"all of the var types should be one of the {var_type_dict.keys()}"
         assert self.S.shape[1] == len(self.lbs) == len(self.ubs) == len(self.objs), \
             f"number of v's lower bounds: {len(self.lbs)}, number of upper bounds: {len(self.ubs)} " \
             f"or the len of c vector: {len(self.c)} does not equal to S.shape[1] {self.S.shape[1]}"
@@ -134,8 +133,8 @@ class Problem:
             f"number of csense: {len(self.c)} or the len of b vector: {len(self.b)} does not equal to " \
             f"S.shape[0]: {self.S.shape[0]}"
         assert all(
-            [c in self.CSENSE for c in self.c]), \
-            f"All of the csense should be one of the: {self.CSENSE.keys()}"
+            [c in csense_dict for c in self.c]), \
+            f"All of the csense should be one of the: {csense_dict.keys()}"
 
     @staticmethod
     def _check_extend_horizontal(e_S, e_v, e_v_lb, e_v_ub, e_objs, e_names=None):
