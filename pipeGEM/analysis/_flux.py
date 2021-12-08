@@ -258,7 +258,6 @@ class ProblemAnalyzer:
         self.new_model.objective = self.prob.Objective(Zero, sloppy=True)
         self.new_model.objective.set_linear_coefficients(obj_vars)
         self.new_model.solver.update()
-        print(self.new_model.objective)
 
     def get_fluxes(self, direction="max") -> pd.DataFrame:
         self.new_model.solver.objective.direction = direction

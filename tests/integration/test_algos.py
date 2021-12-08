@@ -20,7 +20,7 @@ def test_swiftProblem(ecoli_core):
     is_core = np.array([(i in core_index) for i in range(len(ecoli.reactions))])
     m, n = len(ecoli.metabolites), len(ecoli.reactions)
     blocked = np.array([False for _ in range(n)])
-
+    weights[is_core] = 0
     # assert sum(ecoli.optimize().to_frame()["fluxes"].values) != 0, sum(ecoli.optimize().to_frame()["fluxes"].values)
     problem = CoreProblem(model=ecoli,
                           blocked=blocked,
@@ -30,7 +30,7 @@ def test_swiftProblem(ecoli_core):
                           do_reduction=False)
     rxn_ids = np.array([rxn.id for rxn in ecoli.reactions if not rxn.reversibility])
     core_model = ProblemAnalyzer(problem)
-    flux = core_model.get_fluxes("min")
+    flux = core_model.get_fluxes("max")
     # print(flux)
     print(flux.iloc[:n, :][flux.iloc[:n, :]["fluxes"] != 0])
 

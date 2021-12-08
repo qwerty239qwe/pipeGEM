@@ -116,8 +116,7 @@ class CoreProblem(Problem):
         dense[self.blocked] = np.random.normal(0, 1, size=sum(self.blocked))
         k_v, l_v = (self.weights != 0) & rev, (self.weights != 0) & (~rev)
         k, l = np.sum(k_v), np.sum(l_v)
-        print(k, l)
-        self.objs = dense
+        self.objs = -dense
 
         self.lbs = np.where(self.blocked, self.lbs, -1e6)
         self.lbs[l_v] = 0
@@ -132,19 +131,17 @@ class CoreProblem(Problem):
                                e_v=np.array(["C" for _ in range(k + l)]),
                                e_v_lb=-np.ones(shape=(k + l)) * 1e6,
                                e_v_ub=np.ones(shape=(k + l)) * 1e6,
-                               e_objs=np.concatenate([self.weights[k_v], self.weights[l_v]]),
-                               e_names=[f"ext_const_{i}" for i in range(k + l)])
+                               e_objs=-np.concatenate([self.weights[k_v], self.weights[l_v]]),
+                               e_names=[f"ext_var_{i}" for i in range(k + l)])
         temp1, temp2 = np.eye(n), np.eye(k + l)
-        btm_ext_S_1 = np.concatenate([temp1[k_v, :], temp2[rev[self.weights!=0] == 1, :]], axis=1)
+        btm_ext_S_1 = np.concatenate([temp1[k_v, :], temp2[rev[self.weights != 0] == 1, :]], axis=1)
         btm_ext_S_2 = np.concatenate([-temp1[self.weights != 0, :], temp2], axis=1)
-        print(btm_ext_S_1)
-        print(btm_ext_S_2)
         csense = np.array(["G" for _ in range(2 * k + l)])
         b = np.zeros(2 * k + l)
         self.extend_vertical(e_S=np.concatenate([btm_ext_S_1, btm_ext_S_2], axis=0),
                              e_b=b,
                              e_c=csense,
-                             e_names=[f"ext_var_{i}" for i in range(2 * k + l)])
+                             e_names=[f"ext_constr_{i}" for i in range(2 * k + l)])
 
 
 def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16):
@@ -155,6 +152,7 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
     m, n = len(model.metabolites), len(model.reactions)
 
     blocked = np.array([False for _ in range(n)])
+    weights[is_core] = 0
     problem = CoreProblem(model=model,
                           blocked=blocked,
                           weights=weights,
@@ -164,13 +162,10 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
 
     rxn_num, coupling = problem.react_num, problem.couplings
     analyzer = ProblemAnalyzer(problem)
-    flux = analyzer.get_fluxes("min")
+    flux = analyzer.get_fluxes("max")
     weights = problem.weights
-    weights[problem.core_index] = 0
     m_, n_ = problem.original_S_shape
     flux = flux[:n_]
-    print([r.id for i, r in enumerate(model.reactions)])
-    print(flux)
     weights[abs(flux["fluxes"].values) > tol] = 0
     if n == n_:
         blocked = np.array([False for _ in range(n)])
@@ -193,7 +188,7 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
                                            do_reduction=False)
         n_lps += 1
         core_model = ProblemAnalyzer(problem)
-        flux = core_model.get_fluxes("min")[:n_]
+        flux = core_model.get_fluxes("max")[:n_]
         weights[abs(flux["fluxes"].values) > tol] = 0
         assert len(weights) == __w
         blocked[abs(flux["fluxes"].values) > tol] = False
