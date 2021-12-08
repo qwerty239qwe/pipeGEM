@@ -321,12 +321,12 @@ class Group(GEMComposite):
                 max_g = max([c.tree_level for c in group_lis])
             else:
                 group_lis.append(Model(model=comp, name_tag=name, data=self.data))
-                max_g = max(group_lis[-1].tree_level, 0)
+                max_g = max([g.tree_level for g in group_lis] + [1])
         self._lvl = max_g + 1
         return group_lis
 
     def _traverse_util(self, comp: GEMComposite, suffix_row, max_lvl, features, **f_kws) -> List:
-        assert max_lvl >= len(suffix_row)
+        assert max_lvl >= len(suffix_row), f"{suffix_row}, {max_lvl}"
         if comp.is_leaf:
             return suffix_row + \
                    ["-" for _ in range(max_lvl - len(suffix_row))] + \

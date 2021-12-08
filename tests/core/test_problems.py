@@ -1,6 +1,7 @@
 import numpy as np
 
 from pipeGEM.core import Problem
+from pipeGEM.analysis import ProblemAnalyzer
 from pipeGEM.integration.algo import BlockedProblem
 
 
@@ -32,10 +33,10 @@ class TestProblem2(Problem):
 
 def test_problem_consistent(ecoli_core):
     p = TestProblem2(model=ecoli_core)
-    mod = p.to_model("new")
+    mod = ProblemAnalyzer(p)
     sol = ecoli_core.optimize().to_frame()
-    new_sol = mod.get_problem_fluxes()
-    assert np.equal(sol["fluxes"], new_sol["fluxes"])
+    new_sol = mod.get_fluxes()
+    assert all(np.equal(sol["fluxes"], new_sol["fluxes"]))
 
 
 def test_problem_extension(ecoli_core):
@@ -43,14 +44,14 @@ def test_problem_extension(ecoli_core):
     p2 = TestProblem2(model=ecoli_core)
     n = len([r for r in ecoli_core.reactions])
 
-    mod = p.to_model("new")
-    mod2 = p2.to_model("new2")
-    np.equal(mod.get_problem_fluxes()[:n], mod2.get_problem_fluxes()[:n])
+    mod = ProblemAnalyzer(p)
+    mod2 = ProblemAnalyzer(p2)
+    np.equal(mod.get_fluxes()[:n], mod2.get_fluxes()[:n])
 
 
 def test_BlockedProblem(ecoli_core):
     bp = BlockedProblem(ecoli_core)
-    b = bp.to_model("bp")
-    sol = b.get_problem_fluxes("min")
+    b = ProblemAnalyzer(bp)
+    sol = b.get_fluxes("min")
     print(sol[sol["fluxes"] != 0])
     print(sol[sol == -1].index)
