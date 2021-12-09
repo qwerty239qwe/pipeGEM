@@ -5,6 +5,7 @@ from functools import reduce
 import cobra
 
 __all__ = ("get_objective_rxn", "get_subsystems", "get_rxns_in_subsys", "get_rxn_set",
+           "get_organic_exs", "get_not_met_exs",
            "get_genes_in_subsys", "select_rxns_from_model")
 
 

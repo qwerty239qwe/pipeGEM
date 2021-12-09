@@ -1,7 +1,9 @@
 from typing import List, Dict, Any, Optional
+from functools import partial
 
 import cobra
 import pandas as pd
+import numpy as np
 
 from ._base import Pipeline
 from pipeGEM.data.preprocessing import (get_gene_id_map, translate_gene_id, unify_score_column,
@@ -93,6 +95,26 @@ class GeneDataDiscretizer(Pipeline):
                                      expr_threshold_dic=expr_threshold_dic,
                                      non_expr_threshold_dic=non_expr_threshold_dic)
         return output
+
+
+class GeneDataLinearScaler(Pipeline):
+    def __init__(self):
+        super().__init__()
+
+    def run(self,
+            data,
+            domain_lb,
+            domain_ub,
+            range_lb=0,
+            range_ub=1,
+            range_nan=0.5,
+            *args,
+            **kwargs):
+        ls_func = partial(np.interp, xp=[domain_lb, domain_ub], fp=[range_lb, range_ub])
+        self.output = {name: ls_func(val) if not np.isnan(val) else range_nan
+                       for name, val in data.items()}
+        return self.output
+
 
 
 class GeneData(Pipeline):

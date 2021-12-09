@@ -11,3 +11,4 @@ def log_xplus1(x, coef=1):
 
 def exp_x(x, coef=1, a=1.5):
     return a ** x - coef
+

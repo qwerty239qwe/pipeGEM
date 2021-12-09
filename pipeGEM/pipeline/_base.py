@@ -1,15 +1,20 @@
 from collections import OrderedDict
 
 
-__all__ = ["Pipeline"]
+__all__ = ["Pipeline", "Config"]
 
 
-class ConfigManager:
+class Config:
     def __init__(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
 
     def __setstate__(self, state):
+        pass
+
+
+class Recorder:
+    def __init__(self):
         pass
 
 
