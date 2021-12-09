@@ -12,13 +12,11 @@ class TestProblem(Problem):
     def modify_problem(self) -> None:
         m, n = len(self.model.metabolites), len(self.model.reactions)
         e_S = np.zeros(shape=(m, n))
-        #np.fill_diagonal(e_S, 1)
         e_v = np.array(["C" for _ in range(n)])
-        e_lbs = -np.ones((n,)) * np.inf
-        e_ubs = np.ones((n,)) * np.inf
+        e_lbs = -np.ones((n,)) * 1e8
+        e_ubs = np.ones((n,)) * 1e8
         self.extend_horizontal(e_S, e_v, e_lbs, e_ubs, e_objs=np.ones(n,))
         e_S = np.zeros(shape=(m, 2 * n))
-        #np.fill_diagonal(e_S, 1)
         e_b = np.zeros((m,))
         self.extend_vertical(e_S, e_b)
 

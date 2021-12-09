@@ -14,11 +14,11 @@ def test_get_group(ecoli_core):
     g = Group({"ecoli": m1, "ecoli_2": m1.copy()}, name_tag="G1")
     assert m1 == g.tget("ecoli")[0].cobra_model
     assert isinstance(g.tget("ecoli")[0].model, Model)
-    assert g._lvl == 1
+    assert g._lvl == 2
 
     g2 = Group({"ecoli_g1": {"e11": m1, "e12": m1}, "ecoli_g2": {"e21": m1, "e22": m1}, "a": m1}, name_tag="G2")
     assert g2.iget([0, 0])[0].name_tag == "e11"
-    assert g2._lvl == 2
+    assert g2._lvl == 3
 
 
 def test_group_info(ecoli_core):
