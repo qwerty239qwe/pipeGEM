@@ -196,7 +196,6 @@ class ProblemAnalyzer:
         self.setup_constrs()
         self.setup_variables()
 
-
     def setup_constrs(self):
         for i, (b_bound, b_type) in enumerate(zip(self.b, self.csense)):
             constr_data = {"name": f"const_{i}" if self.row_names is None else self.row_names[i]}

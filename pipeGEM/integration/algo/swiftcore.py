@@ -147,6 +147,12 @@ class CoreProblem(Problem):
 def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16):
     if weights is None:
         weights = np.ones(shape=(len(model.reactions),))
+    elif isinstance(weights, dict):
+        weights = np.array([weights[r.id] for r in model.reactions])
+    elif isinstance(weights, list):
+        if len(weights) != len(model.reactions):
+            raise ValueError("Length of the weights need to be equal to the size of reactions")
+        weights = np.array(weights)
     is_core = np.array([(i in core_index) for i in range(len(model.reactions))])
     __w = len(is_core)
     m, n = len(model.metabolites), len(model.reactions)

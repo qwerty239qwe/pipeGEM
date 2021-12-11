@@ -8,6 +8,7 @@ from ..task import ReactionTester
 from ..model import MediumConstraint
 from pipeGEM.integration.mapping import Expression
 from pipeGEM.utils.transform import log_xplus1
+from pipeGEM.utils import get_rxns_in_subsystem
 
 
 class FastCoreAlgo(Pipeline):
@@ -121,6 +122,8 @@ class SwiftCore(Pipeline):
             self.consist_cc = FastCC()
         elif consist_method == "swiftcc":
             self.consist_cc = SwiftCC()
+        elif consist_method is None:
+            self.consist_cc = None
         self.threshold = BimodalThreshold()
         self.medium_constr = MediumConstraint()
         self.rxn_tester = ReactionTester(task_file_path=task_file_path,
@@ -134,17 +137,24 @@ class SwiftCore(Pipeline):
             medium = None,
             protected_rxns = None,
             rxn_score_trans = log_xplus1,
+            not_penalized_subsystem = None,
+            not_penalized_weight = 0.1,
             *args,
             **kwargs):
-        c_model = self.consist_cc(model,
-                                  return_model=True,
-                                  **kwargs)["model"]
+        if self.consist_cc is not None:
+            c_model = self.consist_cc(model,
+                                      return_model=True,
+                                      **kwargs)["model"]
+        else:
+            c_model = model
         # get expression threshold for each samples
         expr_tol_dict, nexpr_tol_dict = {}, {}
         if isinstance(medium, list):
             self.medium_constr.run(c_model, medium, protected_rxns)
         rxn_weight_dic = {}
         model_dic = {}
+        non_penalized = get_rxns_in_subsystem(c_model, not_penalized_subsystem) \
+            if not_penalized_subsystem is not None else []
         for sample in data.columns:
             expr_tol_dict[sample], nexpr_tol_dict[sample] = self.threshold(data=data[sample],
                                                                            sample_name=sample)
@@ -160,12 +170,14 @@ class SwiftCore(Pipeline):
                                           domain_ub=expr_tol_dict[sample],
                                           range_lb=1,
                                           range_ub=0,
-                                          range_nan=0.2)
+                                          range_nan=not_penalized_weight)
 
             for c in core_rxns + protected_rxns:
                 weights[c] = 0
+            for r in non_penalized:
+                weights[r] = min(not_penalized_weight, weights[r])
+
             rxn_weight_dic[sample] = weights
-            output_model = swiftCore(c_model, [], weights)
-            model_dic[sample] = output_model
+            model_dic[sample] = swiftCore(c_model, [], weights)
 
         return model_dic
