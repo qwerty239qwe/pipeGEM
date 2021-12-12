@@ -65,14 +65,43 @@ def _rfastcormics_fit(x, y):
     return best_vals_right, best_vals_left, covar_right, covar_left
 
 
-def _bimodal_fit(x, y):
+def _check_fitted_param(p, amp_ratio_tol=4, var_ratio_tol=2, mean_diff_tol=4):
+    amp1, mean1, cov1, amp2, mean2, cov2 = p
+    if abs(np.log2(amp1) - np.log2(amp2)) > np.log2(amp_ratio_tol):
+        return False
+    if abs(np.log2(cov1) - np.log2(cov1)) > np.log2(var_ratio_tol):
+        return False
+    if abs(mean1 - mean2) > mean_diff_tol:
+        return False
+    return True
+
+
+def _bimodal_fit(x, y, amp_ratio_tol=4, var_ratio_tol=2, mean_diff_tol=4):
     c1, c2 = find_canyons(x, y)
     c1, c2 = min(c1, c2), max(c1, c2)
     print("original guess: ", c1, c2)
-    init_vals = (50, c1, 1, 150, c2, 1)
+    init_vals = (10, c1, 1, 10, c2, 1)
+    grid = [(10 + 20 * i, 10 + 20 * j) for i in range(1, 4) for j in range(1, 4)]
     try:
-        p, covar = curve_fit(bimodal, xdata=x, ydata=y,
-                             p0=init_vals, bounds=((0, -np.inf, 0, 0, -np.inf, 0), np.inf))
+        found_best = False
+        it = 0
+        while not found_best or it < len(grid):
+            tried_vals = [grid[it][0], init_vals[1], init_vals[2],
+                          grid[it][1], init_vals[4], init_vals[5]]
+            p, covar = curve_fit(bimodal, xdata=x, ydata=y,
+                                 p0=tried_vals, bounds=((0, -np.inf, 0, 0, -np.inf, 0), np.inf))
+            if _check_fitted_param(p,
+                                   amp_ratio_tol=amp_ratio_tol,
+                                   var_ratio_tol=var_ratio_tol,
+                                   mean_diff_tol=mean_diff_tol):
+                found_best = True
+            else:
+                it += 1
+        if not found_best:
+            warnings.warn("Fail to find proper parameters, use initial guess")
+            p = init_vals
+            covar = None
+
     except RuntimeError:
         warnings.warn("Fail to optimize")
         p = init_vals

@@ -134,6 +134,7 @@ class SwiftCore(Pipeline):
     def run(self,
             model,
             data,
+            tissue_data = None,
             medium = None,
             protected_rxns = None,
             rxn_score_trans = mod_log10,
