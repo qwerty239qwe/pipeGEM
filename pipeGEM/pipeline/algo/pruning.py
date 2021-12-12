@@ -140,8 +140,11 @@ class SwiftCore(Pipeline):
             rxn_score_trans = mod_log10,
             not_penalized_subsystem = None,
             not_penalized_weight = 0.1,
+            tissue_u_weight = 0.2,
+            tissue_l_weight = 0.8,
             *args,
             **kwargs):
+        self.output = {}
         if self.consist_cc is not None:
             c_model = self.consist_cc(model,
                                       return_model=True,
@@ -153,7 +156,9 @@ class SwiftCore(Pipeline):
         if isinstance(medium, list):
             self.medium_constr.run(c_model, medium, protected_rxns)
         rxn_weight_dic = {}
-        self.output = {}
+        ts_score = Expression(c_model, tissue_data).rxn_scores \
+            if tissue_data is not None else {}
+
         non_penalized = get_rxns_in_subsystem(c_model, not_penalized_subsystem) \
             if not_penalized_subsystem is not None else []
         for sample in data.columns:
@@ -177,6 +182,15 @@ class SwiftCore(Pipeline):
                 weights[c] = 0
             for r in non_penalized:
                 weights[r] = min(not_penalized_weight, weights[r])
+            for r, v in ts_score.items():
+                if v == 2:
+                    weights[r] = 0
+                if v == 1:
+                    weights[r] = min(weights[r], tissue_u_weight)
+                if v == 0:
+                    weights[r] = max(weights[r], tissue_l_weight)
+                if v == -1:
+                    weights[r] = max(weights[r], tissue_l_weight)
 
             rxn_weight_dic[sample] = weights
             self.output[sample] = swiftCore(c_model, [], weights)
