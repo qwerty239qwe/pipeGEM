@@ -5,7 +5,7 @@ def sigmoid(x, coef):
     return 1 / (1 + np.exp(-coef * x))
 
 
-def log_xplus1(x, coef=1):
+def mod_log10(x, coef=1) -> float:
     return np.log10(x + coef)
 
 

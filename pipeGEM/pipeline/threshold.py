@@ -21,8 +21,9 @@ class BimodalThreshold(Pipeline):
     def run(self,
             data: pd.Series,
             sample_name: str) -> (float, float):
-        return get_rfastcormics_thresholds(data.values,
+        self.output = get_rfastcormics_thresholds(data.values,
                                            cut_off=self.cut_off,
                                            file_name=self.naming_format.format(sample_name=sample_name)
                                            if self.naming_format is not None else None,
                                            plot_dist=self.plot_dist)
+        return self.output

@@ -7,7 +7,7 @@ from pipeGEM.pipeline.preprocessing import GeneDataDiscretizer, GeneDataLinearSc
 from ..task import ReactionTester
 from ..model import MediumConstraint
 from pipeGEM.integration.mapping import Expression
-from pipeGEM.utils.transform import log_xplus1
+from pipeGEM.utils.transform import mod_log10
 from pipeGEM.utils import get_rxns_in_subsystem
 
 
@@ -136,7 +136,7 @@ class SwiftCore(Pipeline):
             data,
             medium = None,
             protected_rxns = None,
-            rxn_score_trans = log_xplus1,
+            rxn_score_trans = mod_log10,
             not_penalized_subsystem = None,
             not_penalized_weight = 0.1,
             *args,
@@ -152,11 +152,11 @@ class SwiftCore(Pipeline):
         if isinstance(medium, list):
             self.medium_constr.run(c_model, medium, protected_rxns)
         rxn_weight_dic = {}
-        model_dic = {}
+        self.output = {}
         non_penalized = get_rxns_in_subsystem(c_model, not_penalized_subsystem) \
             if not_penalized_subsystem is not None else []
         for sample in data.columns:
-            expr_tol_dict[sample], nexpr_tol_dict[sample] = self.threshold(data=data[sample],
+            expr_tol_dict[sample], nexpr_tol_dict[sample] = self.threshold(data=rxn_score_trans(data[sample]),
                                                                            sample_name=sample)
             if isinstance(medium, dict):
                 self.medium_constr.run(c_model, medium[sample], protected_rxns)
@@ -178,6 +178,6 @@ class SwiftCore(Pipeline):
                 weights[r] = min(not_penalized_weight, weights[r])
 
             rxn_weight_dic[sample] = weights
-            model_dic[sample] = swiftCore(c_model, [], weights)
+            self.output[sample] = swiftCore(c_model, [], weights)
 
-        return model_dic
+        return self.output

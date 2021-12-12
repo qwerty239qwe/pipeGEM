@@ -208,6 +208,6 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
     kept_rxns = rxn_num[(weights == 0)]
     rxns_to_remove = [r.id for i, r in enumerate(model.reactions) if i not in kept_rxns]
     output = model.copy()
-    print(rxns_to_remove)
+    print(f"Remove {len(rxns_to_remove)} reactions")
     output.remove_reactions(rxns_to_remove, remove_orphans=True)
     return output
