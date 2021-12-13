@@ -9,7 +9,7 @@ from cobra.flux_analysis import flux_variability_analysis
 import pandas as pd
 import numpy as np
 
-from pipeGEM.analysis import Problem
+from pipeGEM.core import Problem
 from pipeGEM.integration.utils import get_PROM_threshold, quantile_norm
 
 
