@@ -188,7 +188,8 @@ class SwiftCore(Pipeline):
                  consist_method,
                  task_file_path,
                  task_constr_name,
-                 model_compartment_format):
+                 model_compartment_format,
+                 saved_dist_plot_format = None,):
         super().__init__()
         if consist_method == "fastcc":
             self.consist_cc = FastCC()
@@ -196,7 +197,7 @@ class SwiftCore(Pipeline):
             self.consist_cc = SwiftCC()
         elif consist_method is None:
             self.consist_cc = None
-        self.threshold = BimodalThreshold()
+        self.threshold = BimodalThreshold(naming_format=saved_dist_plot_format)
         self.medium_constr = MediumConstraint()
         self.rxn_tester = ReactionTester(task_file_path=task_file_path,
                                          model_compartment_format=model_compartment_format,
