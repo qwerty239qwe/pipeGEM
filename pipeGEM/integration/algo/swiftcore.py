@@ -111,6 +111,7 @@ class CoreProblem(Problem):
         if self.do_flip:
             self._flip()
 
+        max_val = 1e3 * n * 2
         rev = self.get_rev()
         dense = np.zeros(shape=(n,))
         dense[self.blocked] = np.random.normal(0, 1, size=sum(self.blocked))
@@ -118,7 +119,7 @@ class CoreProblem(Problem):
         k, l = np.sum(k_v), np.sum(l_v)
         self.objs = -dense
 
-        self.lbs = np.where(self.blocked, self.lbs, -1e6)
+        self.lbs = np.where(self.blocked, self.lbs, -max_val)
         self.lbs[l_v] = 0
         self.v = np.array(["C" for _ in range(n)])
         self.c = np.array(["E" for _ in range(m)])
@@ -126,11 +127,11 @@ class CoreProblem(Problem):
 
         if not any(self.blocked):
             self.lbs[(self.weights == 0) & (~rev)] = 1
-        self.ubs = np.where(self.blocked, self.ubs, 1e6)
+        self.ubs = np.where(self.blocked, self.ubs, max_val)
         self.extend_horizontal(np.zeros(shape=(m, k + l)),
                                e_v=np.array(["C" for _ in range(k + l)]),
-                               e_v_lb=-np.ones(shape=(k + l)) * 1e6,
-                               e_v_ub=np.ones(shape=(k + l)) * 1e6,
+                               e_v_lb=-np.ones(shape=(k + l)) * max_val,
+                               e_v_ub=np.ones(shape=(k + l)) * max_val,
                                e_objs=-np.concatenate([self.weights[k_v], self.weights[l_v]]),
                                e_names=[f"ext_var_{i}" for i in range(k + l)])
         temp1, temp2 = np.eye(n), np.eye(k + l)
@@ -153,12 +154,14 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
         if len(weights) != len(model.reactions):
             raise ValueError("Length of the weights need to be equal to the size of reactions")
         weights = np.array(weights)
-    is_core = np.array([(i in core_index) for i in range(len(model.reactions))])
-    __w = len(is_core)
-    m, n = len(model.metabolites), len(model.reactions)
 
-    blocked = np.array([False for _ in range(n)])
+    is_core = np.array([(i in core_index) for i in range(len(model.reactions))])
     weights[is_core] = 0
+    __w = len(is_core)
+
+    m, n = len(model.metabolites), len(model.reactions)
+    blocked = np.array([False for _ in range(n)])
+
     problem = CoreProblem(model=model,
                           blocked=blocked,
                           weights=weights,
@@ -175,7 +178,7 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
     weights[abs(flux["fluxes"].values) > tol] = 0
     if n == n_:
         blocked = np.array([False for _ in range(n)])
-        blocked[problem.core_index] = True
+        blocked[weights == 0] = True
         blocked[abs(flux["fluxes"].values) > tol] = False
     else:
         _, D, Vt = svds(csr_matrix(problem.S[:m_, :n_][:, weights == 0]), k=k, which="SM")

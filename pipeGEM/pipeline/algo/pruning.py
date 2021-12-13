@@ -1,4 +1,5 @@
 import numpy as np
+import seaborn as sns
 
 from pipeGEM.pipeline import Pipeline
 from pipeGEM.integration.algo.fastcore import (fastCore, get_C_and_P_dic,
@@ -250,6 +251,8 @@ class SwiftCore(Pipeline):
                                           range_ub=0,
                                           range_nan=not_penalized_weight)
 
+            print(f"Core rxns: {len(core_rxns)}; protected rxns: {len(protected_rxns)} (might be overlapped with core)")
+            print(f"non_penalized rxns: {len(non_penalized)}")
             for c in core_rxns + protected_rxns:
                 weights[c] = 0
             for r in non_penalized:
@@ -262,8 +265,8 @@ class SwiftCore(Pipeline):
                 if v == 0:
                     weights[r] = max(weights[r], tissue_l_weight)
                 if v == -1:
-                    weights[r] = max(weights[r], tissue_l_weight)
-
+                    weights[r] = 1
+            sns.histplot(list(weights.values()))
             rxn_weight_dic[sample] = weights
             self.output[sample] = swiftCore(c_model, [], weights)
 

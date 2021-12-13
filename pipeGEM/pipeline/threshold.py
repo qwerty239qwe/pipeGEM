@@ -11,7 +11,7 @@ class BimodalThreshold(Pipeline):
     def __init__(self,
                  cut_off: float = -np.inf,
                  naming_format: Optional[str] = "./thresholds/{sample_name}.png",
-                 plot_dist: bool = False
+                 plot_dist: bool = True
                  ):
         super().__init__()
         self.cut_off = cut_off
