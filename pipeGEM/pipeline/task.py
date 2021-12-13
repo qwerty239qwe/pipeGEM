@@ -24,8 +24,9 @@ class ReactionTester(Pipeline):
             non_expression_threshold: float,
             rxn_scores: dict,
             ref_model: Optional[cobra.Model] = None,
+            reset_tester: bool = False,
             **kwargs) -> (List[str], Dict[str, float]):
-        if self.model_tester is None:
+        if self.model_tester is None or reset_tester:
             self.model_tester = TaskTester(ref_model,
                                            constr=self.constr_name,
                                            task_container=self.task_file_path,

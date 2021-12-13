@@ -7,6 +7,7 @@ import numpy as np
 
 from pipeGEM.integration.mapping import Expression
 from pipeGEM.integration.utils import get_rxn_set, flip_direction
+from pipeGEM.utils import get_rxns_in_subsystem
 from ._LP import LP3, LP7, LP9, non_convex_LP7, non_convex_LP3
 
 
@@ -187,16 +188,12 @@ def get_unpenalized_rxn_ids(ref_model,
                             unpenalized_subsystem):
     unpenalized_rxn_dic = {}
     P_dic = copy.deepcopy(P_dic)
+    if unpenalized_subsystem:
+        unpenalized_rxn_ids = set(get_rxns_in_subsystem(ref_model, unpenalized_subsystem))
+    else:
+        unpenalized_rxn_ids = set()
     for i, sample_name in enumerate(sample_names):
-        if unpenalized_subsystem:
-            patterns = [re.compile(sub) for sub in unpenalized_subsystem]
-            unpenalized_rxn_ids = []
-            for rxn in ref_model.reactions:
-                if rxn.id not in C_dic[sample_name] and any([pat.match(rxn.subsystem) for pat in patterns]):
-                    unpenalized_rxn_ids.append(rxn.id)
-            unpenalized_rxn_dic[sample_name] = set(unpenalized_rxn_ids)
-        else:
-            unpenalized_rxn_dic[sample_name] = set()
+        unpenalized_rxn_dic[sample_name] = (unpenalized_rxn_ids - C_dic[sample_name])
         P_dic[sample_name] -= unpenalized_rxn_dic[sample_name]
 
     return {"unpenalized_rxn_dic": unpenalized_rxn_dic,

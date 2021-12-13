@@ -1,5 +1,10 @@
+import numpy as np
+
 from pipeGEM.pipeline import Pipeline
-from pipeGEM.integration.algo.fastcore import fastCore
+from pipeGEM.integration.algo.fastcore import (fastCore, get_C_and_P_dic,
+                                               supp_protected_rxns, get_unpenalized_rxn_ids,
+                                               get_consistent_p_free_model,
+                                               get_final_models)
 from pipeGEM.integration.algo.swiftcore import swiftCore
 from pipeGEM.pipeline.algo import FastCC, SwiftCC
 from pipeGEM.pipeline.threshold import BimodalThreshold
@@ -7,8 +12,18 @@ from pipeGEM.pipeline.preprocessing import GeneDataDiscretizer, GeneDataLinearSc
 from ..task import ReactionTester
 from ..model import MediumConstraint
 from pipeGEM.integration.mapping import Expression
-from pipeGEM.utils.transform import mod_log10
 from pipeGEM.utils import get_rxns_in_subsystem
+
+
+class ReactionCategorizer(Pipeline):
+    def __init__(self,
+                 method="get_CP"):
+        super().__init__()
+        if method == "get_CP":
+            self.categorizer = get_C_and_P_dic
+
+    def run(self, *args, **kwargs):
+        self.output = self.categorizer(**kwargs)
 
 
 class FastCoreAlgo(Pipeline):
@@ -71,19 +86,34 @@ class FastCore(Pipeline):
 
 class rFastCormics(Pipeline):
     def __init__(self,
-                 consist_method="swiftcc"):
+                 consist_method,
+                 task_file_path,
+                 task_constr_name,
+                 model_compartment_format,
+                 core_threshold=1e-4,
+                 cc_threshold=1e-4):
         super().__init__()
         if consist_method == "fastcc":
             self.consist_cc = FastCC()
         elif consist_method == "swiftcc":
             self.consist_cc = SwiftCC()
-
+        self.core_threshold = core_threshold
+        self.cc_threshold = cc_threshold
         self.threshold = BimodalThreshold()
+        self.medium_constr = MediumConstraint()
+        self.rxn_tester = ReactionTester(task_file_path=task_file_path,
+                                         model_compartment_format=model_compartment_format,
+                                         constr_name=task_constr_name)
         self.disc = GeneDataDiscretizer()
+        self.rxn_categorizer = ReactionCategorizer()
 
     def run(self,
             model,
             data,
+            medium=None,
+            protected_rxns=None,
+            rxn_score_trans=np.log2,
+            not_penalized_subsystem=None,
             *args,
             **kwargs):
         # get consistent model
@@ -93,13 +123,54 @@ class rFastCormics(Pipeline):
 
         # get expression threshold for each samples
         expr_tol_dict, nexpr_tol_dict = {}, {}
-        for sample in data.columns:
-            expr_tol_dict[sample], nexpr_tol_dict[sample] = self.threshold(data=data[sample], sample_name=sample)
 
-        discreted_df = self.disc(data=data, sample_names=data.columns,
+        if isinstance(medium, list):
+            self.medium_constr.run(c_model, medium, protected_rxns)
+
+        task_protected_rxn_dic = {}
+        for sample in data.columns:
+            expr_tol_dict[sample], nexpr_tol_dict[sample] = self.threshold(data=rxn_score_trans(data[sample]),
+                                                                           sample_name=sample)
+            if isinstance(medium, dict):
+                self.medium_constr.run(c_model, medium[sample], protected_rxns)
+            rxn_scores = Expression(c_model, data[sample], rxn_score_trans).rxn_scores
+            core_rxns, _ = self.rxn_tester.run(expression_threshold=expr_tol_dict[sample],
+                                               non_expression_threshold=nexpr_tol_dict[sample],
+                                               rxn_scores=rxn_scores,
+                                               ref_model=c_model,
+                                               reset_tester=False)
+            task_protected_rxn_dic[sample] = core_rxns + protected_rxns
+        discreted_df = self.disc(data=data,
+                                 sample_names=data.columns,
                                  expr_threshold_dic=expr_tol_dict,
                                  non_expr_threshold_dic=nexpr_tol_dict)
-
+        C_P_dics = self.rxn_categorizer(expression_dic=discreted_df,
+                                        sample_names=data.columns,
+                                        consensus_proportion=0.9)
+        self.supp_dic = supp_protected_rxns(c_model,
+                                            data.columns,
+                                            task_protected_rxn_dic,
+                                            C_dic=C_P_dics["C_dic"],
+                                            P_dic=C_P_dics["P_dic"],
+                                            epsilon_for_fastcore=self.core_threshold)
+        self.non_penalized_dic = get_unpenalized_rxn_ids(c_model,
+                                                         C_dic=self.supp_dic["C_dic"],
+                                                         P_dic=self.supp_dic["P_dic"],
+                                                         sample_names=data.columns,
+                                                         unpenalized_subsystem=not_penalized_subsystem)
+        self.p_model_dic = get_consistent_p_free_model(c_model,
+                                                       data.columns,
+                                                       C_dic=self.supp_dic["C_dic"],
+                                                       P_dic=self.non_penalized_dic["P_dic"],
+                                                       epsilon_for_fastcc=self.cc_threshold)
+        self.output = get_final_models(c_model,
+                                       sample_names=data.columns,
+                                       C_dic=self.p_model_dic["C_dic"],
+                                       P_dic=self.non_penalized_dic["P_dic"],
+                                       unpenalized_rxn_dic=self.non_penalized_dic["unpenalized_rxn_dic"],
+                                       p_free_model_dic=self.p_model_dic["p_free_model_dic"],
+                                       epsilon_for_fastcore=self.core_threshold)
+        return self.output
 
 class CORDA(Pipeline):
     def __init__(self):
@@ -137,7 +208,7 @@ class SwiftCore(Pipeline):
             tissue_data = None,
             medium = None,
             protected_rxns = None,
-            rxn_score_trans = mod_log10,
+            rxn_score_trans = np.log2,
             not_penalized_subsystem = None,
             not_penalized_weight = 0.1,
             tissue_u_weight = 0.2,
@@ -170,7 +241,8 @@ class SwiftCore(Pipeline):
             core_rxns, _ = self.rxn_tester.run(expression_threshold = expr_tol_dict[sample],
                                                non_expression_threshold = nexpr_tol_dict[sample],
                                                rxn_scores = rxn_scores,
-                                               ref_model = c_model)
+                                               ref_model = c_model,
+                                               reset_tester=False)
             weights = self.weight_cal.run(data=rxn_scores,
                                           domain_lb=nexpr_tol_dict[sample],
                                           domain_ub=expr_tol_dict[sample],
