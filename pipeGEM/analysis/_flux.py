@@ -181,12 +181,14 @@ class FluxAnalyzer:
 class ProblemAnalyzer:
     def __init__(self,
                  problem,
-                 solver: str = 'gurobi'):
+                 solver: str = None):
         self.S, self.v, self.v_lbs, self.v_ubs, self.b, self.csense = problem.S, problem.v, \
                                                                       problem.lbs, problem.ubs, problem.b, problem.c
         self.objs, self.col_names, self.row_names = problem.objs, problem.col_names, problem.row_names
         self.anchor_n = problem.anchor_n
         self.new_model = cobra.Model()
+        if solver is not None:
+            self.new_model.solver = solver
         self.prob = self.new_model.problem
         self.variables = []
         self.r_variables = []
