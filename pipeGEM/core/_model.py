@@ -6,6 +6,7 @@ import pandas as pd
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.integration.mapping import Expression
 from pipeGEM.analysis import FluxAnalyzer
+from pipeGEM.utils import save_model
 
 
 class Model(GEMComposite):
@@ -116,3 +117,6 @@ class Model(GEMComposite):
         path = Path(file_dir_path)
         self._analyzer.load_analysis(path)
 
+    def save_model(self, file_name):
+        path = Path(file_name)
+        save_model(self._model, str(path.parent / path.stem), path.suffix)

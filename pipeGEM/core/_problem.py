@@ -1,11 +1,13 @@
 from typing import Optional, Sequence, Union
 
 import numpy as np
+import pandas as pd
 import cobra
 
 
 from . import Model
 from .._constant import var_type_dict, csense_dict
+from ..analysis import ProblemAnalyzer
 
 
 class DimensionMismatchedError(ValueError):
@@ -225,6 +227,10 @@ class Problem:
         self.b = np.concatenate([self.b, e_b] if at_bottom else [e_b, self.b])
         self.c = np.concatenate([self.c, e_c] if at_bottom else [e_c, self.c])
         self.row_names = np.concatenate([self.row_names, e_names] if at_bottom else [e_names, self.row_names])
+
+    def get_fluxes(self, direction="max", solver=None) -> pd.DataFrame:
+        pa = ProblemAnalyzer(self, solver=solver)
+        return pa.get_fluxes(direction=direction)
 
 
 class LP_Problem(Problem):

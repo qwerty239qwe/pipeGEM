@@ -28,6 +28,35 @@ def prepare_PCA_dfs(feature_df,
                     transform_func=None,
                     n_components=None,
                     standardize=True):
+    """
+    Get three dataframes containing PCA results from a feature dataframe
+
+    Parameters
+    ----------
+    feature_df: a pd.DataFrame
+        The feature dataframe, the rows are the features of each data
+    transform_func: optional, callable
+        A function that will be performed on the dataframe before analysis
+    n_components: optional, int
+        Number of components in the result dfs, if None than the minimal number of df.shape[0] and df.shape[1] is used.
+    standardize: bool
+        If true, standardize the dataframe before the analysis by removing the mean and scaling to unit variance.
+
+    Returns
+    -------
+    PC_df: pd.DataFrame
+        The PCA result containing the PCs (columns) values of each data (rows)
+    exp_var_df: pd.DataFrame
+        The dataframe containing explained_variance_ratio_ of each PC (rows)
+    component_df: pd.DataFrame
+        The dataframe containing principal axes in feature space,
+        representing the directions of maximum variance in the data.
+
+    References
+    -----------
+    https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
+
+    """
     if transform_func is not None:
         x = transform_func(feature_df)
     else:
@@ -54,6 +83,21 @@ def prepare_embedding_dfs(feature_df,
                           n_components=2,
                           reducer="TSNE",
                           standardize=True, **kwargs):
+    """
+
+    Parameters
+    ----------
+    feature_df
+    transform_func
+    n_components
+    reducer
+    standardize
+    kwargs
+
+    Returns
+    -------
+
+    """
     if transform_func:
         x = transform_func(feature_df.values)
     else:
