@@ -44,18 +44,19 @@ class Pipeline:
 
     def __call__(self, *args, **kwargs):
         if len(self._pre_hooks) == 0 and len(self._post_hooks) == 0:
-            self.run(*args, **kwargs)
-        if len(self._pre_hooks) != 0:
-            for name, hook in self._pre_hooks.items():
-                output = hook(*args)
-                if output is not None:
-                    args = output if isinstance(output, tuple) else (output,)
-        output = self.run(*args, **kwargs)
-        if len(self._post_hooks) != 0:
-            for name, hook in self._post_hooks.items():
-                output = hook(*args)
-                if output is not None:
-                    args = output if isinstance(output, tuple) else (output,)
+            output = self.run(*args, **kwargs)
+        else:
+            if len(self._pre_hooks) != 0:
+                for name, hook in self._pre_hooks.items():
+                    output = hook(*args)
+                    if output is not None:
+                        args = output if isinstance(output, tuple) else (output,)
+            output = self.run(*args, **kwargs)
+            if len(self._post_hooks) != 0:
+                for name, hook in self._post_hooks.items():
+                    output = hook(*args)
+                    if output is not None:
+                        args = output if isinstance(output, tuple) else (output,)
         return output
 
     def __getattr__(self, item):
