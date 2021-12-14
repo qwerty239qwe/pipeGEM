@@ -155,7 +155,7 @@ class rFastCormics(Pipeline):
                                                ref_model=c_model,
                                                reset_tester=False)
             task_protected_rxn_dic[sample] = core_rxns + protected_rxns
-        discreted_df = self.disc(data=data,
+        discreted_df = self.disc(data_df=data,
                                  sample_names=data.columns,
                                  expr_threshold_dic=expr_tol_dict,
                                  non_expr_threshold_dic=nexpr_tol_dict)
