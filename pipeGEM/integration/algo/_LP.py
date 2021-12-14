@@ -233,8 +233,9 @@ class BlockedProblem(Problem):
         self._irrev = ~self.get_rev()
         self.S = self.S.T
         self.objs = np.zeros((m,))
-        self.lbs = np.array([-1e7 for _ in range(m)])
-        self.ubs = np.array([1e7 for _ in range(m)])
+        max_val = 1e3 * max(m, n) * 3
+        self.lbs = np.array([-max_val for _ in range(m)])
+        self.ubs = np.array([max_val for _ in range(m)])
         self.b = np.zeros((n,))
         self.c = np.array(["E" for _ in range(n)])
         self.c[self._irrev] = "L"
