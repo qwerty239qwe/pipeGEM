@@ -91,16 +91,19 @@ class rFastCormics(Pipeline):
                  task_file_path,
                  task_constr_name,
                  model_compartment_format,
-                 core_threshold=1e-4,
-                 cc_threshold=1e-4):
+                 core_threshold=1e-6,
+                 cc_threshold=1e-6,
+                 saved_dist_plot_format=None):
         super().__init__()
         if consist_method == "fastcc":
             self.consist_cc = FastCC()
         elif consist_method == "swiftcc":
             self.consist_cc = SwiftCC()
+        elif consist_method is None:
+            self.consist_cc = consist_method
         self.core_threshold = core_threshold
         self.cc_threshold = cc_threshold
-        self.threshold = BimodalThreshold()
+        self.threshold = BimodalThreshold(naming_format=saved_dist_plot_format)
         self.medium_constr = MediumConstraint()
         self.rxn_tester = ReactionTester(task_file_path=task_file_path,
                                          model_compartment_format=model_compartment_format,
@@ -111,6 +114,8 @@ class rFastCormics(Pipeline):
     def run(self,
             model,
             data,
+            tissue_data=None,
+            tissue_exp_thres=2,
             medium=None,
             protected_rxns=None,
             rxn_score_trans=np.log2,
@@ -118,9 +123,12 @@ class rFastCormics(Pipeline):
             *args,
             **kwargs):
         # get consistent model
-        c_model = self.consist_cc(model,
-                                  return_model=True,
-                                  **kwargs)["model"]
+        if self.consist_cc is not None:
+            c_model = self.consist_cc(model,
+                                      return_model=True,
+                                      **kwargs)["model"]
+        else:
+            c_model = model
 
         # get expression threshold for each samples
         expr_tol_dict, nexpr_tol_dict = {}, {}
@@ -128,6 +136,12 @@ class rFastCormics(Pipeline):
         if isinstance(medium, list):
             self.medium_constr.run(c_model, medium, protected_rxns)
 
+        ts_score = Expression(c_model, tissue_data).rxn_scores \
+            if tissue_data is not None else {}
+        for r, v in ts_score.items():
+            if v >= tissue_exp_thres:
+                protected_rxns.append(r)
+        protected_rxns = list(set(protected_rxns))
         task_protected_rxn_dic = {}
         for sample in data.columns:
             expr_tol_dict[sample], nexpr_tol_dict[sample] = self.threshold(data=rxn_score_trans(data[sample]),
