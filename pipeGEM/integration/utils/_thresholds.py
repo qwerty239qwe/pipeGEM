@@ -80,8 +80,8 @@ def _bimodal_fit(x, y, amp_ratio_tol=4, var_ratio_tol=2, mean_diff_tol=4):
     c1, c2 = find_canyons(x, y)
     c1, c2 = min(c1, c2), max(c1, c2)
     print("original guess: ", c1, c2)
-    init_vals = (10, c1, 1, 10, c2, 1)
-    grid = [(10 + 20 * i, 10 + 20 * j) for i in range(0, 4) for j in range(0, 4)]
+    init_vals = (1, c1, 1, 1, c2, 1)
+    grid = [(5 + 20 * i, 5 + 20 * j) for i in range(0, 4) for j in range(0, 4)]
     try:
         found_best = False
         it = 0

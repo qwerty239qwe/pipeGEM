@@ -346,8 +346,10 @@ class TaskHandler:
     def test_one_task(self, ID, task, model, all_mets_in_model):
         all_met_exist, dummy_rxns, obj_rxns = task.assign(model, all_mets_in_model)
         if not all_met_exist:
-            return {'Passed': False, 'Should fail': task.should_fail,
-                    'Missing mets': True, 'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": obj_rxns}
+            return {'Passed': False,
+                    'Should fail': task.should_fail,
+                    'Missing mets': True,
+                    'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": obj_rxns}
         if self._method == "pFBA":
             model.objective = {rxn: 1 for rxn in obj_rxns}
         sol = model.optimize()
@@ -453,7 +455,8 @@ class TaskTester(TaskHandler):
         return self._passed_tasks_list
 
     def get_all_passed_rxns(self) -> list:
-        return list(set([r for ind in self._passed_tasks_list for r in self._passed_rxns[ind]]))
+        return list(set([r for ind in self._passed_tasks_list if not self.tasks[ind].should_fail
+                         for r in self._passed_rxns[ind]]))
 
     def _get_test_result(self, ID, sol_df, dummy_rxns) -> None:
         passed_rxns = sol_df[(abs(sol_df['fluxes']) >= self.tol)].index.to_list()

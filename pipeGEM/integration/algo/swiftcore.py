@@ -90,7 +90,7 @@ class CoreProblem(Problem):
     def _flip(self):
         rev = np.ones(self.S.shape[1])
         rev[self.lbs >= 0], rev[self.ubs <= 0] = 0, -1
-        self.ubs[rev == -1], self.lbs[rev == -1] = -self.lbs[rev == -1], -self.ubs[rev == -1]
+        self.ubs[rev == -1], self.lbs[rev == -1] = -self.lbs[rev == -1], 0 # -self.ubs[rev == -1]
         self.ubs /= norm(self.ubs, ord=np.inf)
         self.lbs /= norm(self.lbs, ord=np.inf)
         self.react_num = np.arange(self.S.shape[1])
@@ -119,7 +119,7 @@ class CoreProblem(Problem):
         k_v, l_v = (self.weights != 0) & rev, (self.weights != 0) & (~rev)
         k, l = np.sum(k_v), np.sum(l_v)
         self.objs = -dense
-
+        # ori_lbs = self.lbs.copy()
         self.lbs = np.where(self.blocked, self.lbs, -max_val)
         self.lbs[l_v] = 0
         self.v = np.array(["C" for _ in range(n)])
@@ -128,6 +128,7 @@ class CoreProblem(Problem):
 
         if not any(self.blocked):
             self.lbs[(self.weights == 0) & (~rev)] = 1
+            print(f"Forcing {sum((self.weights == 0) & (~rev))} reactions to generate fluxes")
         self.ubs = np.where(self.blocked, self.ubs, max_val)
         self.extend_horizontal(np.zeros(shape=(m, k + l)),
                                e_v=np.array(["C" for _ in range(k + l)]),
