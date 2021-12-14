@@ -18,7 +18,7 @@ def swiftcc(model,
     S = cobra.util.create_stoichiometric_matrix(model)
     blk = ProblemAnalyzer(blk_p)
     consistent = np.array([True for _ in range(len(model.reactions))])
-    sol = blk.get_fluxes("min")
+    sol = blk.get_fluxes("min", raise_error=False)
     sol = sol.iloc[len(model.metabolites):, :]
     consistent[sol["fluxes"] < -0.5] = False
 
