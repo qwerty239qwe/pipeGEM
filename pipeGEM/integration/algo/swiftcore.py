@@ -111,6 +111,7 @@ class CoreProblem(Problem):
         if self.do_flip:
             self._flip()
 
+        assert np.all(self.ubs >= self.lbs), "All ubs should be larger than lbs"
         max_val = 1e3 * n * 2
         rev = self.get_rev()
         dense = np.zeros(shape=(n,))
@@ -201,13 +202,13 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
         weights[abs(flux["fluxes"].values) > tol] = 0
         assert len(weights) == __w
         blocked[abs(flux["fluxes"].values) > tol] = False
-        print(f"Remove {blocked_size - sum(blocked)} blocked rxns")
+        print(f"Remove {blocked_size - sum(blocked)} blocked rxns, {sum(blocked)} left.")
         assert len(
             set(rxn_num[blocked]) - set(rxn_num[weights == 0])) == 0, f"{rxn_num[blocked]}, {rxn_num[weights == 0]}"
         if 2 * sum(blocked) > blocked_size:
             weights /= 2
             assert n_lps < 400, f"{n_lps}, {blocked_size}, {rxn_num[blocked]}, {rxn_num[(weights == 0)]}"
-    print(n_lps)
+    print(f"Number of solved LP: {n_lps}")
     kept_rxns = rxn_num[(weights == 0)]
     rxns_to_remove = [r.id for i, r in enumerate(model.reactions) if i not in kept_rxns]
     output = model.copy()

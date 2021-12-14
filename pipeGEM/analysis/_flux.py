@@ -260,10 +260,12 @@ class ProblemAnalyzer:
         self.new_model.objective.set_linear_coefficients(obj_vars)
         self.new_model.solver.update()
 
-    def get_fluxes(self, direction="max") -> pd.DataFrame:
+    def get_fluxes(self, direction="max", raise_error=True) -> pd.DataFrame:
         self.new_model.solver.objective.direction = direction
         self.new_model.solver.optimize()
         print(self.new_model.solver.status)
+        if raise_error and self.new_model.solver.status != "optimal":
+            raise RuntimeError("The solver's status is infeasible")
         print(self.new_model.solver.objective.value)
         vals = {}
         _skips = []
