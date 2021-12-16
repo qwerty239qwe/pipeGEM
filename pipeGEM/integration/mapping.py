@@ -90,7 +90,7 @@ class Expression:
             if g == "":
                 inner_grr_scores.append(-1)
 
-            elif g[:g.index(".")] if "." in g else g in self.omic_genes:
+            elif (g[:g.index(".")] if "." in g else g) in self.omic_genes:
                 inner_grr_scores.append(self.data[g[:g.index(".")] if "." in g else g])
             else:
                 inner_grr_scores.append(np.inf)

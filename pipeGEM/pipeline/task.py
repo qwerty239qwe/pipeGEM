@@ -12,12 +12,14 @@ class ReactionTester(Pipeline):
                  task_tester: Optional[TaskTester] = None,
                  task_file_path=TASKS_FILE_PATH,
                  model_compartment_format="[{}]",
-                 constr_name = "default"):
+                 constr_name = "default",
+                 solver="gurobi"):
         super().__init__()
         self.constr_name: str = constr_name
         self.task_file_path = task_file_path
         self.model_compartment_format = model_compartment_format
         self.model_tester = task_tester
+        self.solver = solver
 
     def run(self,
             expression_threshold: float,
@@ -28,6 +30,7 @@ class ReactionTester(Pipeline):
             **kwargs) -> (List[str], Dict[str, float]):
         if self.model_tester is None or reset_tester:
             self.model_tester = TaskTester(ref_model,
+                                           solver=self.solver,
                                            constr=self.constr_name,
                                            task_container=self.task_file_path,
                                            model_compartment_parenthesis=self.model_compartment_format,

@@ -25,6 +25,7 @@ class ReactionCategorizer(Pipeline):
 
     def run(self, *args, **kwargs):
         self.output = self.categorizer(**kwargs)
+        return self.output
 
 
 class FastCoreAlgo(Pipeline):
@@ -93,6 +94,7 @@ class rFastCormics(Pipeline):
                  model_compartment_format,
                  core_threshold=1e-6,
                  cc_threshold=1e-6,
+                 solver="gurobi",
                  saved_dist_plot_format=None):
         super().__init__()
         if consist_method == "fastcc":
@@ -107,7 +109,9 @@ class rFastCormics(Pipeline):
         self.medium_constr = MediumConstraint()
         self.rxn_tester = ReactionTester(task_file_path=task_file_path,
                                          model_compartment_format=model_compartment_format,
-                                         constr_name=task_constr_name)
+                                         constr_name=task_constr_name,
+                                         solver=solver)
+        self.solver = solver
         self.disc = GeneDataDiscretizer()
         self.rxn_categorizer = ReactionCategorizer()
 
@@ -123,6 +127,7 @@ class rFastCormics(Pipeline):
             *args,
             **kwargs):
         # get consistent model
+        model.solver = self.solver
         if self.consist_cc is not None:
             c_model = self.consist_cc(model,
                                       return_model=True,
@@ -159,9 +164,16 @@ class rFastCormics(Pipeline):
                                  sample_names=data.columns,
                                  expr_threshold_dic=expr_tol_dict,
                                  non_expr_threshold_dic=nexpr_tol_dict)
-        C_P_dics = self.rxn_categorizer(expression_dic=discreted_df,
+        dis_exp_df = {k: Expression(model=c_model,
+                                    data=v,
+                                    missing_value=np.nan,
+                                    expression_threshold=-np.inf)
+                      for k, v in discreted_df.items()}
+
+        C_P_dics = self.rxn_categorizer(expression_dic=dis_exp_df,
                                         sample_names=data.columns,
-                                        consensus_proportion=0.9)
+                                        consensus_proportion=0.9,
+                                        is_generic_model=False)
         self.supp_dic = supp_protected_rxns(c_model,
                                             data.columns,
                                             task_protected_rxn_dic,

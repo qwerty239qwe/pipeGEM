@@ -1,4 +1,5 @@
 import re
+from warnings import warn
 from typing import List
 
 import numpy as np
@@ -148,3 +149,42 @@ def random_perturb(model,
         for i, rxn in enumerate(model.reactions):
             rxn.lower_bound, rxn.upper_bound = rxn.lower_bound * magnitudes[i], rxn.upper_bound * magnitudes[i]
     return model
+
+
+def sheet_to_comp(model, excel_file_name, raise_err=False):
+    mets = pd.read_excel(excel_file_name, sheet_name="metabolites")
+    rxns = pd.read_excel(excel_file_name, sheet_name="reactions")
+
+    exist_mets = [m.id for m in model.metabolites]
+    exist_rxns = [m.id for m in model.metabolites]
+    added_mets = []
+    added_rxns = []
+    for m in mets.iterrows():
+        if raise_err:
+            assert m[1]['ID'] not in exist_mets, f"The metabolite {m[1]['ID']} is already in the model."
+        new_met = cobra.Metabolite(id=m[1]["ID"],
+                                   formula=m[1]["formula"],
+                                   name=m[1]["name"],
+                                   compartment=m[1]["compartment"])
+        if new_met in exist_mets:
+            warn(f"The metabolite {m[1]['ID']} is already in the model.")
+        else:
+            added_mets.append(new_met)
+    model.add_metabolites(added_mets)
+
+    for r in rxns.iterrows():
+        if raise_err:
+            assert r[1]['ID'] not in exist_mets, f"The reaction {r[1]['ID']} is already in the model."
+        added_rxn = cobra.Reaction(id=r[1]["ID"],
+                                   name=r[1]["name"],
+                                   lower_bound=r[1]["lower_bound"],
+                                   upper_bound=r[1]["upper_bound"])
+        GPR = str(r[1]["GPR"]) if r[1]["GPR"] is not None else ""
+        added_rxn.gene_reaction_rule = GPR
+        if added_rxn in exist_rxns:
+            warn(f"The reaction {r[1]['ID']} is already in the model.")
+        else:
+            added_rxns.append(added_rxn)
+            model.add_reactions([added_rxn])
+
+            added_rxn.build_reaction_from_string(r[1]["reaction"])

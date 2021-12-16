@@ -352,9 +352,9 @@ class TaskHandler:
                     'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": obj_rxns}
         if self._method == "pFBA":
             model.objective = {rxn: 1 for rxn in obj_rxns}
-        sol = model.optimize()
+        sol = model.optimize(raise_error=False)
         true_status = sol.status
-        if true_status != 'infeasible':
+        if true_status == 'optimal':
             try:
                 kws = {}
                 kws.update(self._constr_kwargs)
@@ -370,7 +370,7 @@ class TaskHandler:
                 true_status = "infeasible"
                 print("get an unexpected result")
 
-        return {'Passed': (((true_status != 'infeasible') != task.should_fail) and all_met_exist),
+        return {'Passed': (((true_status == 'optimal') != task.should_fail) and all_met_exist),
                 'Should fail': task.should_fail,
                 'Missing mets': not all_met_exist, 'Status': true_status,
                 'Obj_value': sol.objective_value,
@@ -423,7 +423,8 @@ class TaskTester(TaskHandler):
                  constr='GIMME',
                  fail_tol=1e-6,
                  method_kwargs: dict = None,
-                 constr_kwargs: dict = None
+                 constr_kwargs: dict = None,
+                 solver: str = "glpk"
                  ):
 
         super().__init__(model=model,
@@ -432,7 +433,8 @@ class TaskTester(TaskHandler):
                          method=method,
                          constr=constr,
                          method_kwargs=method_kwargs,
-                         constr_kwargs=constr_kwargs
+                         constr_kwargs=constr_kwargs,
+                         solver=solver
                          )
         self.tol = fail_tol
         if method == 'pFBA':
@@ -502,6 +504,7 @@ class TaskValidator(TaskHandler):
                  constr: str = "None",
                  method_kwargs: dict = None,
                  constr_kwargs: dict = None,
+                 solver: str = "glpk"
                  ):
         super().__init__(model=model,
                          tasks_path_or_container=task_container,
@@ -509,7 +512,8 @@ class TaskValidator(TaskHandler):
                          method=method,
                          constr=constr,
                          method_kwargs=method_kwargs,
-                         constr_kwargs=constr_kwargs
+                         constr_kwargs=constr_kwargs,
+                         solver=solver
                          )
         if method == 'pFBA':
             self._method_kwargs['fraction_of_optimum'] = 1.0
