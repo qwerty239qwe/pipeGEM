@@ -148,12 +148,14 @@ class rFastCormics(Pipeline):
                 protected_rxns.append(r)
         protected_rxns = list(set(protected_rxns))
         task_protected_rxn_dic = {}
+        data = rxn_score_trans(data.copy())
+
         for sample in data.columns:
-            expr_tol_dict[sample], nexpr_tol_dict[sample] = self.threshold(data=rxn_score_trans(data[sample]),
+            expr_tol_dict[sample], nexpr_tol_dict[sample] = self.threshold(data=data[sample],
                                                                            sample_name=sample)
             if isinstance(medium, dict):
                 self.medium_constr.run(c_model, medium[sample], protected_rxns)
-            rxn_scores = Expression(c_model, data[sample], rxn_score_trans).rxn_scores
+            rxn_scores = Expression(c_model, data[sample]).rxn_scores
             core_rxns, _ = self.rxn_tester.run(expression_threshold=expr_tol_dict[sample],
                                                non_expression_threshold=nexpr_tol_dict[sample],
                                                rxn_scores=rxn_scores,
