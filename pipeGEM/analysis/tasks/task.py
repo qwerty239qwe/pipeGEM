@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import cobra
+from cobra.flux_analysis.parsimonious import pfba
 from cobra.exceptions import Infeasible
 
 from pipeGEM.analysis import FluxAnalyzer
@@ -141,6 +142,37 @@ class Task:
                 print(f"{met} is not in the model")
                 all_fine = False
         return all_fine
+
+
+    def _setup_sink_util(self, model, mets, loose, coef):
+        dummy_rxn_list = []
+        for met in mets:
+            met_id = self._substitute_compartment(met[self.met_id_str], met[self.compartment_str])
+            dummy_rxn = cobra.Reaction('input_{}'.format(met_id) if coef < 0 else 'output_{}'.format(met_id))
+            dummy_rxn.add_metabolites({
+                model.metabolites.get_by_id(met_id): coef
+            })
+            if loose:
+                dummy_rxn.lower_bound, dummy_rxn.upper_bound = 0, 1000
+            else:
+                dummy_rxn.lower_bound, dummy_rxn.upper_bound = met[self.lower_bound_str], met[self.upper_bound_str]
+            dummy_rxn_list.append(dummy_rxn)
+        return dummy_rxn_list
+
+    def setup_sinks(self,
+                    model,
+                    set_influx,
+                    set_outflux,
+                    loose_input = False,
+                    loose_output = False):
+        assert set_influx or set_outflux
+        dummies = []
+        if set_influx:
+            dummies.extend(self._setup_sink_util(model, self.in_mets, loose_input, -1)) # provide input mets
+        if set_outflux:
+            dummies.extend(self._setup_sink_util(model, self.in_mets, loose_output, 1))  # consume output mets
+        return dummies
+
 
     def assign(self,
                model,
@@ -343,6 +375,9 @@ class TaskHandler:
     def _get_test_result(self, ID, sol_df, dummy_rxns):
         raise NotImplementedError
 
+    def _add_sink_result(self, ID, sol_df, dummy_rxns):
+        raise NotImplementedError
+
     def test_one_task(self, ID, task, model, all_mets_in_model):
         all_met_exist, dummy_rxns, obj_rxns = task.assign(model, all_mets_in_model)
         if not all_met_exist:
@@ -372,9 +407,37 @@ class TaskHandler:
 
         return {'Passed': (((true_status == 'optimal') != task.should_fail) and all_met_exist),
                 'Should fail': task.should_fail,
-                'Missing mets': not all_met_exist, 'Status': true_status,
+                'Missing mets': not all_met_exist,
+                'Status': true_status,
                 'Obj_value': sol.objective_value,
                 "Obj_rxns": obj_rxns}
+
+
+    def _test_task_sinks_utils(self, ID, task, model, test_input, test_output):
+        dummy_rxns = task.setup_sinks(model, set_influx=test_input, set_outflux=test_output)
+        with model:
+            model.add_reactions(dummy_rxns)
+            model.objective = {rxn: 1 for rxn in dummy_rxns}
+            try:
+                sol = pfba(model)
+            except Infeasible:
+                print(f"Task {ID} cannot generate {'input' if test_input else 'output'} metabolites")
+        return sol, dummy_rxns
+
+    def test_task_sinks(self, ID, task, model):
+        input_sol, input_dummy_rxns  = self._test_task_sinks_utils(ID, task, model, test_input=True, test_output=False)
+        output_sol, output_dummy_rxns = self._test_task_sinks_utils(ID, task, model, test_input=False, test_output=True)
+        input_status = input_sol.status
+        output_status = output_sol.status
+        if input_status == output_status == "optimal":
+            status = "optimal"
+            self._add_sink_result(ID, input_sol.to_frame(), input_dummy_rxns)
+            self._add_sink_result(ID, output_sol.to_frame(), output_dummy_rxns)
+        elif input_status != "optimal" and output_status != "optimal":
+            status = "both_infeasible"
+        else:
+            status = ("input" if input_status != "optimal" else "output") + "infeasible"
+        return status
 
     def test(self, verbosity=0):
         # maybe needs some modifications
@@ -396,7 +459,9 @@ class TaskHandler:
                     print(f'Task {ID} - ', end='')
                 # add dummy reactions to the model
                 task_info[ID] = self.test_one_task(ID, task, model, all_mets_in_model)
-
+                if task_info[ID]['Passed'] and not task.should_fail:
+                    task_info[ID]['Sink Status'] = self.test_task_sinks(ID, task, model)
+                    task_info[ID]['Passed'] = (task_info[ID]['Status'] == task_info[ID]['Sink Status'] == "optimal")
                 if verbosity >= 2:
                     print('status: ', task_info[ID]['Status'],
                           'should fail: ', task.should_fail,
@@ -441,6 +506,7 @@ class TaskTester(TaskHandler):
             self._method_kwargs['fraction_of_optimum'] = 1.0
 
         self._passed_rxns: Union[Dict[str, List[str]], dict] = {}
+        self._passed_rxn_sinks: Union[Dict[str, List[str]], dict] = {}
         self._tasks_scores = {}
         self._passed_tasks_list = []
 
@@ -458,7 +524,14 @@ class TaskTester(TaskHandler):
 
     def get_all_passed_rxns(self) -> list:
         return list(set([r for ind in self._passed_tasks_list if not self.tasks[ind].should_fail
-                         for r in self._passed_rxns[ind]]))
+                         for r in self._passed_rxns[ind]] +
+                        [r for ind in self._passed_tasks_list if not self.tasks[ind].should_fail
+                         for r in self._passed_rxn_sinks[ind]]))
+
+    def _add_sink_result(self, ID, sol_df, dummy_rxns):
+        passed_rxns = sol_df[(abs(sol_df['fluxes']) >= self.tol)].index.to_list()
+        dummy_rxn_id_list = [r.id for r in dummy_rxns]
+        self._passed_rxn_sinks[ID] = [rxn for rxn in passed_rxns if rxn not in dummy_rxn_id_list]
 
     def _get_test_result(self, ID, sol_df, dummy_rxns) -> None:
         passed_rxns = sol_df[(abs(sol_df['fluxes']) >= self.tol)].index.to_list()
