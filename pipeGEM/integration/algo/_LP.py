@@ -55,7 +55,7 @@ def non_convex_LP3(J, model, epsilon) -> list:
             fm = model.optimize(objective_sense="maximize").to_frame()["fluxes"].abs()
             if fm.loc[obj_rxn.id] < epsilon:
                 fm = model.optimize(objective_sense="minimize").to_frame()["fluxes"].abs()
-                print(fm.loc[obj_rxn.id], obj_rxn.id)
+                # print(fm.loc[obj_rxn.id], obj_rxn.id)
                 if fm.loc[obj_rxn.id] < epsilon:
                     fm = pd.Series([0 for _ in model.reactions])
 

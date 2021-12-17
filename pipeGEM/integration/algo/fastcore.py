@@ -29,6 +29,9 @@ def fastcc(model,
            return_rxn_ids: bool,
            return_removed_rxn_ids: bool,
            is_convex=True) -> dict:
+    if not is_convex:
+        print("Using non-convex fastcc method")
+
     if return_model:
         consistent_model = model.copy()
     all_rxns = get_rxn_set(model)

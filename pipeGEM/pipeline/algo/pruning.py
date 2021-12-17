@@ -115,6 +115,14 @@ class rFastCormics(Pipeline):
         self.disc = GeneDataDiscretizer()
         self.rxn_categorizer = ReactionCategorizer()
 
+    def get_log(self, *args, **kwargs):
+        log = ""
+        if self.consist_cc is not None:
+            log += self.consist_cc.get_log()
+        log += self.threshold.get_log()
+
+        return log
+
     def run(self,
             model,
             data,
@@ -147,7 +155,7 @@ class rFastCormics(Pipeline):
             if v >= tissue_exp_thres:
                 protected_rxns.append(r)
         protected_rxns = list(set(protected_rxns))
-        task_protected_rxn_dic = {}
+        self.task_protected_rxn_dic = {}
         data = rxn_score_trans(data.copy())
 
         for sample in data.columns:
@@ -161,7 +169,7 @@ class rFastCormics(Pipeline):
                                                rxn_scores=rxn_scores,
                                                ref_model=c_model,
                                                reset_tester=False)
-            task_protected_rxn_dic[sample] = core_rxns + protected_rxns
+            self.task_protected_rxn_dic[sample] = core_rxns + protected_rxns
         discreted_df = self.disc(data_df=data,
                                  sample_names=data.columns,
                                  expr_threshold_dic=expr_tol_dict,
@@ -178,7 +186,7 @@ class rFastCormics(Pipeline):
                                         is_generic_model=False)
         self.supp_dic = supp_protected_rxns(c_model,
                                             data.columns,
-                                            task_protected_rxn_dic,
+                                            self.task_protected_rxn_dic,
                                             C_dic=C_P_dics["C_dic"],
                                             P_dic=C_P_dics["P_dic"],
                                             epsilon_for_fastcore=self.core_threshold)

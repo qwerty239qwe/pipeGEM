@@ -13,9 +13,19 @@ class Config:
         pass
 
 
-class Recorder:
-    def __init__(self):
-        pass
+class Logger:
+    def __init__(self, pipeline, verbose=True, file_name=None):
+        self.pipeline = pipeline
+        self.verbose = verbose
+        self.file_name = file_name
+
+    def __call__(self, *args, **kwargs):
+        log = self.pipeline.get_log(*args, **kwargs)
+        if self.verbose:
+            print(log)
+        if self.file_name is not None:
+            with open(self.file_name, "w+") as f:
+                f.write(log)
 
 
 class Pipeline:
@@ -27,6 +37,9 @@ class Pipeline:
 
     def __str__(self):
         return self.__class__.__name__ + self._next_layer_tree()
+
+    def get_log(self, *args, **kwargs):
+        raise NotImplementedError()
 
     def _next_layer_tree(self):
         pipelines = [getattr(self, name) for name in dir(self)

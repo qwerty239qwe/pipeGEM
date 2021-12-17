@@ -122,12 +122,18 @@ def get_PROM_threshold(df, q=0.33) -> float:
 def get_rfastcormics_thresholds(dat: np.ndarray,
                                 cut_off: float = -np.inf,
                                 file_name: str = None,
-                                plot_dist: bool = False):
+                                plot_dist: bool = False,
+                                use_first_guess: bool = False):
     dat = dat[dat > cut_off]
     kde_f = gaussian_kde(dat)
     x = np.linspace(dat.min(), dat.max(), 10000)
     y = kde_f(x)
-    best_vals_right, best_vals_left, _ = _bimodal_fit(x, y)
+    if use_first_guess:
+        c1, c2 = find_canyons(x, y)
+        c1, c2 = min(c1, c2), max(c1, c2)
+        best_vals_right, best_vals_left = (1, c2, 1), (1, c1, 1)
+    else:
+        best_vals_right, best_vals_left, _ = _bimodal_fit(x, y)
     sigma = np.sqrt(abs(best_vals_right[2]) / 2)
     zscored_x = (x - best_vals_right[1]) / sigma
     zscored_left_thres = (best_vals_left[1] - best_vals_right[1]) / sigma  # if the threshold is lower than -3, pick -3
