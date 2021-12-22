@@ -115,7 +115,9 @@ def non_convex_LP7(J, model: cobra.Model, epsilon: float, use_abs=True) -> list:
 def LP7(J,
         model: cobra.Model,
         epsilon: float,
-        use_abs=True) -> list:
+        use_abs=True,
+        rxn_scale_eps=None,
+        return_min_v=False) -> list:
     """
     LP7 tries to maximize the number of feasible fluxes in J whose value is at least epsilon (Nikos Vlassis, et al. 2013)
 
@@ -137,30 +139,46 @@ def LP7(J,
         prob = model.problem
         vars = []
         consts = []
+        constr_coefs = {}
         for j in J:
             rxn = model.reactions.get_by_id(j)
             var = prob.Variable(f"LP7_z_{rxn.id}", lb=0, ub=epsilon)  # 0 <= zi <= eps
-            const = prob.Constraint(-rxn.flux_expression + 1.0 * var,
-                                    name=f"const_LP7_{rxn.id}", ub=0)  # vi >= zi
+            c_name = f"const_LP7_{rxn.id}"
+            const = prob.Constraint(Zero,
+                                    name=c_name, ub=0)  # vi >= zi
             consts.append(const)
+            constr_coefs[c_name] = {var: 1,
+                                    rxn.forward_variable: -1,
+                                    rxn.reverse_variable: 1}
             vars.append(var)
-        model.add_cons_vars(vars + consts)
+        model.add_cons_vars(consts, sloppy=True)
+        model.add_cons_vars(vars, sloppy=True)
+        # model.add_cons_vars(vars + consts)
+        for con, coefs in constr_coefs.items():
+            model.constraints[con].set_linear_coefficients(coefs)
+
         model.objective = prob.Objective(Zero, sloppy=True)
         model.objective.set_linear_coefficients({v: -1 for v in vars})
+        model.solver.update()
         sol = model.optimize(objective_sense="minimize", raise_error=True)
+        print(f"LP7 with cons {len(model.constraints)}, vars {len(model.variables)}")
     if use_abs:
         fm = sol.to_frame()["fluxes"].abs()
     else:
         fm = sol.to_frame()["fluxes"]
-
-    return fm[fm > 0.99*epsilon].index.to_list()
-
+    if rxn_scale_eps is None:
+        if return_min_v:
+            return fm[fm > 0.99*epsilon].index.to_list(), fm
+        return fm[fm > 0.99*epsilon].index.to_list()
+    return fm[fm > rxn_scale_eps[fm.index]].index.to_list()
 
 def LP9(K,
         P,
         NonP,
         model: cobra.Model,
-        epsilon) -> list:
+        epsilon,
+        min_v,
+        rxn_scale_eps=None) -> list:
     """
     LP9 minimizes the L1 norm of fluxes in the penalty set P, subject to a minimum flux constraint on the set K.
     (Nikos Vlassis, et al. 2013)
@@ -181,48 +199,81 @@ def LP9(K,
     -------
         The result rxn ids list
     """
-    scaling_factor = 1e5
+    scaling_factor = 1e4
+    assert min_v > 0
+    assert len(set(P) & set(K)) == 0
     with model:
         prob = model.problem
         vars = []
         objs = []
-        consts = []
+        constr_coefs = {}
         # print(f"In LP9, |P| = {len(P)}, |K| = {len(K)}")
 
         for p in P:  # penalized rxns
             rxn = model.reactions.get_by_id(p)
+            f_name, r_name = f"const_forward_LP9_{rxn.id}", f"const_reverse_LP9_{rxn.id}"
+            fconst = prob.Constraint(Zero,
+                                     name=f_name, ub=0)  # vi <= zi
+            rconst = prob.Constraint(Zero,
+                                     name=r_name, ub=0)  # -zi <= vi
+            model.add_cons_vars([fconst, rconst])
             z = prob.Variable(f"LP9_z_{rxn.id}", lb=0, ub=max(abs(rxn.lower_bound),
                                                               abs(rxn.upper_bound)) * scaling_factor)  # define z
-            fconst = prob.Constraint(-z + rxn.flux_expression,
-                                     name=f"const_forward_LP9_{rxn.id}", ub=0)  # vi <= zi
-            rconst = prob.Constraint(-z - rxn.flux_expression,
-                                     name=f"const_reverse_LP9_{rxn.id}", ub=0)  # -zi <= vi
+            constr_coefs[fconst] = {z: -1.0,
+                                    rxn.forward_variable: 1.0,
+                                    rxn.reverse_variable: -1.0}
+            constr_coefs[rconst] = {z: -1.0,
+                                    rxn.forward_variable: -1.0,
+                                    rxn.reverse_variable: 1.0}
             vars.append(z)
             if p not in NonP:
                 objs.append(z)
-            consts.extend([fconst, rconst])
-        for k in K:  # to maintain
-            rxn = model.reactions.get_by_id(k)
-
-            # vi >= eps (for all i in K)
-            kconst = prob.Constraint(-rxn.flux_expression,
-                                     name=f"const_K_LP9_{rxn.id}", ub=-epsilon * scaling_factor)
-            consts.append(kconst)
+        model.add_cons_vars(vars)
+        model.solver.update()
         for r in model.reactions:
-            r.lower_bound, r.upper_bound = r.lower_bound * scaling_factor, r.upper_bound * scaling_factor
-
-        model.add_cons_vars(vars + consts)
+            if r.id in K:
+                r.lower_bound = min_v * scaling_factor
+            else:
+                r.lower_bound *= scaling_factor
+            r.upper_bound *= scaling_factor
+        # for k in K:  # to maintain
+            # k_name = f"const_K_LP9_{rxn.id}"
+            # vi >= eps (for all i in K)
+            # kconst = prob.Constraint(rxn.flux_expression,
+            #                          name=k_name, lb=min_v * scaling_factor)
+            # constr_coefs[k_name] = dict()
+            # constr_coefs[k_name][rxn.forward_variable] = 1
+            # constr_coefs[k_name][rxn.reverse_variable] = -1
+            #
+            # consts.append(kconst)
+        # model.add_cons_vars(vars + consts)
+        for con, coefs in constr_coefs.items():
+            con.set_linear_coefficients(coefs)
         model.objective = prob.Objective(Zero, sloppy=True)
-        model.objective.set_linear_coefficients({v: 1.0 for v in objs})  # sum of zi
+        model.objective.set_linear_coefficients({v: -1.0 for v in objs})  # sum of zi
         # print(len(model.constraints), len(model.variables))
+
         try:
-            sol = model.optimize(objective_sense="minimize", raise_error=True)
+            sol = model.optimize(objective_sense="maximize", raise_error=True)
+            print(sol.objective_value)
+            print(f"LP10 with cons {len(model.constraints)}, vars {len(model.variables)}")
         except:
             print("infeasible result: K = ", K)
             return []
         fm = sol.to_frame()["fluxes"].abs()
-    return fm[fm > 0.99 * epsilon].index.to_list()  # supp
+        print("K")
+        ksol = fm[list(K)]
+        print(ksol[ksol == 0])
+        for k in ksol[ksol == 0].index:
+            print(k, model.reactions.get_by_id(k).bounds)
 
+        print("P")
+        psol = fm[list(P)]
+        print(psol[psol != 0])
+
+    if rxn_scale_eps is None:
+        return fm[fm > 0.99 * min_v].index.to_list()  # supp
+    return fm[fm > rxn_scale_eps[fm.index]].index.to_list()
 
 class BlockedProblem(Problem):
     def __init__(self, model, **kwargs):

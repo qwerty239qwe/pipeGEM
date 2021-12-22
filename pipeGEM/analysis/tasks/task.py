@@ -148,7 +148,8 @@ class Task:
         dummy_rxn_list = []
         for met in mets:
             met_id = self._substitute_compartment(met[self.met_id_str], met[self.compartment_str])
-            dummy_rxn = cobra.Reaction('input_{}'.format(met_id) if coef < 0 else 'output_{}'.format(met_id))
+            dummy_rxn = cobra.Reaction('_input_sink_{}'.format(met_id)
+                                       if coef < 0 else '_output_sink_{}'.format(met_id))
             dummy_rxn.add_metabolites({
                 model.metabolites.get_by_id(met_id): coef
             })
@@ -421,14 +422,15 @@ class TaskHandler:
             try:
                 sol = pfba(model)
             except Infeasible:
+                sol = None
                 print(f"Task {ID} cannot generate {'input' if test_input else 'output'} metabolites")
         return sol, dummy_rxns
 
     def test_task_sinks(self, ID, task, model):
-        input_sol, input_dummy_rxns  = self._test_task_sinks_utils(ID, task, model, test_input=True, test_output=False)
+        input_sol, input_dummy_rxns = self._test_task_sinks_utils(ID, task, model, test_input=True, test_output=False)
         output_sol, output_dummy_rxns = self._test_task_sinks_utils(ID, task, model, test_input=False, test_output=True)
-        input_status = input_sol.status
-        output_status = output_sol.status
+        input_status = input_sol.status if input_sol is not None else "infeasible"
+        output_status = output_sol.status if output_sol is not None else "infeasible"
         if input_status == output_status == "optimal":
             status = "optimal"
             self._add_sink_result(ID, input_sol.to_frame(), input_dummy_rxns)
@@ -441,33 +443,33 @@ class TaskHandler:
 
     def test(self, verbosity=0):
         # maybe needs some modifications
-        boundary = [r for r in self.model.exchanges] + \
-                   [r for r in self.model.demands] + \
-                   [r for r in self.model.sinks]
+        boundary = [r.id for r in self.model.exchanges] + \
+                   [r.id for r in self.model.demands] + \
+                   [r.id for r in self.model.sinks]
         task_info = {}
         all_mets_in_model = [m.id for m in self.model.metabolites]
         for ID, task in self.tasks.items():
-            with self.analyzer.model as model:
+            with self.model as model:
                 for r in boundary:
                     if task.knockout_output_flag:
-                        r.upper_bound = 0
+                        model.reactions.get_by_id(r).upper_bound = 0
                     if task.knockout_input_flag:
-                        r.lower_bound = 0
+                        model.reactions.get_by_id(r).lower_bound = 0
                 if verbosity >= 2:
                     print(f'Checking Task {ID}')
                 elif verbosity >= 1:
                     print(f'Task {ID} - ', end='')
                 # add dummy reactions to the model
                 task_info[ID] = self.test_one_task(ID, task, model, all_mets_in_model)
-                if task_info[ID]['Passed'] and not task.should_fail:
-                    task_info[ID]['Sink Status'] = self.test_task_sinks(ID, task, model)
-                    task_info[ID]['Passed'] = (task_info[ID]['Status'] == task_info[ID]['Sink Status'] == "optimal")
-                if verbosity >= 2:
-                    print('status: ', task_info[ID]['Status'],
-                          'should fail: ', task.should_fail,
-                          'Passed: ', task_info[ID]['Passed'])
-                elif verbosity >= 1:
-                    print('Passed' if task_info[ID]['Passed'] else 'Failed')
+            if task_info[ID]['Passed'] and not task.should_fail:
+                task_info[ID]['Sink Status'] = self.test_task_sinks(ID, task, self.model)
+                task_info[ID]['Passed'] = (task_info[ID]['Status'] == task_info[ID]['Sink Status'] == "optimal")
+            if verbosity >= 2:
+                print('status: ', task_info[ID]['Status'],
+                      'should fail: ', task.should_fail,
+                      'Passed: ', task_info[ID]['Passed'])
+            elif verbosity >= 1:
+                print('Passed' if task_info[ID]['Passed'] else 'Failed')
         self._result_df = pd.DataFrame(data=task_info).T
         score = len(self.tasks)
 
@@ -542,7 +544,7 @@ class TaskTester(TaskHandler):
                           expression_threshold = None,
                           non_expression_threshold = None,
                           rxn_scores = None,
-                          coef=0.8,
+                          coef=1,
                           **kwargs) -> None:
         if expression_threshold is not None:
             self._expr_th = expression_threshold
@@ -552,8 +554,10 @@ class TaskTester(TaskHandler):
             self._rxn_score = rxn_scores
         if self._passed_rxns is not None:
             self._tasks_scores = dict()
-            for ID, rxns in self._passed_rxns.items():
-                grr_rxns = [v for v in rxns if self._rxn_score[v] != 0 and not np.isnan(self._rxn_score[v])]
+            passed_tasks = self._result_df[(self._result_df["Should fail"] == False) &
+                                           (self._result_df["Passed"] == True)].index.to_list()
+            for ID in passed_tasks:
+                grr_rxns = [v for v in self._passed_rxns[ID] if self._rxn_score[v] != 0 and not np.isnan(self._rxn_score[v])]
                 if len(grr_rxns) > 0:
                     self._tasks_scores[ID] = sum([self._rxn_score[v]
                                                   if v in self._rxn_score and self._rxn_score[v] != -1 else 0

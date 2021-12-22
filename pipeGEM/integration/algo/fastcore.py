@@ -1,9 +1,10 @@
 from typing import Set, Union, List, Dict
 import copy
-import re
+from warnings import warn
 
 import cobra
 import numpy as np
+import pandas as pd
 
 from pipeGEM.integration.mapping import Expression
 from pipeGEM.integration.utils import get_rxn_set, flip_direction
@@ -11,16 +12,19 @@ from pipeGEM.utils import get_rxns_in_subsystem
 from ._LP import LP3, LP7, LP9, non_convex_LP7, non_convex_LP3
 
 
-def find_sparse_mode(J, P, nonP, model, singleton, epsilon):
+def find_sparse_mode(J, P, nonP, model, singleJ, epsilon):
     if len(J) == 0:
         return []
-    if singleton:
-        singleJ = {next(iter(J))}
         # print(f"find_sparse_mode of single reaction: {singleJ}")
-    K = np.intersect1d(list(J), (LP7(J if not singleton else singleJ, model, epsilon, use_abs=False)))
+    supps, v = LP7(J if singleJ is None else singleJ,
+                   model, epsilon, use_abs=False, return_min_v=True)
+    K = np.intersect1d(list(J), supps)
+    if singleJ is not None and len(singleJ & set(K)) == 0:
+        warn(f"Singleton {singleJ} flux cannot be generate in LP7")
+    print(f"cons {len(model.constraints)}, vars {len(model.variables)}")
     if K.shape[0] == 0:
         return []
-    return LP9(K, P, nonP, model, epsilon)
+    return LP9(K, P, nonP, model, epsilon, min_v=v[list(K)].min())
 
 
 def fastcc(model,
@@ -31,7 +35,7 @@ def fastcc(model,
            is_convex=True) -> dict:
     if not is_convex:
         print("Using non-convex fastcc method")
-
+    print(f"Epsilon used: {epsilon}")
     if return_model:
         consistent_model = model.copy()
     all_rxns = get_rxn_set(model)
@@ -96,13 +100,20 @@ def fastCore(C: Union[List[str], Set[str]],
              epsilon: float,
              return_model: bool,
              return_rxn_ids: bool,
-             return_removed_rxn_ids: bool):
+             return_removed_rxn_ids: bool,
+             scale_by_coef: bool = True):
     if return_model:
         output_model = model.copy()
     if not isinstance(C, set):
         C = set(C)
     if not isinstance(nonP, set):
         nonP = set(nonP)
+    # if scale_by_coef:
+    #     print("Use scaled epsilons")
+    #     rxn_scale_eps = pd.Series({r.id: 0.99*epsilon / max([abs(mc) for mc in r.metabolites.values()])
+    #                                for r in model.reactions})
+    # else:
+    #     rxn_scale_eps = None
 
     all_rxns = get_rxn_set(model)
     irr_rxns = get_rxn_set(model, "irreversible")
@@ -115,23 +126,39 @@ def fastCore(C: Union[List[str], Set[str]],
         flipped, singleton = False, False
         J = C & irr_rxns
         P = all_rxns - C - nonP
-        A = set(find_sparse_mode(J, P, nonP, model, singleton, epsilon))
+        singleJ = None
+        A = set(find_sparse_mode(J, P, nonP, model, singleJ, epsilon))
         invalid_part = J - A
-        assert len(invalid_part) == 0, \
-            f"Inconsistent irreversible core reactions (They should be included in A): {invalid_part}"
+        track_irrev = False
+        if len(invalid_part) != 0:
+            track_irrev = True
+            warn(f"Inconsistent irreversible core reactions (They should be included in A): Total: {len(invalid_part)}")
         J = C - A  # reactions to be added to the model
         while len(J) > 0:
             P = P - A
-            supp = set(find_sparse_mode(J, P, nonP, model, singleton, epsilon))
+            supp = set(find_sparse_mode(J, P, nonP, model, singleJ, epsilon))
             A |= supp
             if len(J & A) > 0:
                 J -= A
-                flipped = False
+                flipped, singleton = False, False
+                singleJ = None
+
+                if track_irrev:
+                    print(f"Irrev in J: {len(J & irr_rxns)}, J: {len(J)}")
             else:
-                Jrev = {next(iter(J))} - irr_rxns if singleton else J - irr_rxns
+                if singleton:
+                    if singleJ is None:
+                        Jrev = {next(iter(J - irr_rxns))}
+                        singleJ = Jrev
+                        flipped = False
+                else:
+                    Jrev = J - irr_rxns
                 if len(Jrev) == 0 or flipped:  # If no reversible J or the model is flipped
-                    assert not singleton, "Error: Global network is not consistent."
+                    assert not singleton, f"Error: Global network is not consistent. Last rxn: {Jrev} |J| = {len(J)}"
                     flipped, singleton = False, True
+                    if singleJ is None:
+                        Jrev = {next(iter(J - irr_rxns))}
+                        singleJ = Jrev
                 else:
                     flip_direction(model, Jrev)
                     flipped = True

@@ -144,7 +144,7 @@ def save_model(model: cobra.Model,
     if output_extension == ".mat":
         cobra.io.save_matlab_model(model, output_file_name.with_suffix(output_extension))
     elif output_extension == ".json":
-        cobra.io.json.save_json_model(model, output_file_name.with_suffix(output_extension))
+        cobra.io.json.save_json_model(model, str(output_file_name.with_suffix(output_extension)))
     elif output_extension == ".xml":
         cobra.io.write_sbml_model(model, output_file_name.with_suffix(output_extension))
     elif output_extension == ".yaml":
@@ -170,7 +170,7 @@ def load_model(model_file_path: str) -> cobra.Model:
     elif fn_path.suffix == ".mat":
         return cobra.io.load_matlab_model(fn_path)
     elif fn_path.suffix == ".json":
-        return cobra.io.load_json_model(fn_path)
+        return cobra.io.load_json_model(str(fn_path))
     elif fn_path.suffix == ".yaml":
         return cobra.io.load_yaml_model(fn_path)
     else:

@@ -23,8 +23,15 @@ class ReactionCategorizer(Pipeline):
         if method == "get_CP":
             self.categorizer = get_C_and_P_dic
 
-    def run(self, *args, **kwargs):
+    def run(self, force_core_rxns = None, *args, **kwargs):
         self.output = self.categorizer(**kwargs)
+        if force_core_rxns is not None:
+            for k, v in self.output["C_dic"].items():
+                self.output["C_dic"][k] = (set(v) | set(force_core_rxns))
+            if "P_dic" in self.output:
+                for k, v in self.output["P_dic"].items():
+                    self.output["P_dic"][k] = (set(v) - set(force_core_rxns))
+
         return self.output
 
 
@@ -95,7 +102,8 @@ class rFastCormics(Pipeline):
                  core_threshold=1e-6,
                  cc_threshold=1e-6,
                  solver="gurobi",
-                 saved_dist_plot_format=None):
+                 saved_dist_plot_format=None,
+                 use_first_guess=True):
         super().__init__()
         if consist_method == "fastcc":
             self.consist_cc = FastCC()
@@ -105,7 +113,8 @@ class rFastCormics(Pipeline):
             self.consist_cc = consist_method
         self.core_threshold = core_threshold
         self.cc_threshold = cc_threshold
-        self.threshold = BimodalThreshold(naming_format=saved_dist_plot_format)
+        self.threshold = BimodalThreshold(naming_format=saved_dist_plot_format,
+                                          use_first_guess=use_first_guess)
         self.medium_constr = MediumConstraint()
         self.rxn_tester = ReactionTester(task_file_path=task_file_path,
                                          model_compartment_format=model_compartment_format,
@@ -139,6 +148,7 @@ class rFastCormics(Pipeline):
         if self.consist_cc is not None:
             c_model = self.consist_cc(model,
                                       return_model=True,
+                                      tol=self.cc_threshold,
                                       **kwargs)["model"]
         else:
             c_model = model
@@ -151,10 +161,10 @@ class rFastCormics(Pipeline):
 
         ts_score = Expression(c_model, tissue_data).rxn_scores \
             if tissue_data is not None else {}
+        ts_rxns = []
         for r, v in ts_score.items():
             if v >= tissue_exp_thres:
-                protected_rxns.append(r)
-        protected_rxns = list(set(protected_rxns))
+                ts_rxns.append(r)
         self.task_protected_rxn_dic = {}
         data = rxn_score_trans(data.copy())
 
@@ -183,7 +193,8 @@ class rFastCormics(Pipeline):
         C_P_dics = self.rxn_categorizer(expression_dic=dis_exp_df,
                                         sample_names=data.columns,
                                         consensus_proportion=0.9,
-                                        is_generic_model=False)
+                                        is_generic_model=False,
+                                        force_core_rxns=ts_rxns)
         self.supp_dic = supp_protected_rxns(c_model,
                                             data.columns,
                                             self.task_protected_rxn_dic,
