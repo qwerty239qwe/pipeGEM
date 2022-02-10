@@ -161,7 +161,6 @@ def LP7(J,
         model.objective.set_linear_coefficients({v: -1 for v in vars})
         model.solver.update()
         sol = model.optimize(objective_sense="minimize", raise_error=True)
-        print(f"LP7 with cons {len(model.constraints)}, vars {len(model.variables)}")
     if use_abs:
         fm = sol.to_frame()["fluxes"].abs()
     else:
@@ -255,22 +254,10 @@ def LP9(K,
 
         try:
             sol = model.optimize(objective_sense="maximize", raise_error=True)
-            print(sol.objective_value)
-            print(f"LP10 with cons {len(model.constraints)}, vars {len(model.variables)}")
         except:
             print("infeasible result: K = ", K)
             return []
         fm = sol.to_frame()["fluxes"].abs()
-        print("K")
-        ksol = fm[list(K)]
-        print(ksol[ksol == 0])
-        for k in ksol[ksol == 0].index:
-            print(k, model.reactions.get_by_id(k).bounds)
-
-        print("P")
-        psol = fm[list(P)]
-        print(psol[psol != 0])
-
     if rxn_scale_eps is None:
         return fm[fm > 0.99 * min_v].index.to_list()  # supp
     return fm[fm > rxn_scale_eps[fm.index]].index.to_list()

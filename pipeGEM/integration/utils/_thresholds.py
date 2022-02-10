@@ -138,22 +138,24 @@ def get_rfastcormics_thresholds(dat: np.ndarray,
     zscored_x = (x - best_vals_right[1]) / sigma
     zscored_left_thres = (best_vals_left[1] - best_vals_right[1]) / sigma  # if the threshold is lower than -3, pick -3
     if plot_dist:
-        right_c = gaussian(x, *tuple(best_vals_right))
-        left_c = gaussian(x, *tuple(best_vals_left))
-        fig, axes = plt.subplots(1, 2, figsize=(11, 6))
-        axes[0].plot(zscored_x, y, label="Data")
-        axes[0].plot(zscored_x, right_c, label="Fitted expressed distribution")
-        axes[0].plot(zscored_x, left_c, label="Fitted non-expressed distribution")
-        axes[0].plot([0, 0], [0, np.max(y)])
-        axes[0].plot([zscored_left_thres, zscored_left_thres], [0, np.max(y)])
-        axes[0].legend()
 
-        axes[1].plot(x, y, label="Data")
-        axes[1].plot(x, right_c, label="Fitted expressed distribution")
-        axes[1].plot(x, left_c, label="Fitted non-expressed distribution")
-        axes[1].plot([best_vals_left[1], best_vals_left[1]], [0, np.max(y)])
-        axes[1].plot([best_vals_right[1], best_vals_right[1]], [0, np.max(y)])
-        axes[1].legend()
+        fig, ax = plt.subplots(figsize=(8, 6))
+        # axes[0].plot(zscored_x, y, label="Data")
+        # axes[0].plot(zscored_x, right_c, label="Fitted expressed distribution")
+        # axes[0].plot(zscored_x, left_c, label="Fitted non-expressed distribution")
+        # axes[0].plot([0, 0], [0, np.max(y)])
+        # axes[0].plot([zscored_left_thres, zscored_left_thres], [0, np.max(y)])
+        # axes[0].legend()
+
+        ax.plot(x, y, label="Data")
+        if not use_first_guess:
+            right_c = gaussian(x, *tuple(best_vals_right))
+            left_c = gaussian(x, *tuple(best_vals_left))
+            ax.plot(x, right_c, label="Fitted expressed distribution")
+            ax.plot(x, left_c, label="Fitted non-expressed distribution")
+        ax.plot([best_vals_left[1], best_vals_left[1]], [0, np.max(y)])
+        ax.plot([best_vals_right[1], best_vals_right[1]], [0, np.max(y)])
+        ax.legend()
         if file_name:
             plt.savefig(file_name, dpi=300)
         plt.show()

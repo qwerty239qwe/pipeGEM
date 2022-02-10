@@ -21,7 +21,6 @@ def find_sparse_mode(J, P, nonP, model, singleJ, epsilon):
     K = np.intersect1d(list(J), supps)
     if singleJ is not None and len(singleJ & set(K)) == 0:
         warn(f"Singleton {singleJ} flux cannot be generate in LP7")
-    print(f"cons {len(model.constraints)}, vars {len(model.variables)}")
     if K.shape[0] == 0:
         return []
     return LP9(K, P, nonP, model, epsilon, min_v=v[list(K)].min())

@@ -178,6 +178,8 @@ class Task:
     def assign(self,
                model,
                all_mets_in_model = None,
+               add_output_rxns = True,
+               add_input_rxns = True,
                loose_input=False,
                loose_output=False):
         """
@@ -215,8 +217,12 @@ class Task:
                         dummy_rxn.lower_bound, dummy_rxn.upper_bound = 0, 1000
                     else:
                         dummy_rxn.lower_bound, dummy_rxn.upper_bound = met[self.lower_bound_str], met[self.upper_bound_str]
-                    dummy_rxn_list.append(dummy_rxn)
+
+                    if coef == 1 and add_input_rxns:
+                        dummy_rxn_list.append(dummy_rxn)
                     if coef == -1:
+                        if add_output_rxns:
+                            dummy_rxn_list.append(dummy_rxn)
                         obj_rxn_list.append(dummy_rxn)
                 else:
                     print(met_id, 'not exists in the model')
@@ -318,6 +324,7 @@ class TaskHandler:
         self.tasks = self._init_task_container(tasks_path_or_container,
                                                compartment_patenthesis=model_compartment_parenthesis)
         self.analyzer = FluxAnalyzer(model=self.model, solver=solver)
+        self.consider_sink = False
 
         self._method = method
         self._method_kwargs = {} if method_kwargs is None else method_kwargs
@@ -380,39 +387,7 @@ class TaskHandler:
         raise NotImplementedError
 
     def test_one_task(self, ID, task, model, all_mets_in_model):
-        all_met_exist, dummy_rxns, obj_rxns = task.assign(model, all_mets_in_model)
-        if not all_met_exist:
-            return {'Passed': False,
-                    'Should fail': task.should_fail,
-                    'Missing mets': True,
-                    'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": obj_rxns}
-        if self._method == "pFBA":
-            model.objective = {rxn: 1 for rxn in obj_rxns}
-        sol = model.optimize(raise_error=False)
-        true_status = sol.status
-        if true_status == 'optimal':
-            try:
-                kws = {}
-                kws.update(self._constr_kwargs)
-                kws.update(self._method_kwargs)
-                self.analyzer.do_analysis(method=self._method,
-                                          constr=self._constr,
-                                          **kws)
-                sol_df = self.analyzer.get_flux(method=self._method,
-                                                constr=self._constr,
-                                                keep_rc=False)
-                self._get_test_result(ID, sol_df, dummy_rxns)
-            except Infeasible:
-                true_status = "infeasible"
-                print("get an unexpected result")
-
-        return {'Passed': (((true_status == 'optimal') != task.should_fail) and all_met_exist),
-                'Should fail': task.should_fail,
-                'Missing mets': not all_met_exist,
-                'Status': true_status,
-                'Obj_value': sol.objective_value,
-                "Obj_rxns": obj_rxns}
-
+        raise NotImplementedError
 
     def _test_task_sinks_utils(self, ID, task, model, test_input, test_output):
         dummy_rxns = task.setup_sinks(model, set_influx=test_input, set_outflux=test_output)
@@ -441,12 +416,13 @@ class TaskHandler:
             status = ("input" if input_status != "optimal" else "output") + "infeasible"
         return status
 
-    def test(self, verbosity=0):
+    def test(self, test_sink=True, verbosity=0):
         # maybe needs some modifications
         boundary = [r.id for r in self.model.exchanges] + \
                    [r.id for r in self.model.demands] + \
                    [r.id for r in self.model.sinks]
         task_info = {}
+        self.consider_sink = test_sink
         all_mets_in_model = [m.id for m in self.model.metabolites]
         for ID, task in self.tasks.items():
             with self.model as model:
@@ -461,7 +437,7 @@ class TaskHandler:
                     print(f'Task {ID} - ', end='')
                 # add dummy reactions to the model
                 task_info[ID] = self.test_one_task(ID, task, model, all_mets_in_model)
-            if task_info[ID]['Passed'] and not task.should_fail:
+            if task_info[ID]['Passed'] and not task.should_fail and test_sink:
                 task_info[ID]['Sink Status'] = self.test_task_sinks(ID, task, self.model)
                 task_info[ID]['Passed'] = (task_info[ID]['Status'] == task_info[ID]['Sink Status'] == "optimal")
             if verbosity >= 2:
@@ -524,11 +500,45 @@ class TaskTester(TaskHandler):
     def passed_tasks_list(self):
         return self._passed_tasks_list
 
+    def test_one_task(self, ID, task, model, all_mets_in_model):
+        all_met_exist, dummy_rxns, obj_rxns = task.assign(model, all_mets_in_model)
+        if not all_met_exist:
+            return {'Passed': False,
+                    'Should fail': task.should_fail,
+                    'Missing mets': True,
+                    'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": obj_rxns}
+        if self._method == "pFBA":
+            model.objective = {rxn: 1 for rxn in obj_rxns}
+        sol = model.optimize(raise_error=False)
+        true_status = sol.status
+        if true_status == 'optimal':
+            try:
+                kws = {}
+                kws.update(self._constr_kwargs)
+                kws.update(self._method_kwargs)
+                self.analyzer.do_analysis(method=self._method,
+                                          constr=self._constr,
+                                          **kws)
+                sol_df = self.analyzer.get_flux(method=self._method,
+                                                constr=self._constr,
+                                                keep_rc=False)
+                self._get_test_result(ID, sol_df, dummy_rxns)
+            except Infeasible:
+                true_status = "infeasible"
+                print("get an unexpected result")
+
+        return {'Passed': (((true_status == 'optimal') != task.should_fail) and all_met_exist),
+                'Should fail': task.should_fail,
+                'Missing mets': not all_met_exist,
+                'Status': true_status,
+                'Obj_value': sol.objective_value,
+                "Obj_rxns": obj_rxns}
+
     def get_all_passed_rxns(self) -> list:
         return list(set([r for ind in self._passed_tasks_list if not self.tasks[ind].should_fail
                          for r in self._passed_rxns[ind]] +
                         [r for ind in self._passed_tasks_list if not self.tasks[ind].should_fail
-                         for r in self._passed_rxn_sinks[ind]]))
+                         for r in self._passed_rxn_sinks[ind]] if self.consider_sink else []))
 
     def _add_sink_result(self, ID, sol_df, dummy_rxns):
         passed_rxns = sol_df[(abs(sol_df['fluxes']) >= self.tol)].index.to_list()
@@ -595,6 +605,42 @@ class TaskValidator(TaskHandler):
         if method == 'pFBA':
             self._method_kwargs['fraction_of_optimum'] = 1.0
         self._flux_dfs = {}
+
+    def test_one_task(self, ID, task, model, all_mets_in_model):
+        all_met_exist, dummy_rxns, obj_rxns = task.assign(model,
+                                                          all_mets_in_model,
+                                                          loose_output=True)
+        if not all_met_exist:
+            return {'Passed': False,
+                    'Should fail': task.should_fail,
+                    'Missing mets': True,
+                    'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": obj_rxns}
+        if self._method == "pFBA":
+            model.objective = {rxn: 1 for rxn in obj_rxns}
+        sol = model.optimize(raise_error=False)
+        true_status = sol.status
+        if true_status == 'optimal':
+            try:
+                kws = {}
+                kws.update(self._constr_kwargs)
+                kws.update(self._method_kwargs)
+                self.analyzer.do_analysis(method=self._method,
+                                          constr=self._constr,
+                                          **kws)
+                sol_df = self.analyzer.get_flux(method=self._method,
+                                                constr=self._constr,
+                                                keep_rc=False)
+                self._get_test_result(ID, sol_df, dummy_rxns)
+            except Infeasible:
+                true_status = "infeasible"
+                print("get an unexpected result")
+
+        return {'Passed': (((true_status == 'optimal') != task.should_fail) and all_met_exist),
+                'Should fail': task.should_fail,
+                'Missing mets': not all_met_exist,
+                'Status': true_status,
+                'Obj_value': sol.objective_value,
+                "Obj_rxns": obj_rxns}
 
     @property
     def flux_dfs(self):

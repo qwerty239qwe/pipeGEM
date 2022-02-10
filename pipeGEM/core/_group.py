@@ -707,5 +707,3 @@ class Group(GEMComposite):
                      dpi=dpi,
                      **kwargs)
 
-
-
