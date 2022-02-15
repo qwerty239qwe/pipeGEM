@@ -13,33 +13,16 @@ class Config:
         pass
 
 
-class Logger:
-    def __init__(self, pipeline, verbose=True, file_name=None):
-        self.pipeline = pipeline
-        self.verbose = verbose
-        self.file_name = file_name
-
-    def __call__(self, *args, **kwargs):
-        log = self.pipeline.get_log(*args, **kwargs)
-        if self.verbose:
-            print(log)
-        if self.file_name is not None:
-            with open(self.file_name, "w+") as f:
-                f.write(log)
-
-
 class Pipeline:
     def __init__(self, *args, **kwargs):
         self.output = None
-        self._pre_hooks = OrderedDict()  # affect on every jobs
+        self._pre_hooks = OrderedDict()  # affect every jobs
         self._post_hooks = OrderedDict()
         self._jobs = OrderedDict()
+        self._prev_lvl_pl_name = kwargs.get("container_name")
 
     def __str__(self):
         return self.__class__.__name__ + self._next_layer_tree()
-
-    def get_log(self, *args, **kwargs):
-        raise NotImplementedError()
 
     def _next_layer_tree(self):
         pipelines = [getattr(self, name) for name in dir(self)

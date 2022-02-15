@@ -3,7 +3,7 @@ from typing import Optional, List, Union
 import numpy as np
 import pandas as pd
 
-from ._base import Pipeline
+from ._base import Pipeline, Logger
 from pipeGEM.integration.utils import get_rfastcormics_thresholds
 
 
@@ -13,8 +13,10 @@ class BimodalThreshold(Pipeline):
                  naming_format: Optional[str] = "./thresholds/{sample_name}.png",
                  plot_dist: bool = True,
                  use_first_guess: bool = False,
+                 verbose: bool = True
                  ):
         super().__init__()
+        self._logger = Logger(self, verbose=verbose, )
         self.cut_off = cut_off
         self.plot_dist = plot_dist
         self.naming_format = naming_format

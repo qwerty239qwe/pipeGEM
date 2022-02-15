@@ -1,4 +1,5 @@
 from typing import List
+import logging
 
 import pandas as pd
 
@@ -10,6 +11,9 @@ from pipeGEM.plotting.heatmap import plot_clustermap
 class TestScorePlotter(Pipeline):
     def __init__(self, model_tester):
         super().__init__()
+        self._log = logging.getLogger((self._prev_lvl_pl_name + ".") if self._prev_lvl_pl_name is not None else "" +
+                                      type(self).__name__)
+        self._log.debug(f"Init {type(self).__name__} pipeline.")
         self.model_tester = model_tester
 
     def run(self,
