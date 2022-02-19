@@ -8,9 +8,14 @@ def follow_up(constraint_details, constr, **kwargs):
         return _Eflux_follow_up(constraint_details, **kwargs)
     if constr == "GIMME":
         return _GIMME_follow_up(constraint_details, **kwargs)
+    if constr == "RIPTiDe":
+        return _GIMME_follow_up(constraint_details, **kwargs)
 
 
 def post_process(sol_df, constr, **kwargs):
     if constr == "GIMME":
         return _GIMME_post_process(sol_df, **kwargs)
+    if constr == "RIPTiDe":
+        return _GIMME_post_process(sol_df, **kwargs)
+
     return sol_df
