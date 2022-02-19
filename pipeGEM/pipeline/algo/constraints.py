@@ -7,7 +7,7 @@ from pipeGEM.integration import constraints
 
 class GIMME(Pipeline):
     def __init__(self, data_df):
-        super(GIMME, self).__init__()
+        super().__init__()
         self.gene_dataset = GeneDataSet(data_df)
         self.data_df = data_df
 

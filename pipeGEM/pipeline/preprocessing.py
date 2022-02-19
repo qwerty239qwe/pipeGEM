@@ -23,9 +23,11 @@ class GeneDataIDConverter(Pipeline):
                  ds_kws: Dict[str, Any],
                  map_type: str = "df",
                  drop_unused: bool = False,
-                 ref_model: Optional[cobra.Model] = None
+                 ref_model: Optional[cobra.Model] = None,
+                 *args,
+                 **kwargs
                  ):
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self.map_df = get_gene_id_map(gene_names=gene_names,
                                       from_id=from_id,
                                       to_id=to_id,
@@ -41,10 +43,12 @@ class GeneDataIDConverter(Pipeline):
             gene_col: str,
             to_id: str
             ) -> pd.DataFrame:
+
         self.output = translate_gene_id(data_df=data_df,
                                         map_df=map_df,
                                         gene_col=gene_col,
                                         to_id=to_id)
+
         return self.output["data_df"]
 
 
@@ -56,9 +60,10 @@ class GeneDataLengthGetter(Pipeline):
                  ds_kws: Dict[str, Any],
                  map_type: str = "df",
                  drop_unused: bool = False,
-                 ref_model: Optional[cobra.Model] = None
+                 ref_model: Optional[cobra.Model] = None,
+                 *args, **kwargs
                  ):
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self.map_df = get_gene_id_map(gene_names=gene_names,
                                       from_id=from_id,
                                       to_id="transcript_length",
@@ -80,7 +85,7 @@ class GeneDataLengthGetter(Pipeline):
 
 
 class GeneDataDiscretizer(Pipeline):
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         super().__init__()
 
     def run(self,
@@ -116,10 +121,9 @@ class GeneDataLinearScaler(Pipeline):
         return self.output
 
 
-
 class GeneData(Pipeline):
-    def __init__(self):
-        super(GeneData, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(GeneData, self).__init__(*args, **kwargs)
         self._expression = None
 
     def run(self, data, model, *args, **kwargs):
@@ -129,8 +133,8 @@ class GeneData(Pipeline):
 
 
 class GeneDataSet(Pipeline):
-    def __init__(self, data_df: pd.DataFrame):
-        super().__init__()
+    def __init__(self, data_df: pd.DataFrame, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.data_df = data_df
         self.jobs = {c: GeneData() for c in data_df.columns}
         self._expression_dict = {}
@@ -225,8 +229,8 @@ class HPADataFetcher(Pipeline):
         self.ptn_loader = ProteinDataLoader(data_name=data_name,
                                             data_path=data_path)
         self.ptn_transformer = ProteinDataTransformer(level_dic=level_dic,
-                                                 categories=categories,
-                                                 score_col_name=score_col_name)
+                                                      categories=categories,
+                                                      score_col_name=score_col_name)
 
     def run(self,
             cancer_query="all",

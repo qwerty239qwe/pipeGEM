@@ -1,5 +1,4 @@
 from typing import List
-import logging
 
 import pandas as pd
 
@@ -9,17 +8,15 @@ from pipeGEM.plotting.heatmap import plot_clustermap
 
 
 class TestScorePlotter(Pipeline):
-    def __init__(self, model_tester):
-        super().__init__()
-        self._log = logging.getLogger((self._prev_lvl_pl_name + ".") if self._prev_lvl_pl_name is not None else "" +
-                                      type(self).__name__)
-        self._log.debug(f"Init {type(self).__name__} pipeline.")
+    def __init__(self, model_tester, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.model_tester = model_tester
 
     def run(self,
             task_scores: List[str],
             file_name=None,
             z_score=1) -> None:
+        self._info(f"Start to plot the test score heatmap.")
         score_data = pd.DataFrame(task_scores).fillna(-1)
         subsystem_dict = {ID: task.subsystem
                           for ID, task in self.model_tester.tasks.items()}
@@ -28,12 +25,16 @@ class TestScorePlotter(Pipeline):
                         file_name=file_name,
                         z_score=z_score,
                         )
+        self._info(f"Finish plotting the test score heatmap.")
 
 
 class GeneDataSetHeatmap(Pipeline):
     def __init__(self, data_df, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ds = GeneDataSet(data_df=data_df)
+        self._debug(f"Init {type(self).__name__} pipeline.")
+        self.ds = GeneDataSet(data_df=data_df,
+                              container_name=type(self).__name__,
+                              verbosity=kwargs.get("verbosity"))
 
     def run(self,
             model,
@@ -43,6 +44,8 @@ class GeneDataSetHeatmap(Pipeline):
             *args,
             **kwargs) -> None:
         exp_dic = self.ds(model, *args, **kwargs)
+
+        self._info(f"Start to plot the gene dataset heatmap.")
         dfs = []
         plotting_kws = plotting_kws if plotting_kws is not None else {}
         for sample_name, exp in exp_dic.items():
@@ -54,5 +57,5 @@ class GeneDataSetHeatmap(Pipeline):
                 raise ValueError("choose from subsystems or rxns")
             dfs.append(pd.Series(scores).to_frame().rename(columns={0: sample_name}))
         plot_clustermap(pd.concat(dfs, axis=1), **plotting_kws)
-
+        self._info(f"Finish plotting the gene dataset heatmap.")
 

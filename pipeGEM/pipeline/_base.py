@@ -1,4 +1,6 @@
 from collections import OrderedDict
+from functools import partial
+import warnings
 
 
 __all__ = ["Pipeline", "Config"]
@@ -20,6 +22,23 @@ class Pipeline:
         self._post_hooks = OrderedDict()
         self._jobs = OrderedDict()
         self._prev_lvl_pl_name = kwargs.get("container_name")
+        self._verbosity = kwargs.get("verbosity") or 0
+        self._setup_loggers()
+        self._debug(f"Init {type(self).__name__} pipeline.")
+
+    def _setup_loggers(self):
+        self._debug = partial(self._log_msg, is_warning=False, verbose=self._verbosity > 1)
+        self._info = partial(self._log_msg, is_warning=False, verbose=self._verbosity > 0)
+        self._warn = partial(self._log_msg, is_warning=True, verbose=self._verbosity > -1)
+
+    @staticmethod
+    def _log_msg(val, is_warning, verbose):
+        if not verbose:
+            return
+        if is_warning:
+            warnings.warn(val)
+        else:
+            print(val)
 
     def __str__(self):
         return self.__class__.__name__ + self._next_layer_tree()
