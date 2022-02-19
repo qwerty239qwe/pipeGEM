@@ -3,6 +3,7 @@ from typing import Optional, Sequence, Union
 import numpy as np
 import pandas as pd
 import cobra
+import scipy.sparse
 
 
 from . import Model
@@ -50,12 +51,12 @@ class Problem:
             return int(s)
 
     def parse_s_shape(self, s_shape) -> dict:
-        S = self.S.copy()
+        S: scipy.sparse.lil_matrix = self.S.copy()
         reconstruct_attr = True
         if "m" in s_shape[1] or "n" in s_shape[0]:
             reconstruct_attr = False
             s_shape = s_shape[1], s_shape[0]
-            S = S.T
+            S = S.transpose()
 
         if "m" in s_shape[1] or "n" in s_shape[0]:
             raise ValueError("No such reshape option provided")
@@ -158,8 +159,11 @@ class Problem:
             raise DimensionMismatchedError("")
 
     @staticmethod
-    def prepare_problem(model):
-        S = cobra.util.create_stoichiometric_matrix(model)
+    def prepare_problem(model) -> (scipy.sparse.lil_matrix,
+                                   np.ndarray, np.ndarray, np.ndarray,
+                                   np.ndarray, np.ndarray, np.ndarray,
+                                   np.ndarray, np.ndarray):
+        S = cobra.util.create_stoichiometric_matrix(model, array_type="lil")
         v = np.array(["C" for _ in range(len(model.reactions))])
         lbs = np.array([r.lower_bound for r in model.reactions])
         ubs = np.array([r.upper_bound for r in model.reactions])
@@ -211,7 +215,7 @@ class Problem:
         e_names = e_names if e_names is not None else np.array(
             [f"var_{i}" for i in range(len(self.col_names), len(self.col_names) + e_S.shape[1])])
         self._check_extend_horizontal(e_S, e_v, e_v_lb, e_v_ub, e_objs, e_names)
-        self.S = np.concatenate([self.S, e_S] if at_right else [e_S, self.S], axis=1)
+        self.S = scipy.sparse.hstack([self.S, e_S] if at_right else [e_S, self.S])
         self.v = np.concatenate([self.v, e_v] if at_right else [e_v, self.v])
         self.lbs = np.concatenate([self.lbs, e_v_lb] if at_right else [e_v_lb, self.lbs])
         self.ubs = np.concatenate([self.ubs, e_v_ub] if at_right else [e_v_ub, self.ubs])
@@ -223,7 +227,7 @@ class Problem:
         e_names = e_names if e_names is not None else np.array(
             [f"const_{i}" for i in range(len(self.row_names), len(self.row_names) + e_S.shape[0])])
         self._check_extend_vertical(e_S, e_b, e_c, e_names)
-        self.S = np.concatenate([self.S, e_S], axis=0 if at_bottom else [e_S, self.S])
+        self.S = scipy.sparse.vstack([self.S, e_S] if at_bottom else [e_S, self.S])
         self.b = np.concatenate([self.b, e_b] if at_bottom else [e_b, self.b])
         self.c = np.concatenate([self.c, e_c] if at_bottom else [e_c, self.c])
         self.row_names = np.concatenate([self.row_names, e_names] if at_bottom else [e_names, self.row_names])

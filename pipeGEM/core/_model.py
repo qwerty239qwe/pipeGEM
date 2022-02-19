@@ -9,6 +9,20 @@ from pipeGEM.analysis import FluxAnalyzer
 from pipeGEM.utils import save_model
 
 
+class ModelRecorder:
+    def __init__(self):
+        self.records = {}
+
+    def __getitem__(self, item):
+        return self.records[item]
+
+    def write(self, col_name, data):
+        self.records[col_name] = data
+
+    def to_df(self):
+        return pd.DataFrame(self.records)
+
+
 class Model(GEMComposite):
     _is_leaf = True
 
