@@ -55,35 +55,43 @@ def RIPTiDe(model: cobra.Model,
     for r in model.reactions:
         if r.objective_coefficient > 0:
             r.lower_bound = obj_frac * sol_df.loc[r.id, "fluxes"]
+    minimized_rs = []
+
+    not_related_rxns = set([r.id for r in model.reactions]) - set(rxn_expr_score.keys())
     if prune_rxns:
         obj_dict = {mapped_r_id: (max_gw + min_gw - r_exp) / max_gw
                     for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)
                     for mapped_r_id in rev_map_to_irrev[r_id]}
+        obj_dict.update({r.id: min_gw / max_gw
+                        for r in model.reactions if r.id not in obj_dict})  # same as the smallest weight
+
         model.objective = model.problem.Objective(Zero, direction="min", sloppy=True)
         model.objective = {
             model.reactions.get_by_id(k): v for k, v in obj_dict.items() if v != 0
         }
         if return_pruning_coef:
             return
-
         min_sol_df = model.optimize(objective_sense="minimize").to_frame()
         rev_sol_df = merge_irrevs_in_df(min_sol_df, forward_prefix, backward_prefix)
         to_remove = rev_sol_df[rev_sol_df["fluxes"] < pruning_tol].index
-        to_remove_rs = []
+
         for r in to_remove:
             if r in rev_map_to_irrev:
-                to_remove_rs.extend(rev_map_to_irrev[r])
+                minimized_rs.extend(rev_map_to_irrev[r])
             else:
-                to_remove_rs.append(r)
-        print(f"KO {len(to_remove_rs)} reactions (fluxes smaller than {pruning_tol})")
-        for r in to_remove_rs:
+                minimized_rs.append(r)
+        print(f"KO {len(minimized_rs)} reactions (fluxes smaller than {pruning_tol})")
+        for r in minimized_rs:
             model.reactions.get_by_id(r).bounds = (0, 0)
         # model.remove_reactions(to_remove_rs, remove_orphans=True)
     current_rs = [r.id for r in model.reactions]
 
     obj_dict = {mapped_r_id: r_exp / max_gw
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)
-                for mapped_r_id in rev_map_to_irrev[r_id]}
+                for mapped_r_id in rev_map_to_irrev[r_id] if mapped_r_id not in minimized_rs}
+    obj_dict.update({r.id: 1
+                     for r in model.reactions if r.id not in obj_dict})
+
     model.objective = model.problem.Objective(Zero, direction="max", sloppy=True)
     model.objective = {
         model.reactions.get_by_id(k): v for k, v in obj_dict.items() if v != 0 and k in current_rs
@@ -91,7 +99,7 @@ def RIPTiDe(model: cobra.Model,
 
     max_sol_df = model.optimize(objective_sense="maximize").to_frame()
     for i, row in max_sol_df.iterrows():
-        model.reactions.get_by_id(row.index).upper_bound = row["fluxes"]
+        model.reactions.get_by_id(i).upper_bound = row["fluxes"]
 
     if get_details:
         return obj_dict
