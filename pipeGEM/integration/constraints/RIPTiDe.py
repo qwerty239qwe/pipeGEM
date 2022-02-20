@@ -75,8 +75,10 @@ def RIPTiDe(model: cobra.Model,
                 to_remove_rs.extend(rev_map_to_irrev[r])
             else:
                 to_remove_rs.append(r)
-        print(f"Remove {len(to_remove_rs)} reactions (fluxes smaller than {pruning_tol})")
-        model.remove_reactions(to_remove_rs, remove_orphans=True)
+        print(f"KO {len(to_remove_rs)} reactions (fluxes smaller than {pruning_tol})")
+        for r in to_remove_rs:
+            model.reactions.get_by_id(r).bounds = (0, 0)
+        # model.remove_reactions(to_remove_rs, remove_orphans=True)
     current_rs = [r.id for r in model.reactions]
 
     obj_dict = {mapped_r_id: r_exp / max_gw
@@ -86,6 +88,10 @@ def RIPTiDe(model: cobra.Model,
     model.objective = {
         model.reactions.get_by_id(k): v for k, v in obj_dict.items() if v != 0 and k in current_rs
     }
+
+    max_sol_df = model.optimize(objective_sense="maximize").to_frame()
+    for i, row in max_sol_df.iterrows():
+        model.reactions.get_by_id(row.index).upper_bound = row["fluxes"]
 
     if get_details:
         return obj_dict
