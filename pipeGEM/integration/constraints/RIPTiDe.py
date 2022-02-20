@@ -80,15 +80,15 @@ def RIPTiDe(model: cobra.Model,
                 minimized_rs.extend(rev_map_to_irrev[r])
             else:
                 minimized_rs.append(r)
-        print(f"KO {len(minimized_rs)} reactions (fluxes smaller than {pruning_tol})")
-        for r in minimized_rs:
-            model.reactions.get_by_id(r).bounds = (0, 0)
+        print(f"{len(minimized_rs)} reactions are non-core reactions (fluxes smaller than {pruning_tol})")
+        # for r in minimized_rs:
+        #     model.reactions.get_by_id(r).bounds = (0, 0)
         # model.remove_reactions(to_remove_rs, remove_orphans=True)
     current_rs = [r.id for r in model.reactions]
 
-    obj_dict = {mapped_r_id: r_exp / max_gw
+    obj_dict = {mapped_r_id: r_exp / max_gw if mapped_r_id not in minimized_rs else (-max_gw - min_gw + r_exp) / max_gw
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)
-                for mapped_r_id in rev_map_to_irrev[r_id] if mapped_r_id not in minimized_rs}
+                for mapped_r_id in rev_map_to_irrev[r_id]}
     obj_dict.update({r.id: 1
                      for r in model.reactions if r.id not in obj_dict})
 
