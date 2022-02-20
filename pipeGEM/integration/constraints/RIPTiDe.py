@@ -16,6 +16,7 @@ def RIPTiDe(model: cobra.Model,
             obj_frac: float = 0.8,
             prune_rxns: bool = False,
             pruning_tol: float = 1e-4,
+            return_pruning_coef: bool = False,
             get_details: bool = True):
     """
     RIPTiDe implementation
@@ -58,10 +59,13 @@ def RIPTiDe(model: cobra.Model,
         obj_dict = {mapped_r_id: (max_gw + min_gw - r_exp) / max_gw
                     for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)
                     for mapped_r_id in rev_map_to_irrev[r_id]}
-        model.objective = model.problem.Objective(Zero, sloppy=True)
+        model.objective = model.problem.Objective(Zero, direction="min", sloppy=True)
         model.objective = {
             model.reactions.get_by_id(k): v for k, v in obj_dict.items() if v != 0
         }
+        if return_pruning_coef:
+            return
+
         min_sol_df = model.optimize(objective_sense="minimize").to_frame()
         rev_sol_df = merge_irrevs_in_df(min_sol_df, forward_prefix, backward_prefix)
         to_remove = rev_sol_df[rev_sol_df["fluxes"] < pruning_tol].index
@@ -71,13 +75,14 @@ def RIPTiDe(model: cobra.Model,
                 to_remove_rs.extend(rev_map_to_irrev[r])
             else:
                 to_remove_rs.append(r)
+        print(f"Remove {len(to_remove_rs)} reactions (fluxes smaller than {pruning_tol})")
         model.remove_reactions(to_remove_rs, remove_orphans=True)
     current_rs = [r.id for r in model.reactions]
 
     obj_dict = {mapped_r_id: r_exp / max_gw
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)
                 for mapped_r_id in rev_map_to_irrev[r_id]}
-    model.objective = model.problem.Objective(Zero, sloppy=True)
+    model.objective = model.problem.Objective(Zero, direction="max", sloppy=True)
     model.objective = {
         model.reactions.get_by_id(k): v for k, v in obj_dict.items() if v != 0 and k in current_rs
     }

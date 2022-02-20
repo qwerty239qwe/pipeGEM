@@ -21,6 +21,24 @@ class Expression:
                  loaded_rxn_scores=None,
                  loaded_rxn_score_in_subsystem=None,
                  loaded_subsystems=None):
+        """
+        Expression is a class that could be used to map the data onto model's reactions,
+        providing the calculated rxn_scores of the mapping result
+
+        Parameters
+        ----------
+        model
+        data
+        transform
+        method
+        expression_threshold
+        missing_value
+        convert_to_str
+        load_mode
+        loaded_rxn_scores
+        loaded_rxn_score_in_subsystem
+        loaded_subsystems
+        """
 
         self.missing_value = missing_value
         if not load_mode:
@@ -164,6 +182,15 @@ class Expression:
             warn(f"{not_exist_subsystems} are not model's subsystems!")
 
         return {subsystem: data for subsystem, data in subsystem_score.items() if subsystem not in not_exist_subsystems}
+
+
+class GeneExpression(Expression):
+    def __init__(self, data, model, level_order, **kwargs):
+        super(GeneExpression, self).__init__(data=data, model=model, **kwargs)
+
+    def map_id(self):
+        # TODO
+        raise NotImplementedError("This class haven't be finished yet.")
 
 
 def map_data_to_rxns(data_df,
