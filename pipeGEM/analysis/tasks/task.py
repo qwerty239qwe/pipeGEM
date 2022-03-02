@@ -704,3 +704,40 @@ def get_task_protection_rxns(ref_model,
     return {"protected_rxns": protected_rxns,
             "score_data": score_data,
             "subsystem_dict": subsystem_dict}
+
+
+def table_to_container(df,
+                       id_name="ID",
+                       should_fail_name="SHOULD FAIL",
+                       desc_name="DESCRIPTION",
+                       in_met_name="IN",
+                       in_met_lb="IN LB",
+                       in_met_ub="IN UB",
+                       out_met_name="OUT",
+                       out_met_lb="OUT LB",
+                       out_met_ub="OUT UB",
+                       sys_name="",
+                       sub_sys_name="",
+                       compartment_format="[{}]"
+                       ):
+    # a helper function to construct TaskContainer from a dataframe, the table could be
+    df = df.copy()
+    df[id_name] = df[id_name].fillna(method='ffill')
+    task_d = {}
+
+    for i in df[id_name].unique():
+        sub_df = df.query(f"{id_name} == {i}")
+        task_names = {"system": sys_name, "subsystem": sub_sys_name, "description": desc_name,
+                    "should_fail": should_fail_name, "annotation": None}
+        task_kws = {}
+        in_mets, out_mets = [], []
+        for ind, row in sub_df.iterrows():
+            for t, v in task_names.items():
+                if v is not None and v in row and pd.notna(row[v]):
+                    task_kws[v] = row[v]
+            in_mets.append({"met_id": row[in_met_name], "lb": row[in_met_lb], "ub": row[in_met_ub], "compartment": None})
+            # TODO: finish this
+
+        task_d[i] = Task(**task_kws)
+
+    return TaskContainer(task_d)
