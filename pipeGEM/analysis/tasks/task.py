@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Dict, Any, Union, List, Optional
 from pathlib import Path
 
@@ -143,7 +144,6 @@ class Task:
                 all_fine = False
         return all_fine
 
-
     def _setup_sink_util(self, model, mets, loose, coef):
         dummy_rxn_list = []
         for met in mets:
@@ -173,7 +173,6 @@ class Task:
         if set_outflux:
             dummies.extend(self._setup_sink_util(model, self.in_mets, loose_output, 1))  # consume output mets
         return dummies
-
 
     def assign(self,
                model,
@@ -707,6 +706,7 @@ def get_task_protection_rxns(ref_model,
 
 
 def table_to_container(df,
+                       met_id_map=None,
                        id_name="ID",
                        should_fail_name="SHOULD FAIL",
                        desc_name="DESCRIPTION",
@@ -716,9 +716,9 @@ def table_to_container(df,
                        out_met_name="OUT",
                        out_met_lb="OUT LB",
                        out_met_ub="OUT UB",
-                       sys_name="",
-                       sub_sys_name="",
-                       compartment_format="[{}]"
+                       sys_name="SYSTEM",
+                       sub_sys_name="SUBSYSTEM",
+                       compartment_format="\[(.?)\]"
                        ):
     # a helper function to construct TaskContainer from a dataframe, the table could be
     df = df.copy()
@@ -726,18 +726,37 @@ def table_to_container(df,
     task_d = {}
 
     for i in df[id_name].unique():
-        sub_df = df.query(f"{id_name} == {i}")
+        sub_df = df[df[id_name] == i]
         task_names = {"system": sys_name, "subsystem": sub_sys_name, "description": desc_name,
-                    "should_fail": should_fail_name, "annotation": None}
+                      "should_fail": should_fail_name, "annotation": None}
         task_kws = {}
         in_mets, out_mets = [], []
         for ind, row in sub_df.iterrows():
             for t, v in task_names.items():
                 if v is not None and v in row and pd.notna(row[v]):
-                    task_kws[v] = row[v]
-            in_mets.append({"met_id": row[in_met_name], "lb": row[in_met_lb], "ub": row[in_met_ub], "compartment": None})
-            # TODO: finish this
-
+                    task_kws[t] = row[v]
+                elif t == "should_fail":
+                    task_kws[t] = False
+            if pd.notna(row[in_met_name]):
+                in_met_id_matches = [r for r in re.finditer(compartment_format, row[in_met_name])]
+                in_met_id_match = max(in_met_id_matches, key=lambda x: x.start())
+                met_id = met_id_map[row[in_met_name][:in_met_id_match.start()]] \
+                    if met_id_map is not None else row[in_met_name][:in_met_id_match.start()]
+                in_mets.append({"met_id": met_id,
+                                "lb": row[in_met_lb] if pd.notna(row[in_met_lb]) else 0,
+                                "ub": row[in_met_ub] if pd.notna(row[in_met_ub]) else 1000,
+                                "compartment": re.findall(compartment_format, row[in_met_name])[0]})
+            if pd.notna(row[out_met_name]):
+                out_met_id_matches = [r for r in re.finditer(compartment_format, row[out_met_name])]
+                out_met_id_match = max(out_met_id_matches, key=lambda x: x.start())
+                met_id = met_id_map[row[out_met_name][:out_met_id_match.start()]] \
+                    if met_id_map is not None else row[out_met_name][:out_met_id_match.start()]
+                out_mets.append({"met_id": met_id,
+                                 "lb": row[out_met_lb] if pd.notna(row[out_met_lb]) else 0,
+                                 "ub": row[out_met_ub] if pd.notna(row[out_met_ub]) else 1000,
+                                 "compartment": re.findall(compartment_format, row[out_met_name])[0]})
+        task_kws["in_mets"] = in_mets
+        task_kws["out_mets"] = out_mets
         task_d[i] = Task(**task_kws)
 
     return TaskContainer(task_d)
