@@ -15,7 +15,7 @@ def swiftcc(model,
             return_rxn_ids=True):
     blk_p = BlockedProblem(model=model)
     rev = get_rev_arr(model)
-    S = cobra.util.create_stoichiometric_matrix(model)
+    S = cobra.util.create_stoichiometric_matrix(model, array_type="lil")
     blk = ProblemAnalyzer(blk_p)
     consistent = np.array([True for _ in range(len(model.reactions))])
     sol = blk.get_fluxes("min", raise_error=False)

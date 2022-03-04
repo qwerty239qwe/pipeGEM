@@ -1,4 +1,4 @@
-from pipeGEM.pipeline.algo import SwiftCC
+from pipeGEM.pipeline.algo import SwiftCC, FastCC
 
 
 def test_swiftcc(ecoli_core):
@@ -8,3 +8,10 @@ def test_swiftcc(ecoli_core):
     assert len(consist["model"].metabolites) > 0, len(consist["model"].metabolites) != len(ecoli_core.metabolites)
     assert len(consist["model"].genes) > 0, len(consist["model"].genes) != len(ecoli_core.genes)
 
+
+def test_fastcc(ecoli_core):
+    fastcc = FastCC()
+    consist = fastcc(ecoli_core)
+    assert len(consist["model"].reactions) > 0, len(consist["model"].reactions) != len(ecoli_core.reactions)
+    assert len(consist["model"].metabolites) > 0, len(consist["model"].metabolites) != len(ecoli_core.metabolites)
+    assert len(consist["model"].genes) > 0, len(consist["model"].genes) != len(ecoli_core.genes)
