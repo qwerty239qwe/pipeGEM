@@ -27,7 +27,7 @@ def get_gene_id_map(gene_names: List[str],
     Parameters
     ----------
     gene_names: list of str
-        The gene names / IDs to be translate into another gene names or IDs
+        The gene names / IDs to be translated into another gene names or IDs
     from_id: str
         The name of the current IDs
     to_id: str

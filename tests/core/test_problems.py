@@ -29,12 +29,14 @@ class TestProblem2(Problem):
         pass
 
 
-def test_problem_consistent(ecoli_core):
+def test_problem_flux_consistency(ecoli_core):
+    solver = "glpk"
     p = TestProblem2(model=ecoli_core)
-    mod = ProblemAnalyzer(p)
+    mod = ProblemAnalyzer(p, solver=solver)
+    ecoli_core.solver = solver
     sol = ecoli_core.optimize().to_frame()
     new_sol = mod.get_fluxes()
-    assert all(np.equal(sol["fluxes"], new_sol["fluxes"]))
+    assert all(np.equal(sol["fluxes"], new_sol["fluxes"])), sol["fluxes"] - new_sol["fluxes"]
 
 
 def test_problem_extension(ecoli_core):

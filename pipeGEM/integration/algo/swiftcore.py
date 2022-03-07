@@ -22,8 +22,9 @@ def swiftcc(model,
     sol = sol.iloc[len(model.metabolites):, :]
     consistent[sol["fluxes"] < -0.5] = False
 
-    tol = tol * norm(S[:, consistent], ord='fro')
-    q, r, _ = qr(a=S[:, consistent].T, pivoting=True)
+    cons_S = S[:, consistent].toarray()
+    tol = tol * norm(cons_S, ord='fro')
+    q, r, _ = qr(a=cons_S.T, pivoting=True)
     z = q[rev[consistent], np.sum(np.abs(np.diag(r)) > tol):]
     consistent[rev & consistent] = np.diag(z @ z.T) > (tol ** 2)
     output_dic = {}

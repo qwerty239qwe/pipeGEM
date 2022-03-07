@@ -217,8 +217,7 @@ class Problem:
         self._check_extend_horizontal(e_S, e_v, e_v_lb, e_v_ub, e_objs, e_names)
         if not scipy.sparse.issparse(e_S):
             e_S = scipy.sparse.lil_matrix(e_S.copy())
-
-        self.S = scipy.sparse.hstack([self.S, e_S] if at_right else [e_S, self.S])
+        self.S = scipy.sparse.hstack([self.S, e_S] if at_right else [e_S, self.S], format="lil")
         self.v = np.concatenate([self.v, e_v] if at_right else [e_v, self.v])
         self.lbs = np.concatenate([self.lbs, e_v_lb] if at_right else [e_v_lb, self.lbs])
         self.ubs = np.concatenate([self.ubs, e_v_ub] if at_right else [e_v_ub, self.ubs])
@@ -233,7 +232,7 @@ class Problem:
         if not scipy.sparse.issparse(e_S):
             e_S = scipy.sparse.lil_matrix(e_S.copy())
 
-        self.S = scipy.sparse.vstack([self.S, e_S] if at_bottom else [e_S, self.S])
+        self.S = scipy.sparse.vstack([self.S, e_S] if at_bottom else [e_S, self.S], format="lil")
         self.b = np.concatenate([self.b, e_b] if at_bottom else [e_b, self.b])
         self.c = np.concatenate([self.c, e_c] if at_bottom else [e_c, self.c])
         self.row_names = np.concatenate([self.row_names, e_names] if at_bottom else [e_names, self.row_names])
