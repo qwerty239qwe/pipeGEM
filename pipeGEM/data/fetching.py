@@ -45,10 +45,10 @@ def _fetch_individual_kegg_gene(gene_id):
     body = []
     text = resp.text.split("\n")
     for line in text:
-        if re.match("\s+.*", line):
+        if re.match(r"\s+.*", line):
             body.append(line.lstrip())
         else:
-            matched = re.match(".*?\s+", line)
+            matched = re.match(r".*?\s+", line)
             if matched:
                 if header is not None:
                     if header == "BRITE":

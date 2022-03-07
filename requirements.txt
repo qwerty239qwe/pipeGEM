@@ -14,3 +14,4 @@ biodbs~=0.0.1
 tqdm~=4.60.0
 optlang~=1.4.4
 networkx
+zeep
