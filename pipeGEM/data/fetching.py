@@ -96,6 +96,10 @@ def fetch_KEGG_gene_data(organism) -> pd.DataFrame:
     return pd.DataFrame(gene_data)
 
 
+def fetch_brenda_ligand():
+    pass
+
+
 def fetch_brenda_data(account, pwd, organism, field):
     wsdl = "https://www.brenda-enzymes.org/soap/brenda_zeep.wsdl"
     password = hashlib.sha256(pwd.encode("utf-8")).hexdigest()
@@ -106,7 +110,8 @@ def fetch_brenda_data(account, pwd, organism, field):
                      "PATH": ("getEcNumbersFromPathway", "getPathway"),
                      "SEQ": ("getEcNumbersFromSequence", "getSequence"),
                      "SA": ("getEcNumbersFromSpecificActivity", "getSpecificActivity"),
-                     "KCAT": ("getEcNumbersFromTurnoverNumber", "getTurnoverNumber"),}
+                     "KCAT": ("getEcNumbersFromTurnoverNumber", "getTurnoverNumber"),
+                     "LIGAND": ("getEcNumbersFromLigands", "getLigands",)}
     param_dic = {"KM": ("kmValue*", "kmValueMaximum*", "substrate*", "substrate*", "commentary*",
                          f"organism*{_ORGANISM_BRENDA[organism]}", "ligandStructureId*", "literature*"),
                  "MW": ("molecularWeight*", "molecularWeightMaximum*", "commentary*",
@@ -117,7 +122,8 @@ def fetch_brenda_data(account, pwd, organism, field):
                  "SA": ("specificActivity*", "specificActivityMaximum*", "commentary*",
                         f"organism*{_ORGANISM_BRENDA[organism]}", "literature*"),
                  "KCAT": ("turnoverNumber*", "turnoverNumberMaximum*", "substrate*", "commentary*",
-                          f"organism*{_ORGANISM_BRENDA[organism]}", "ligandStructureId*", "literature*"),}
+                          f"organism*{_ORGANISM_BRENDA[organism]}", "ligandStructureId*", "literature*"),
+                 "LIGAND": ()}
 
     parameters = (account, password)
 
