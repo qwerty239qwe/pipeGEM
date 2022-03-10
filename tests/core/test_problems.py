@@ -36,7 +36,9 @@ def test_problem_flux_consistency(ecoli_core):
     ecoli_core.solver = solver
     sol = ecoli_core.optimize().to_frame()
     new_sol = mod.get_fluxes()
-    assert all(np.equal(sol["fluxes"], new_sol["fluxes"])), sol["fluxes"] - new_sol["fluxes"]
+    diff = sol["fluxes"] - new_sol["fluxes"]
+
+    assert all(diff < 1e-8), diff[diff > 1e-8]
 
 
 def test_problem_extension(ecoli_core):
