@@ -167,14 +167,17 @@ def fastCore(C: Union[List[str], Set[str]],
                                 raise ValueError(f"Error: Global network is not consistent. Last rxn: {J} |J| = {len(J)}")
                             else:
                                 to_remove = next(iter(J))
-                                warn(f"Error: Global network is not consistent. Remove core rxn: {to_remove}")
+                                warn(f"Error: Global network is not consistent. Removed core rxn: {to_remove}")
                                 J -= set(to_remove)
                                 n_j = len(J)
                                 pbar.update(1)
-                        flipped, singleton = False, True
-                        if singleJ is None and len(J - irr_rxns) != 0:
-                            Jrev = {next(iter(J - irr_rxns))}
-                            singleJ = Jrev
+                                flipped, singleton = False, False
+                                singleJ = None
+                        else:
+                            flipped, singleton = False, True
+                            if singleJ is None and len(J - irr_rxns) != 0:
+                                Jrev = {next(iter(J - irr_rxns))}
+                                singleJ = Jrev
                     else:
                         flip_direction(model, Jrev)
                         flipped = True
