@@ -3,9 +3,10 @@ import seaborn as sns
 
 from pipeGEM.pipeline import Pipeline
 from pipeGEM.integration.algo.fastcore import (fastCore, get_C_and_P_dic,
-                                               supp_protected_rxns, get_unpenalized_rxn_ids,
-                                               get_consistent_p_free_model,
-                                               get_final_models)
+                                               get_unpenalized_rxn_ids_one_sample,
+                                               supp_protected_rxns_one_sample,
+                                               get_cons_p_free_mod_one_sample,
+                                               get_final_model)
 from pipeGEM.integration.algo.swiftcore import swiftCore
 from pipeGEM.pipeline.algo import FastCC, SwiftCC
 from pipeGEM.pipeline.threshold import BimodalThreshold
@@ -103,7 +104,8 @@ class rFastCormics(Pipeline):
                  cc_threshold=1e-6,
                  solver="gurobi",
                  saved_dist_plot_format=None,
-                 use_first_guess=True):
+                 use_first_guess=True,
+                 **kwargs):
         super().__init__()
         if consist_method == "fastcc":
             self.consist_cc = FastCC()
@@ -124,13 +126,15 @@ class rFastCormics(Pipeline):
         self.disc = GeneDataDiscretizer()
         self.rxn_categorizer = ReactionCategorizer()
 
-    def get_log(self, *args, **kwargs):
-        log = ""
-        if self.consist_cc is not None:
-            log += self.consist_cc.get_log()
-        log += self.threshold.get_log()
+        self.expr_tol_dict, self.nexpr_tol_dict = {}, {}
+        self.task_protected_rxn_dic = {}
+        self.supp_c_dic, self.supp_p_dic = {}, {}
+        self.unp_p_dic, self.unp_rxn_dic = {}, {}
+        self.pfree_c_dic, self.pfree_mod_dic = {}, {}
 
-        return log
+        for k, v in kwargs.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
 
     def run(self,
             model,
@@ -154,8 +158,6 @@ class rFastCormics(Pipeline):
             c_model = model
 
         # get expression threshold for each samples
-        expr_tol_dict, nexpr_tol_dict = {}, {}
-
         if isinstance(medium, list):
             self.medium_constr.run(c_model, medium, protected_rxns)
 
@@ -165,25 +167,30 @@ class rFastCormics(Pipeline):
         for r, v in ts_score.items():
             if v >= tissue_exp_thres:
                 ts_rxns.append(r)
-        self.task_protected_rxn_dic = {}
+
         data = rxn_score_trans(data.copy())
 
         for sample in data.columns:
-            expr_tol_dict[sample], nexpr_tol_dict[sample] = self.threshold(data=data[sample],
-                                                                           sample_name=sample)
+            if sample not in self.expr_tol_dict or sample not in self.nexpr_tol_dict:
+                self._info(f"Calculating thresholds: {sample}")
+                self.expr_tol_dict[sample], self.nexpr_tol_dict[sample] = self.threshold(data=data[sample],
+                                                                                         sample_name=sample)
             if isinstance(medium, dict):
                 self.medium_constr.run(c_model, medium[sample], protected_rxns)
-            rxn_scores = Expression(c_model, data[sample]).rxn_scores
-            core_rxns, _ = self.rxn_tester.run(expression_threshold=expr_tol_dict[sample],
-                                               non_expression_threshold=nexpr_tol_dict[sample],
-                                               rxn_scores=rxn_scores,
-                                               ref_model=c_model,
-                                               reset_tester=False)
-            self.task_protected_rxn_dic[sample] = core_rxns + protected_rxns
+
+            if sample not in self.task_protected_rxn_dic:
+                self._info(f"Finding task-protected reactions: {sample}")
+                rxn_scores = Expression(c_model, data[sample]).rxn_scores
+                core_rxns, _ = self.rxn_tester.run(expression_threshold=self.expr_tol_dict[sample],
+                                                   non_expression_threshold=self.nexpr_tol_dict[sample],
+                                                   rxn_scores=rxn_scores,
+                                                   ref_model=c_model,
+                                                   reset_tester=False)
+                self.task_protected_rxn_dic[sample] = core_rxns + protected_rxns
         discreted_df = self.disc(data_df=data,
                                  sample_names=data.columns,
-                                 expr_threshold_dic=expr_tol_dict,
-                                 non_expr_threshold_dic=nexpr_tol_dict)
+                                 expr_threshold_dic=self.expr_tol_dict,
+                                 non_expr_threshold_dic=self.nexpr_tol_dict)
         dis_exp_df = {k: Expression(model=c_model,
                                     data=v,
                                     missing_value=np.nan,
@@ -195,30 +202,35 @@ class rFastCormics(Pipeline):
                                         consensus_proportion=0.9,
                                         is_generic_model=False,
                                         force_core_rxns=ts_rxns)
-        self.supp_dic = supp_protected_rxns(c_model,
-                                            data.columns,
-                                            self.task_protected_rxn_dic,
-                                            C_dic=C_P_dics["C_dic"],
-                                            P_dic=C_P_dics["P_dic"],
-                                            epsilon_for_fastcore=self.core_threshold)
-        self.non_penalized_dic = get_unpenalized_rxn_ids(c_model,
-                                                         C_dic=self.supp_dic["C_dic"],
-                                                         P_dic=self.supp_dic["P_dic"],
-                                                         sample_names=data.columns,
-                                                         unpenalized_subsystem=not_penalized_subsystem)
-        self.p_model_dic = get_consistent_p_free_model(c_model,
-                                                       data.columns,
-                                                       C_dic=self.supp_dic["C_dic"],
-                                                       P_dic=self.non_penalized_dic["P_dic"],
-                                                       epsilon_for_fastcc=self.cc_threshold)
-        self.output = get_final_models(c_model,
-                                       sample_names=data.columns,
-                                       C_dic=self.p_model_dic["C_dic"],
-                                       P_dic=self.non_penalized_dic["P_dic"],
-                                       unpenalized_rxn_dic=self.non_penalized_dic["unpenalized_rxn_dic"],
-                                       p_free_model_dic=self.p_model_dic["p_free_model_dic"],
-                                       epsilon_for_fastcore=self.core_threshold)
+        for sample in data.columns:
+            if sample not in self.supp_c_dic or sample not in self.supp_p_dic:
+                self.supp_c_dic[sample], self.supp_p_dic[sample], _ = supp_protected_rxns_one_sample(c_model,
+                                                                                                     sample,
+                                                                                                     self.task_protected_rxn_dic[sample],
+                                                                                                     C=C_P_dics["C_dic"][sample],
+                                                                                                     P=C_P_dics["P_dic"][sample],
+                                                                                                     epsilon_for_fastcore=self.core_threshold)
+            if sample not in self.unp_p_dic or sample not in self.unp_rxn_dic:
+                self.unp_rxn_dic[sample], self.unp_p_dic[sample] = get_unpenalized_rxn_ids_one_sample(ref_model=c_model,
+                                                          C=self.supp_c_dic[sample],
+                                                          P=self.supp_p_dic[sample],
+                                                          unpenalized_subsystem=not_penalized_subsystem)
+
+            if sample not in self.pfree_c_dic and sample not in self.pfree_mod_dic:
+                self.pfree_mod_dic[sample], self.pfree_c_dic[sample] = get_cons_p_free_mod_one_sample(c_model,
+                                                                                                      C=self.supp_c_dic[sample],
+                                                                                                      P=self.unp_p_dic[sample],
+                                                                                                      epsilon_for_fastcc=self.cc_threshold)
+
+            if sample not in self.output:
+                self.output[sample] = get_final_model(c_model,
+                                                      C=self.pfree_c_dic[sample],
+                                                      P=self.unp_p_dic[sample],
+                                                      unpenalized_rxn=self.unp_rxn_dic[sample],
+                                                      p_free_model=self.pfree_mod_dic[sample],
+                                                      epsilon_for_fastcore=self.core_threshold)
         return self.output
+
 
 class CORDA(Pipeline):
     def __init__(self):
