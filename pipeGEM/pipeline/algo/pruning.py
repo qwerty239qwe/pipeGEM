@@ -131,6 +131,7 @@ class rFastCormics(Pipeline):
         self.supp_c_dic, self.supp_p_dic = {}, {}
         self.unp_p_dic, self.unp_rxn_dic = {}, {}
         self.pfree_c_dic, self.pfree_mod_dic = {}, {}
+        self.output = {}
 
         for k, v in kwargs.items():
             if hasattr(self, k):

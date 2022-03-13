@@ -1,6 +1,7 @@
 from typing import Set, Union, List, Dict
 import copy
 from warnings import warn
+from tqdm import tqdm
 
 import cobra
 import numpy as np
@@ -52,34 +53,34 @@ def fastcc(model,
         J = all_rxns - A - J - no_expressed  # rev rxns to check
         # print("J: ", len(J))
         singleton, flipped = False, False
-
-        while len(J) != 0:
-            if singleton:
-                Ji = {next(iter(J))}
-                new_supps = set(LP3(Ji, model, epsilon)) if is_convex else set(non_convex_LP3(Ji, model, epsilon))
-            else:
-                Ji = J.copy()
-                new_supps = set(LP7(Ji, model, epsilon)) if is_convex else set(non_convex_LP7(Ji, model, epsilon))
-            A |= new_supps
-            before_n = len(J)
-            J -= A
-            after_n = len(J)
-            print(f"rxns to be examined: {after_n}")
-            if before_n != after_n:
-                flipped = False
-            else :  # no change in number of rxn_to_keeps
-                Jirev = Ji - irr_rxns
-                if flipped or len(Jirev) == 0:
-                    flipped = False
-                    if singleton:
-                        J -= Ji
-                        # print("[Removed] ", Ji, "is flux inconsistent.")
-                        print(f"rxns to be examined: {len(J)}")
-                    else:
-                        singleton = True
+        with tqdm(total=len(J)) as pbar:
+            while len(J) != 0:
+                if singleton:
+                    Ji = {next(iter(J))}
+                    new_supps = set(LP3(Ji, model, epsilon)) if is_convex else set(non_convex_LP3(Ji, model, epsilon))
                 else:
-                    flip_direction(model, Jirev)
-                    flipped = True
+                    Ji = J.copy()
+                    new_supps = set(LP7(Ji, model, epsilon)) if is_convex else set(non_convex_LP7(Ji, model, epsilon))
+                A |= new_supps
+                before_n = len(J)
+                J -= A
+                after_n = len(J)
+                pbar.update(before_n - after_n)
+                if before_n != after_n:
+                    flipped = False
+                else :  # no change in number of rxn_to_keeps
+                    Jirev = Ji - irr_rxns
+                    if flipped or len(Jirev) == 0:
+                        flipped = False
+                        if singleton:
+                            J -= Ji
+                            # print("[Removed] ", Ji, "is flux inconsistent.")
+                            pbar.update(1)
+                        else:
+                            singleton = True
+                    else:
+                        flip_direction(model, Jirev)
+                        flipped = True
     rxns_to_remove = list(all_rxns - A)
     output = {}
     if return_model:
@@ -135,34 +136,39 @@ def fastCore(C: Union[List[str], Set[str]],
             track_irrev = True
             warn(f"Inconsistent irreversible core reactions (They should be included in A): Total: {len(invalid_part)}")
         J = C - A  # reactions to be added to the model
-        while len(J) > 0:
-            P = P - A
-            supp = set(find_sparse_mode(J, P, nonP, model, singleJ, epsilon))
-            A |= supp
-            if len(J & A) > 0:
-                J -= A
-                flipped, singleton = False, False
-                singleJ = None
+        with tqdm(total=len(J)) as pbar:
+            n_j = len(J)
 
-                if track_irrev:
-                    print(f"Irrev in J: {len(J & irr_rxns)}, J: {len(J)}")
-            else:
-                if singleton and len(J - irr_rxns) != 0:
-                    if singleJ is None:
-                        Jrev = {next(iter(J - irr_rxns))}
-                        singleJ = Jrev
-                        flipped = False
+            while len(J) > 0:
+                P = P - A
+                supp = set(find_sparse_mode(J, P, nonP, model, singleJ, epsilon))
+                A |= supp
+                if len(J & A) > 0:
+                    J -= A
+                    pbar.update(n_j - len(J))
+                    n_j = len(J)
+                    flipped, singleton = False, False
+                    singleJ = None
+
+                    if track_irrev:
+                        print(f"Irrev in J: {len(J & irr_rxns)}, J: {len(J)}")
                 else:
-                    Jrev = J - irr_rxns
-                if len(Jrev) == 0 or flipped:  # If no reversible J or the model is flipped
-                    assert not singleton, f"Error: Global network is not consistent. Last rxn: {Jrev} |J| = {len(J)}"
-                    flipped, singleton = False, True
-                    if singleJ is None and len(J - irr_rxns) != 0:
-                        Jrev = {next(iter(J - irr_rxns))}
-                        singleJ = Jrev
-                else:
-                    flip_direction(model, Jrev)
-                    flipped = True
+                    if singleton and len(J - irr_rxns) != 0:
+                        if singleJ is None:
+                            Jrev = {next(iter(J - irr_rxns))}
+                            singleJ = Jrev
+                            flipped = False
+                    else:
+                        Jrev = J - irr_rxns
+                    if len(Jrev) == 0 or flipped:  # If no reversible J or the model is flipped
+                        assert not singleton, f"Error: Global network is not consistent. Last rxn: {Jrev} |J| = {len(J)}"
+                        flipped, singleton = False, True
+                        if singleJ is None and len(J - irr_rxns) != 0:
+                            Jrev = {next(iter(J - irr_rxns))}
+                            singleJ = Jrev
+                    else:
+                        flip_direction(model, Jrev)
+                        flipped = True
     rxns_to_remove = list(all_rxns - A)
     output = {}
     if return_model:
