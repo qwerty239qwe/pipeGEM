@@ -217,7 +217,7 @@ class rFastCormics(Pipeline):
                                                           unpenalized_subsystem=not_penalized_subsystem)
 
             if sample not in self.pfree_c_dic and sample not in self.pfree_mod_dic:
-                self.pfree_mod_dic[sample], self.pfree_c_dic[sample] = get_cons_p_free_mod_one_sample(c_model,
+                self.pfree_mod_dic[sample], self.pfree_c_dic[sample], _ = get_cons_p_free_mod_one_sample(c_model,
                                                                                                       C=self.supp_c_dic[sample],
                                                                                                       P=self.unp_p_dic[sample],
                                                                                                       epsilon_for_fastcc=self.cc_threshold)

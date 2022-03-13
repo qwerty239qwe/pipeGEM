@@ -331,7 +331,7 @@ def get_final_model(ref_model,
                               return_model=True,
                               return_rxn_ids=False,
                               return_removed_rxn_ids=True)
-    return result_dic
+    return result_dic["model"]
 
 
 def get_final_models(ref_model,
