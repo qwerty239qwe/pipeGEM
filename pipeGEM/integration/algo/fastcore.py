@@ -21,7 +21,7 @@ def find_sparse_mode(J, P, nonP, model, singleJ, epsilon):
                    model, epsilon, use_abs=False, return_min_v=True)
     K = np.intersect1d(list(J), supps)
     if singleJ is not None and len(singleJ & set(K)) == 0:
-        warn(f"Singleton {singleJ} flux cannot be generate in LP7")
+        warn(f"Singleton {singleJ} flux cannot be generated in LP7")
     if K.shape[0] == 0:
         return []
     return LP9(K, P, nonP, model, epsilon, min_v=v[list(K)].min())
@@ -103,6 +103,7 @@ def fastCore(C: Union[List[str], Set[str]],
              return_model: bool,
              return_rxn_ids: bool,
              return_removed_rxn_ids: bool,
+             raise_err: bool = False,
              scale_by_coef: bool = True):
     if return_model:
         output_model = model.copy()
@@ -161,7 +162,15 @@ def fastCore(C: Union[List[str], Set[str]],
                     else:
                         Jrev = J - irr_rxns
                     if len(Jrev) == 0 or flipped:  # If no reversible J or the model is flipped
-                        assert not singleton, f"Error: Global network is not consistent. Last rxn: {Jrev} |J| = {len(J)}"
+                        if singleton:
+                            if raise_err:
+                                raise ValueError(f"Error: Global network is not consistent. Last rxn: {J} |J| = {len(J)}")
+                            else:
+                                to_remove = next(iter(J))
+                                warn(f"Error: Global network is not consistent. Remove core rxn: {to_remove}")
+                                J -= to_remove
+                                n_j = len(J)
+                                pbar.update(1)
                         flipped, singleton = False, True
                         if singleJ is None and len(J - irr_rxns) != 0:
                             Jrev = {next(iter(J - irr_rxns))}
