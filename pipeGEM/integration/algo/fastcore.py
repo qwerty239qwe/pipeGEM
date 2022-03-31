@@ -166,9 +166,9 @@ def fastCore(C: Union[List[str], Set[str]],
                             if raise_err:
                                 raise ValueError(f"Error: Global network is not consistent. Last rxn: {J} |J| = {len(J)}")
                             else:
-                                to_remove = next(iter(J))
+                                to_remove = {next(iter(J))}
                                 warn(f"Error: Global network is not consistent. Removed core rxn: {to_remove}")
-                                J -= set(to_remove)
+                                J -= to_remove
                                 n_j = len(J)
                                 pbar.update(1)
                                 flipped, singleton = False, False
