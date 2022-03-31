@@ -139,7 +139,7 @@ def plot_2D_PCA_score(pca_df,
         pc1_exp, pc2_exp = kwargs['exp_var_df'].iloc[0, 0], kwargs['exp_var_df'].iloc[1, 0]
     x_label = f'Principle Component 1' + f'(explain {pc1_exp * 100:.2f}% variance)' if pc1_exp else ''
     y_label = f'Principle Component 2' + f'(explain {pc2_exp * 100:.2f}% variance)' if pc2_exp else ''
-    title = f'PCA_score_{fig_title}'
+    title = f'PCA_score{("_" + fig_title) if fig_title is not None else ""}'
     ax = _set_default_ax(ax, x_label=x_label, y_label=y_label, title=title)
     plotting_kws = {k: v for k, v in kwargs.items() if k in ["file_name", "dpi", "prefix"]}
     plotting_kws.update({"g": fig})
@@ -168,7 +168,7 @@ def plot_3D_PCA_score(pca_df,
     x_label = f'PC1' + f'(explain {pc1_exp * 100:.2f}% variance)' if pc1_exp else ''
     y_label = f'PC2' + f'(explain {pc2_exp * 100:.2f}% variance)' if pc2_exp else ''
     z_label = f'PC3' + f'(explain {pc3_exp * 100:.2f}% variance)' if pc3_exp else ''
-    title = f'PCA_score_{fig_title}'
+    title = f'PCA_score{("_" + fig_title) if fig_title is not None else ""}'
 
     ax = _set_default_ax(ax, x_label=x_label, y_label=y_label, z_label=z_label, title=title)
     plotting_kws = {k: v for k, v in kwargs.items() if k in ["file_name", "dpi", "prefix"]}

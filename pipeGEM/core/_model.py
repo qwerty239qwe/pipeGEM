@@ -64,6 +64,9 @@ class Model(GEMComposite):
     def __getattr__(self, item):
         return getattr(self._model, item)
 
+    def __add__(self, other):
+        NotImplemented
+
     @property
     def expression(self):
         return self._expression

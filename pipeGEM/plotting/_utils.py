@@ -78,7 +78,7 @@ def format_file_name(name_format, plotting_kws):
     format_kws = [x[1] for x in sf.parse(name_format) if x[1] is not None]
     if all([f in plotting_kws for f in format_kws]):
         naming_kws = {f: plotting_kws.pop(f) for f in format_kws}
-        return name_format.format(**naming_kws)
+        return name_format.format(**naming_kws) if all([v is not None for v in naming_kws.values()]) else None
     return None
 
 
