@@ -39,7 +39,7 @@ class ReactionTester(Pipeline):
                                            task_container=self.task_file_path,
                                            model_compartment_parenthesis=self.model_compartment_format,
                                            **kwargs)
-            self.model_tester.test(test_sink=test_sink)
+            self.model_tester.test_all(test_sink=test_sink)
         self.model_tester.update_thresholds(express_thres=expression_threshold,
                                             non_express_thres=non_expression_threshold,
                                             rxn_scores=rxn_scores)

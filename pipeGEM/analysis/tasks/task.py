@@ -144,7 +144,7 @@ class Task:
                 all_fine = False
         return all_fine
 
-    def _setup_sink_util(self, model, mets, loose, coef):
+    def _setup_sink_util(self, model, mets, coef):
         dummy_rxn_list = []
         for met in mets:
             met_id = self._substitute_compartment(met[self.met_id_str], met[self.compartment_str])
@@ -153,25 +153,26 @@ class Task:
             dummy_rxn.add_metabolites({
                 model.metabolites.get_by_id(met_id): coef
             })
-            if loose:
-                dummy_rxn.lower_bound, dummy_rxn.upper_bound = 0, 1000
-            else:
-                dummy_rxn.lower_bound, dummy_rxn.upper_bound = met[self.lower_bound_str], met[self.upper_bound_str]
-            dummy_rxn_list.append(dummy_rxn)
+            dummy_rxn.lower_bound, dummy_rxn.upper_bound = met[self.lower_bound_str], met[self.upper_bound_str]
+
+            if dummy_rxn.upper_bound == 1000:
+                # as little as possible if the upper bound is not determined
+                dummy_rxn.upper_bound = dummy_rxn.lower_bound
+
+            if dummy_rxn.lower_bound != 0:
+                dummy_rxn_list.append(dummy_rxn)
         return dummy_rxn_list
 
     def setup_sinks(self,
                     model,
                     set_influx,
-                    set_outflux,
-                    loose_input = False,
-                    loose_output = False):
+                    set_outflux):
         assert set_influx or set_outflux
         dummies = []
         if set_influx:
-            dummies.extend(self._setup_sink_util(model, self.in_mets, loose_input, -1)) # provide input mets
+            dummies.extend(self._setup_sink_util(model, self.in_mets, -1)) # provide input mets
         if set_outflux:
-            dummies.extend(self._setup_sink_util(model, self.in_mets, loose_output, 1))  # consume output mets
+            dummies.extend(self._setup_sink_util(model, self.out_mets, 1))  # consume output mets
         return dummies
 
     def assign(self,
@@ -412,10 +413,10 @@ class TaskHandler:
         elif input_status != "optimal" and output_status != "optimal":
             status = "both_infeasible"
         else:
-            status = ("input" if input_status != "optimal" else "output") + "infeasible"
+            status = ("input" if input_status != "optimal" else "output") + " infeasible"
         return status
 
-    def test(self, test_sink=True, verbosity=0):
+    def test_all(self, test_sink=True, verbosity=0):
         # maybe needs some modifications
         boundary = [r.id for r in self.model.exchanges] + \
                    [r.id for r in self.model.demands] + \
