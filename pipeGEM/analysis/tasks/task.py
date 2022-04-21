@@ -144,7 +144,7 @@ class Task:
                 all_fine = False
         return all_fine
 
-    def _setup_sink_util(self, model, mets, coef, sink_reqs):
+    def _setup_sink_util(self, model, mets, coef, sink_reqs):  # TODO: delete
         dummy_rxn = cobra.Reaction('_input_sink'
                                    if coef < 0 else '_output_sink')
         for met in mets:
@@ -157,16 +157,19 @@ class Task:
 
     def setup_sinks(self,
                     model,
-                    sink_reqs,
-                    set_influx,
-                    set_outflux):
-        assert set_influx or set_outflux
-        dummies = []
-        if set_influx:
-            dummies.append(self._setup_sink_util(model, self.in_mets, -1, sink_reqs)) # provide input mets
-        if set_outflux:
-            dummies.append(self._setup_sink_util(model, self.out_mets, 1, sink_reqs))  # consume output mets
-        return dummies
+                    sink_reqs):
+        obj_dic = {}
+        for k, v in sink_reqs.items():
+            model.reactions.get_by_id(k).bounds = (v, v)
+            obj_dic[model.reactions.get_by_id(k)] = 1 if v > 0 else -1
+        model.objective = obj_dic
+        # assert set_influx or set_outflux
+        # dummies = []
+        # if set_influx:
+        #     dummies.append(self._setup_sink_util(model, self.in_mets, -1, sink_reqs)) # provide input mets
+        # if set_outflux:
+        #     dummies.append(self._setup_sink_util(model, self.out_mets, 1, sink_reqs))  # consume output mets
+        # return dummies
 
     def assign(self,
                model,
@@ -383,31 +386,31 @@ class TaskHandler:
         raise NotImplementedError
 
     def _test_task_sinks_utils(self, ID, task, model, test_input, test_output):
-        dummy_rxns = task.setup_sinks(model, sink_reqs=self.passed_rxns_req[ID],
-                                      set_influx=test_input, set_outflux=test_output)
+
         with model:
-            model.add_reactions(dummy_rxns)
-            model.objective = {rxn: 1 for rxn in dummy_rxns}
+            task.setup_sinks(model, sink_reqs=self.passed_rxns_req[ID],
+                             # set_influx=test_input, set_outflux=test_output
+                             )
             try:
                 sol = pfba(model)
             except Infeasible:
                 sol = None
-                print(f"Task {ID} cannot generate {'input' if test_input else 'output'} metabolites")
-        return sol, dummy_rxns
+                print(f"Task {ID} cannot support tasks' metabolites")
+        return sol
 
     def test_task_sinks(self, ID, task, model):
-        input_sol, input_dummy_rxns = self._test_task_sinks_utils(ID, task, model, test_input=True, test_output=False)
-        output_sol, output_dummy_rxns = self._test_task_sinks_utils(ID, task, model, test_input=False, test_output=True)
-        input_status = input_sol.status if input_sol is not None and input_sol.objective_value != 0 else "infeasible"
-        output_status = output_sol.status if output_sol is not None and output_sol.objective_value != 0 else "infeasible"
-        if input_status == output_status == "optimal":
+        supp_sol = self._test_task_sinks_utils(ID, task, model, test_input=True, test_output=False)
+        # output_sol, output_dummy_rxns = self._test_task_sinks_utils(ID, task, model, test_input=False, test_output=True)
+        supp_status = supp_sol.status if supp_sol is not None else "infeasible"
+        #output_status = output_sol.status if output_sol is not None and output_sol.objective_value != 0 else "infeasible"
+        if supp_status == "optimal":
             status = "optimal"
-            self._add_sink_result(ID, input_sol.to_frame(), input_dummy_rxns)
-            self._add_sink_result(ID, output_sol.to_frame(), output_dummy_rxns)
-        elif input_status != "optimal" and output_status != "optimal":
-            status = "both_infeasible"
+            self._add_sink_result(ID, supp_sol.to_frame(), [])
+            # self._add_sink_result(ID, output_sol.to_frame(), [])
+        # elif input_status != "optimal" and output_status != "optimal":
+        #     status = "both_infeasible"
         else:
-            status = ("input" if input_status != "optimal" else "output") + " infeasible"
+            status = "support rxns infeasible"
         return status
 
     def test_all(self, test_sink=True, task_ids="all", verbosity=0):
