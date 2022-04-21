@@ -144,35 +144,28 @@ class Task:
                 all_fine = False
         return all_fine
 
-    def _setup_sink_util(self, model, mets, coef):
-        dummy_rxn_list = []
+    def _setup_sink_util(self, model, mets, coef, sink_reqs):
+        dummy_rxn = cobra.Reaction('_input_sink'
+                                   if coef < 0 else '_output_sink')
         for met in mets:
             met_id = self._substitute_compartment(met[self.met_id_str], met[self.compartment_str])
-            dummy_rxn = cobra.Reaction('_input_sink_{}'.format(met_id)
-                                       if coef < 0 else '_output_sink_{}'.format(met_id))
-            dummy_rxn.add_metabolites({
-                model.metabolites.get_by_id(met_id): coef
-            })
-            dummy_rxn.lower_bound, dummy_rxn.upper_bound = met[self.lower_bound_str], met[self.upper_bound_str]
-
-            if dummy_rxn.upper_bound == 1000:
-                # as little as possible if the upper bound is not determined
-                dummy_rxn.upper_bound = dummy_rxn.lower_bound
-
-            if dummy_rxn.lower_bound != 0:
-                dummy_rxn_list.append(dummy_rxn)
-        return dummy_rxn_list
+            if sink_reqs[("input_" if coef < 0 else "output_") + met_id] != 0:
+                dummy_rxn.add_metabolites({
+                    model.metabolites.get_by_id(met_id): sink_reqs[("input_" if coef < 0 else "output_") + met_id]
+                })
+        return dummy_rxn
 
     def setup_sinks(self,
                     model,
+                    sink_reqs,
                     set_influx,
                     set_outflux):
         assert set_influx or set_outflux
         dummies = []
         if set_influx:
-            dummies.extend(self._setup_sink_util(model, self.in_mets, -1)) # provide input mets
+            dummies.append(self._setup_sink_util(model, self.in_mets, -1, sink_reqs)) # provide input mets
         if set_outflux:
-            dummies.extend(self._setup_sink_util(model, self.out_mets, 1))  # consume output mets
+            dummies.append(self._setup_sink_util(model, self.out_mets, 1, sink_reqs))  # consume output mets
         return dummies
 
     def assign(self,
@@ -390,7 +383,8 @@ class TaskHandler:
         raise NotImplementedError
 
     def _test_task_sinks_utils(self, ID, task, model, test_input, test_output):
-        dummy_rxns = task.setup_sinks(model, set_influx=test_input, set_outflux=test_output)
+        dummy_rxns = task.setup_sinks(model, sink_reqs=self.passed_rxns_req,
+                                      set_influx=test_input, set_outflux=test_output)
         with model:
             model.add_reactions(dummy_rxns)
             model.objective = {rxn: 1 for rxn in dummy_rxns}
@@ -404,8 +398,8 @@ class TaskHandler:
     def test_task_sinks(self, ID, task, model):
         input_sol, input_dummy_rxns = self._test_task_sinks_utils(ID, task, model, test_input=True, test_output=False)
         output_sol, output_dummy_rxns = self._test_task_sinks_utils(ID, task, model, test_input=False, test_output=True)
-        input_status = input_sol.status if input_sol is not None else "infeasible"
-        output_status = output_sol.status if output_sol is not None else "infeasible"
+        input_status = input_sol.status if input_sol is not None and input_sol.objective_value != 0 else "infeasible"
+        output_status = output_sol.status if output_sol is not None and input_sol.objective_value != 0 else "infeasible"
         if input_status == output_status == "optimal":
             status = "optimal"
             self._add_sink_result(ID, input_sol.to_frame(), input_dummy_rxns)
@@ -484,13 +478,19 @@ class TaskTester(TaskHandler):
             self._method_kwargs['fraction_of_optimum'] = 1.0
 
         self._passed_rxns: Union[Dict[str, List[str]], dict] = {}
+        self._passed_rxns_req: Union[Dict[str, Dict], dict] = {}
         self._passed_rxn_sinks: Union[Dict[str, List[str]], dict] = {}
+
         self._tasks_scores = {}
         self._passed_tasks_list = []
 
     @property
     def passed_rxns(self):
         return self._passed_rxns
+
+    @property
+    def passed_rxns_req(self):
+        return self._passed_rxns_req
 
     @property
     def tasks_scores(self):
@@ -549,6 +549,7 @@ class TaskTester(TaskHandler):
         passed_rxns = sol_df[(abs(sol_df['fluxes']) >= self.tol)].index.to_list()
         dummy_rxn_id_list = [r.id for r in dummy_rxns]
         self._passed_rxns[ID] = [rxn for rxn in passed_rxns if rxn not in dummy_rxn_id_list]
+        self._passed_rxns_req[ID] = dict(zip(dummy_rxn_id_list, sol_df.loc[dummy_rxn_id_list, "fluxes"].values))
 
     def map_expr_to_tasks(self,
                           expression_threshold = None,
