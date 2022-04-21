@@ -554,7 +554,7 @@ class TaskTester(TaskHandler):
         passed_rxns = sol_df[(abs(sol_df['fluxes']) >= self.tol)].index.to_list()
         dummy_rxn_id_list = [r.id for r in dummy_rxns]
         self._passed_rxns[ID] = [rxn for rxn in passed_rxns if rxn not in dummy_rxn_id_list]
-        self._passed_rxns_req[ID] = dict(zip(dummy_rxn_id_list, sol_df.loc[dummy_rxn_id_list, "fluxes"].values))
+        self._passed_rxns_req[ID] = dict(zip(self._passed_rxns[ID], sol_df.loc[self._passed_rxns[ID], "fluxes"].values))
 
     def map_expr_to_tasks(self,
                           expression_threshold = None,
