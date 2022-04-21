@@ -151,7 +151,7 @@ class Task:
             met_id = self._substitute_compartment(met[self.met_id_str], met[self.compartment_str])
             if sink_reqs[("input_" if coef < 0 else "output_") + met_id] != 0:
                 dummy_rxn.add_metabolites({
-                    model.metabolites.get_by_id(met_id): sink_reqs[("input_" if coef < 0 else "output_") + met_id]
+                    model.metabolites.get_by_id(met_id): coef * sink_reqs[("input_" if coef < 0 else "output_") + met_id]
                 })
         return dummy_rxn
 
@@ -383,7 +383,7 @@ class TaskHandler:
         raise NotImplementedError
 
     def _test_task_sinks_utils(self, ID, task, model, test_input, test_output):
-        dummy_rxns = task.setup_sinks(model, sink_reqs=self.passed_rxns_req,
+        dummy_rxns = task.setup_sinks(model, sink_reqs=self.passed_rxns_req[ID],
                                       set_influx=test_input, set_outflux=test_output)
         with model:
             model.add_reactions(dummy_rxns)
@@ -399,7 +399,7 @@ class TaskHandler:
         input_sol, input_dummy_rxns = self._test_task_sinks_utils(ID, task, model, test_input=True, test_output=False)
         output_sol, output_dummy_rxns = self._test_task_sinks_utils(ID, task, model, test_input=False, test_output=True)
         input_status = input_sol.status if input_sol is not None and input_sol.objective_value != 0 else "infeasible"
-        output_status = output_sol.status if output_sol is not None and input_sol.objective_value != 0 else "infeasible"
+        output_status = output_sol.status if output_sol is not None and output_sol.objective_value != 0 else "infeasible"
         if input_status == output_status == "optimal":
             status = "optimal"
             self._add_sink_result(ID, input_sol.to_frame(), input_dummy_rxns)
@@ -410,7 +410,7 @@ class TaskHandler:
             status = ("input" if input_status != "optimal" else "output") + " infeasible"
         return status
 
-    def test_all(self, test_sink=True, verbosity=0):
+    def test_all(self, test_sink=True, task_ids="all", verbosity=0):
         # maybe needs some modifications
         boundary = [r.id for r in self.model.exchanges] + \
                    [r.id for r in self.model.demands] + \
@@ -419,6 +419,8 @@ class TaskHandler:
         self.consider_sink = test_sink
         all_mets_in_model = [m.id for m in self.model.metabolites]
         for ID, task in self.tasks.items():
+            if task_ids != "all" and ID not in task_ids:
+                continue
             with self.model as model:
                 for r in boundary:
                     if task.knockout_output_flag:
@@ -441,7 +443,7 @@ class TaskHandler:
             elif verbosity >= 1:
                 print('Passed' if task_info[ID]['Passed'] else 'Failed')
         self._result_df = pd.DataFrame(data=task_info).T
-        score = len(self.tasks)
+        score = len(self.tasks) if task_ids == "all" else len(task_ids)
 
         for ID, info in task_info.items():
             if not info['Passed']:

@@ -56,8 +56,7 @@ def RIPTiDe(model: cobra.Model,
         if r.objective_coefficient > 0:
             r.lower_bound = obj_frac * sol_df.loc[r.id, "fluxes"]
     minimized_rs = []
-
-    not_related_rxns = set([r.id for r in model.reactions]) - set(rxn_expr_score.keys())
+    obj_dict = None
     if prune_rxns:
         obj_dict = {mapped_r_id: (max_gw + min_gw - r_exp) / max_gw
                     for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)
@@ -81,11 +80,14 @@ def RIPTiDe(model: cobra.Model,
             else:
                 minimized_rs.append(r)
         print(f"{len(minimized_rs)} reactions are non-core reactions (fluxes smaller than {pruning_tol})")
-        # for r in minimized_rs:
-        #     model.reactions.get_by_id(r).bounds = (0, 0)
-        # model.remove_reactions(to_remove_rs, remove_orphans=True)
-    current_rs = [r.id for r in model.reactions]
-
+        # for rm in minimized_rs:
+        #     model.reactions.get_by_id(rm).bounds = (0, 0)
+    # for r_id, r_exp in rxn_expr_score.items():
+    #     if not np.isnan(r_exp):
+    #         for mapped_r_id in rev_map_to_irrev[r_id]:
+    #             c = r_exp / max_gw
+    #             r = model.reactions.get_by_id(mapped_r_id)
+    #             r.bounds = (i * c for i in r.bounds)
     obj_dict = {mapped_r_id: r_exp / max_gw if mapped_r_id not in minimized_rs else (-max_gw - min_gw + r_exp) / max_gw
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)
                 for mapped_r_id in rev_map_to_irrev[r_id]}
@@ -94,12 +96,11 @@ def RIPTiDe(model: cobra.Model,
 
     model.objective = model.problem.Objective(Zero, direction="max", sloppy=True)
     model.objective = {
-        model.reactions.get_by_id(k): v for k, v in obj_dict.items() if v != 0 and k in current_rs
+        model.reactions.get_by_id(k): v for k, v in obj_dict.items() if v != 0
     }
 
     max_sol_df = model.optimize(objective_sense="maximize").to_frame()
     for i, row in max_sol_df.iterrows():
         model.reactions.get_by_id(i).upper_bound = row["fluxes"]
-
     if get_details:
         return obj_dict
