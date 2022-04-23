@@ -160,16 +160,9 @@ class Task:
                     sink_reqs):
         obj_dic = {}
         for k, v in sink_reqs.items():
-            model.reactions.get_by_id(k).bounds = (v, v)
+            model.reactions.get_by_id(k).bounds = (-1000, -1e-3) if v < 0 else (1e-3, 1000)
             obj_dic[model.reactions.get_by_id(k)] = 1 if v > 0 else -1
         model.objective = obj_dic
-        # assert set_influx or set_outflux
-        # dummies = []
-        # if set_influx:
-        #     dummies.append(self._setup_sink_util(model, self.in_mets, -1, sink_reqs)) # provide input mets
-        # if set_outflux:
-        #     dummies.append(self._setup_sink_util(model, self.out_mets, 1, sink_reqs))  # consume output mets
-        # return dummies
 
     def assign(self,
                model,
@@ -385,7 +378,7 @@ class TaskHandler:
     def test_one_task(self, ID, task, model, all_mets_in_model):
         raise NotImplementedError
 
-    def _test_task_sinks_utils(self, ID, task, model, test_input, test_output):
+    def _test_task_sinks_utils(self, ID, task, model):
 
         with model:
             task.setup_sinks(model, sink_reqs=self.passed_rxns_req[ID],
@@ -399,16 +392,11 @@ class TaskHandler:
         return sol
 
     def test_task_sinks(self, ID, task, model):
-        supp_sol = self._test_task_sinks_utils(ID, task, model, test_input=True, test_output=False)
-        # output_sol, output_dummy_rxns = self._test_task_sinks_utils(ID, task, model, test_input=False, test_output=True)
+        supp_sol = self._test_task_sinks_utils(ID, task, model)
         supp_status = supp_sol.status if supp_sol is not None else "infeasible"
-        #output_status = output_sol.status if output_sol is not None and output_sol.objective_value != 0 else "infeasible"
         if supp_status == "optimal":
             status = "optimal"
             self._add_sink_result(ID, supp_sol.to_frame(), [])
-            # self._add_sink_result(ID, output_sol.to_frame(), [])
-        # elif input_status != "optimal" and output_status != "optimal":
-        #     status = "both_infeasible"
         else:
             status = "support rxns infeasible"
         return status
@@ -453,7 +441,7 @@ class TaskHandler:
                 if verbosity >= 1:
                     print(f'Task {ID} is not correct')
                 score -= 1
-        print(f'score of the model: {score} / {len(self.tasks)}')
+        print(f'score of the model: {score} / {len(self.tasks) if task_ids == "all" else len(task_ids)}')
 
 
 class TaskTester(TaskHandler):
@@ -514,7 +502,7 @@ class TaskTester(TaskHandler):
                     'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": obj_rxns}
         if self._method == "pFBA":
             model.objective = {rxn: 1 for rxn in obj_rxns}
-        sol = model.optimize(raise_error=False)
+        sol = model.optimize(raise_error=False, objective_sense="minimize")
         true_status = sol.status
         if true_status == 'optimal':
             try:
