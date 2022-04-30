@@ -44,7 +44,7 @@ class ReactionTester(Pipeline):
                                             non_express_thres=non_expression_threshold,
                                             rxn_scores=rxn_scores)
         self.model_tester.map_expr_to_tasks()
-        return self.model_tester.get_all_passed_rxns(), self.model_tester.tasks_scores
+        return self.model_tester.get_all_protected_rxns(), self.model_tester.tasks_scores
 
 # add validator
 

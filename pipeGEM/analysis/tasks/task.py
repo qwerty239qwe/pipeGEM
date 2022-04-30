@@ -144,21 +144,11 @@ class Task:
                 all_fine = False
         return all_fine
 
-    def _setup_sink_util(self, model, mets, coef, sink_reqs):  # TODO: delete
-        dummy_rxn = cobra.Reaction('_input_sink'
-                                   if coef < 0 else '_output_sink')
-        for met in mets:
-            met_id = self._substitute_compartment(met[self.met_id_str], met[self.compartment_str])
-            if sink_reqs[("input_" if coef < 0 else "output_") + met_id] != 0:
-                dummy_rxn.add_metabolites({
-                    model.metabolites.get_by_id(met_id): coef * sink_reqs[("input_" if coef < 0 else "output_") + met_id]
-                })
-        return dummy_rxn
-
     def setup_sinks(self,
                     model,
                     sink_reqs):
         obj_dic = {}
+
         for k, v in sink_reqs.items():
             model.reactions.get_by_id(k).bounds = (-1000, -1e-3) if v < 0 else (1e-3, 1000)
             obj_dic[model.reactions.get_by_id(k)] = 1 if v > 0 else -1
@@ -288,7 +278,6 @@ class TaskContainer:
 
     def save(self, file_path):
         data = {tid: tobj.to_dict() for tid, tobj in self.tasks.items()}
-        print(json.dumps(data, indent=4))
         with open(file_path, "w") as f:
             json.dump(data, f)
 
@@ -324,6 +313,22 @@ class TaskHandler:
         self._result_df = pd.DataFrame(columns=['Passed', 'Should fail',
                                                 'Missing mets', 'Status', 'Obj_value'])
         self._expr_th, self._non_expr_th, self._rxn_score = 0, 0, {}
+
+    def _load_stuffs(self, task_id, task_results):
+        raise NotImplementedError()
+
+    @classmethod
+    def load_test_result(cls, file_name, **kwargs):
+        with open(file_name) as json_file:
+            data = json.load(json_file)
+            task_tester = cls(**kwargs)
+            result_dic = {k: { task_id: task_results[k] for task_id, task_results in data.items()}
+                          for k in ['Passed', 'Should fail',
+                                    'Missing mets', 'Status', 'Obj_value', 'Obj_rxns', 'Sink Status']}
+            task_tester._result_df = pd.DataFrame(result_dic)
+
+            for task_id, task_results in data.items():
+                task_tester._load_stuffs(task_id, task_results)
 
     @property
     def result_df(self):
@@ -370,26 +375,16 @@ class TaskHandler:
             self._constr_kwargs['low_exp'], self._constr_kwargs['high_exp'] = self._non_expr_th, self._expr_th
 
     def _get_test_result(self, ID, sol_df, dummy_rxns):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def _add_sink_result(self, ID, sol_df, dummy_rxns):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def test_one_task(self, ID, task, model, all_mets_in_model):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def _test_task_sinks_utils(self, ID, task, model):
-
-        with model:
-            task.setup_sinks(model, sink_reqs=self.passed_rxns_req[ID],
-                             # set_influx=test_input, set_outflux=test_output
-                             )
-            try:
-                sol = pfba(model)
-            except Infeasible:
-                sol = None
-                print(f"Task {ID} cannot support tasks' metabolites")
-        return sol
+        raise NotImplementedError()
 
     def test_task_sinks(self, ID, task, model):
         supp_sol = self._test_task_sinks_utils(ID, task, model)
@@ -470,20 +465,39 @@ class TaskTester(TaskHandler):
         if method == 'pFBA':
             self._method_kwargs['fraction_of_optimum'] = 1.0
 
-        self._passed_rxns: Union[Dict[str, List[str]], dict] = {}
-        self._passed_rxns_req: Union[Dict[str, Dict], dict] = {}
+        self._protected_rxns: Union[Dict[str, List[str]], dict] = {}
+        self._protected_rxn_reqs: Union[Dict[str, Dict], dict] = {}
         self._passed_rxn_sinks: Union[Dict[str, List[str]], dict] = {}
 
         self._tasks_scores = {}
         self._passed_tasks_list = []
 
+    def save_test_result(self, file_name):
+        result_dic = {}
+        for c in self.result_df.columns:
+            for k, v in self.result_df[c].to_dict().items():
+                if k not in result_dic:
+                    result_dic[k] = {}
+                if c != "Obj_rxns":
+                    result_dic[k][c] = v if not pd.isna(v) else None
+                else:
+                    result_dic[k][c] = [vi.id for vi in v]
+
+        for attr_name, attr in zip(["protected_rxns", "protected_rxn_reqs", "protected_rxn_sinks"],
+                                   [self._protected_rxns, self._protected_rxn_reqs, self._passed_rxn_sinks]):
+            for k, v in attr.items():
+                result_dic[k][attr_name] = v
+
+        with open(file_name, "w") as f:
+            json.dump(result_dic, f)
+
     @property
-    def passed_rxns(self):
-        return self._passed_rxns
+    def protected_rxns(self):
+        return self._protected_rxns
 
     @property
     def passed_rxns_req(self):
-        return self._passed_rxns_req
+        return self._protected_rxn_reqs
 
     @property
     def tasks_scores(self):
@@ -492,6 +506,21 @@ class TaskTester(TaskHandler):
     @property
     def passed_tasks_list(self):
         return self._passed_tasks_list
+
+    def _load_stuffs(self, task_id, task_results):
+        self._protected_rxns[task_id] = task_results["protected_rxns"]
+        self._protected_rxn_reqs[task_id] = task_results["protected_rxn_reqs"]
+        self._passed_rxn_sinks[task_id] = task_results["protected_rxn_sinks"]
+
+    def _test_task_sinks_utils(self, ID, task, model):
+        with model:
+            task.setup_sinks(model, sink_reqs=self.passed_rxns_req[ID])
+            try:
+                sol = pfba(model)
+            except Infeasible:
+                sol = None
+                print(f"Task {ID} cannot support tasks' metabolites")
+        return sol
 
     def test_one_task(self, ID, task, model, all_mets_in_model):
         all_met_exist, dummy_rxns, obj_rxns = task.assign(model, all_mets_in_model)
@@ -527,9 +556,9 @@ class TaskTester(TaskHandler):
                 'Obj_value': sol.objective_value,
                 "Obj_rxns": obj_rxns}
 
-    def get_all_passed_rxns(self) -> list:
+    def get_all_protected_rxns(self) -> list:
         return list(set([r for ind in self._passed_tasks_list if not self.tasks[ind].should_fail
-                         for r in self._passed_rxns[ind]] +
+                         for r in self.protected_rxns[ind]] +
                         [r for ind in self._passed_tasks_list if not self.tasks[ind].should_fail
                          for r in self._passed_rxn_sinks[ind]] if self.consider_sink else []))
 
@@ -541,8 +570,8 @@ class TaskTester(TaskHandler):
     def _get_test_result(self, ID, sol_df, dummy_rxns) -> None:
         passed_rxns = sol_df[(abs(sol_df['fluxes']) >= self.tol)].index.to_list()
         dummy_rxn_id_list = [r.id for r in dummy_rxns]
-        self._passed_rxns[ID] = [rxn for rxn in passed_rxns if rxn not in dummy_rxn_id_list]
-        self._passed_rxns_req[ID] = dict(zip(self._passed_rxns[ID], sol_df.loc[self._passed_rxns[ID], "fluxes"].values))
+        self._protected_rxns[ID] = [rxn for rxn in passed_rxns if rxn not in dummy_rxn_id_list]
+        self._protected_rxn_reqs[ID] = dict(zip(self._protected_rxns[ID], sol_df.loc[self._protected_rxns[ID], "fluxes"].values))
 
     def map_expr_to_tasks(self,
                           expression_threshold = None,
@@ -556,12 +585,12 @@ class TaskTester(TaskHandler):
             self._non_expr_th = non_expression_threshold
         if rxn_scores is not None:
             self._rxn_score = rxn_scores
-        if self._passed_rxns is not None:
+        if self._protected_rxns is not None:
             self._tasks_scores = dict()
             passed_tasks = self._result_df[(self._result_df["Should fail"] == False) &
                                            (self._result_df["Passed"] == True)].index.to_list()
             for ID in passed_tasks:
-                grr_rxns = [v for v in self._passed_rxns[ID] if self._rxn_score[v] != 0 and not np.isnan(self._rxn_score[v])]
+                grr_rxns = [v for v in self._protected_rxns[ID] if self._rxn_score[v] != 0 and not np.isnan(self._rxn_score[v])]
                 if len(grr_rxns) > 0:
                     self._tasks_scores[ID] = sum([self._rxn_score[v]
                                                   if v in self._rxn_score and self._rxn_score[v] != -1 else 0
@@ -670,15 +699,15 @@ def get_task_protection_rxns(ref_model,
                               model_compartment_parenthesis=model_compartment_format,
                               **task_kwargs)
     if constr not in ["GIMME"]:
-        model_tester.test()
+        model_tester.test_all()
     for sample in sample_names:
         model_tester.update_thresholds(express_thres=expr_threshold_dic[sample],
                                        non_express_thres=non_expr_threshold_dic[sample],
                                        rxn_scores=expression_dic[sample].rxn_scores)
         if constr in ["GIMME"]:
-            model_tester.test()
+            model_tester.test_all()
         model_tester.map_expr_to_tasks()
-        protected_rxns[sample].extend(model_tester.get_all_passed_rxns())
+        protected_rxns[sample].extend(model_tester.get_all_protected_rxns())
         task_scores[sample] = model_tester.tasks_scores
         if added_protected_rxns is not None:
             protected_rxns[sample].extend(added_protected_rxns)
