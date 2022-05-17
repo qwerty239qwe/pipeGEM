@@ -26,16 +26,20 @@ def get_second_deriv(y, dx):
     return np.gradient(np.gradient(y, dx), dx)
 
 
-def find_canyons(x, y, min_x_dis=3):
+def _cal_canyons_p(x1, y1, x2, y2, c=0.5):
+    return c * 2 ** (-abs(x1-x2)) + (1-c) * 1.5 ** (((y1 / y2) if y1 > y2 else (y2 / y1)) - 1) / 55
+
+
+def find_canyons(x, y, min_x_dis=3, max_y_ratio=4):
     dx = x[1] - x[0]
-    y = get_second_deriv(y, dx)
+    ypp = get_second_deriv(y, dx)
 
     prev = None
     cans = []
     can_deeps = []
 
     is_inc = False
-    for i, yi in enumerate(y):
+    for i, yi in enumerate(ypp):
         if prev is None:
             prev = yi
         else:
@@ -50,17 +54,19 @@ def find_canyons(x, y, min_x_dis=3):
             prev = yi
 
     candidates = x[np.array(cans)[np.argsort(can_deeps)]]
+    y_of_cands = y[np.array(cans)[np.argsort(can_deeps)]]
     # greedy
-    first_sel = candidates[0]
-    cur_best_dis, cur_best_c = 0, None
-    for c in candidates[1:]:
-        if first_sel - c >= min_x_dis:
-            return first_sel, c
-        if cur_best_dis < first_sel - c:
-            cur_best_dis = first_sel - c
-            cur_best_c = c
+    first_cx, first_y = candidates[0], y_of_cands[0]
+    cur_best_p, cur_best_cx = np.inf, None
+    for cx, cy in zip(candidates[1:], y_of_cands[1:]):
+        if first_cx - cx >= min_x_dis and abs(np.log(first_y / cy)) <= np.log(max_y_ratio):
+            return first_cx, cx
+        new_p = _cal_canyons_p(x1=first_cx, y1=first_y, x2=cx, y2=cy)
+        if cur_best_p > new_p:
+            cur_best_p = new_p
+            cur_best_cx = cx
 
-    return first_sel, cur_best_c
+    return first_cx, cur_best_cx
 
 
 def _rfastcormics_fit(x, y):
@@ -94,7 +100,7 @@ def _get_y_by_nearest_x(x, y, c):
 
 
 def _bimodal_fit(x, y, amp_ratio_tol=4, var_ratio_tol=2, mean_diff_tol=4):
-    c1, c2 = find_canyons(x, y, min_x_dis=mean_diff_tol)
+    c1, c2 = find_canyons(x, y, min_x_dis=mean_diff_tol, max_y_ratio=amp_ratio_tol)
     c1, c2 = min(c1, c2), max(c1, c2)
     print("original guess: ", c1, c2)
     init_vals = (1, c1, 1, 1, c2, 1)
