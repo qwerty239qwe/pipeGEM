@@ -26,7 +26,7 @@ def get_second_deriv(y, dx):
     return np.gradient(np.gradient(y, dx), dx)
 
 
-def find_canyons(x, y, n=2):
+def find_canyons(x, y, min_x_dis=3):
     dx = x[1] - x[0]
     y = get_second_deriv(y, dx)
 
@@ -48,7 +48,19 @@ def find_canyons(x, y, n=2):
             else:
                 is_inc = False
             prev = yi
-    return x[np.array(cans)[np.argsort(can_deeps)[:n]]]
+
+    candidates = x[np.array(cans)[np.argsort(can_deeps)]]
+    # greedy
+    first_sel = candidates[0]
+    cur_best_dis, cur_best_c = 0, None
+    for c in candidates[1:]:
+        if first_sel - c >= min_x_dis:
+            return first_sel, c
+        if cur_best_dis < first_sel - c:
+            cur_best_dis = first_sel - c
+            cur_best_c = c
+
+    return first_sel, cur_best_c
 
 
 def _rfastcormics_fit(x, y):
@@ -82,7 +94,7 @@ def _get_y_by_nearest_x(x, y, c):
 
 
 def _bimodal_fit(x, y, amp_ratio_tol=4, var_ratio_tol=2, mean_diff_tol=4):
-    c1, c2 = find_canyons(x, y)
+    c1, c2 = find_canyons(x, y, min_x_dis=mean_diff_tol)
     c1, c2 = min(c1, c2), max(c1, c2)
     print("original guess: ", c1, c2)
     init_vals = (1, c1, 1, 1, c2, 1)
