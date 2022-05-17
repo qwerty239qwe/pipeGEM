@@ -76,11 +76,17 @@ def _check_fitted_param(p, amp_ratio_tol=4, var_ratio_tol=2, mean_diff_tol=4):
     return True
 
 
+def _get_y_by_nearest_x(x, y, c):
+    dtx = abs(x - c)
+    return y[np.argsort(dtx)[0]]
+
+
 def _bimodal_fit(x, y, amp_ratio_tol=4, var_ratio_tol=2, mean_diff_tol=4):
     c1, c2 = find_canyons(x, y)
     c1, c2 = min(c1, c2), max(c1, c2)
     print("original guess: ", c1, c2)
     init_vals = (1, c1, 1, 1, c2, 1)
+    init_val_displayed = (_get_y_by_nearest_x(x, y, c1), c1, 1, _get_y_by_nearest_x(x, y, c2), c2, 1)
     grid = [(5 + 20 * i, 5 + 20 * j) for i in range(0, 4) for j in range(0, 4)]
     try:
         found_best = False
@@ -99,12 +105,12 @@ def _bimodal_fit(x, y, amp_ratio_tol=4, var_ratio_tol=2, mean_diff_tol=4):
                 it += 1
         if not found_best:
             warnings.warn("Fail to find proper parameters, use initial guess")
-            p = init_vals
+            p = init_val_displayed
             covar = None
 
     except RuntimeError:
         warnings.warn("Fail to optimize")
-        p = init_vals
+        p = init_val_displayed
         covar = None
 
     A1, mu1, wid1, A2, mu2, wid2 = p
