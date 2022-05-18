@@ -36,7 +36,7 @@ def find_canyons(x, y, min_x_dis=3, max_y_ratio=4, min_h_ratio=1.5, max_w_ratio=
     dx = x[1] - x[0]
     ypp = get_second_deriv(y, dx)
     peak = np.max(y)
-    xmin, xmax = x[y > 1e-3][0], x[y > 1e-3][-1]
+    xmin, xmax = x[y > np.max(y) * 0.1][0], x[y > np.max(y) * 0.1][-1]
 
     prev = None
     cans = []
