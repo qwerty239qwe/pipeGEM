@@ -68,9 +68,9 @@ def find_canyons(x, y, min_x_dis=3, max_y_ratio=4, min_h_ratio=1.5, max_w_ratio=
                            ((min(x1, x2) - xmin) / (xmax - max(x1, x2)) < 1/max_w_ratio)
             if i == j or is_invalid_h or is_invalid_w:
                 continue
-
             p_arr[i, j] = _cal_canyons_p(x1=x1, y1=y1, x2=x2, y2=y2)
     print("best p score is", np.min(p_arr))
+    print(np.argmin(p_arr, axis=-1), p_arr)
     return candidates[np.argmin(p_arr, axis=-1)[0]], candidates[np.argmin(p_arr, axis=-1)[1]]
     #
     #
