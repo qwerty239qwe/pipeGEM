@@ -30,9 +30,10 @@ def _cal_canyons_p(x1, y1, x2, y2, c=0.5):
     return c * 2 ** (-abs(x1-x2)) + (1-c) * 1.5 ** (((y1 / y2) if y1 > y2 else (y2 / y1)) - 1) / 55
 
 
-def find_canyons(x, y, min_x_dis=3, max_y_ratio=4):
+def find_canyons(x, y, min_x_dis=3, max_y_ratio=4, min_h_ratio=1.5, n_top=30):
     dx = x[1] - x[0]
     ypp = get_second_deriv(y, dx)
+    peak = np.max(y)
 
     prev = None
     cans = []
@@ -53,20 +54,30 @@ def find_canyons(x, y, min_x_dis=3, max_y_ratio=4):
                 is_inc = False
             prev = yi
 
-    candidates = x[np.array(cans)[np.argsort(can_deeps)]]
-    y_of_cands = y[np.array(cans)[np.argsort(can_deeps)]]
-    # greedy
-    first_cx, first_y = candidates[0], y_of_cands[0]
-    cur_best_p, cur_best_cx = np.inf, None
-    for cx, cy in zip(candidates[1:], y_of_cands[1:]):
-        if first_cx - cx >= min_x_dis and abs(np.log(first_y / cy)) <= np.log(max_y_ratio):
-            return first_cx, cx
-        new_p = _cal_canyons_p(x1=first_cx, y1=first_y, x2=cx, y2=cy)
-        if cur_best_p > new_p:
-            cur_best_p = new_p
-            cur_best_cx = cx
+    candidates = x[np.array(cans)[np.argsort(can_deeps)]][:n_top]
+    y_of_cands = y[np.array(cans)[np.argsort(can_deeps)]][:n_top]
+    # grid search
+    p_arr = np.ones(shape=(len(candidates), len(y_of_cands))) * np.inf
+    for i, (x1, y1) in enumerate(zip(candidates, y_of_cands)):
+        for j, (x2, y2) in enumerate(zip(candidates, y_of_cands)):
+            if i == j and (min_h_ratio * y1 < peak and min_h_ratio * y2 < peak):
+                continue
 
-    return first_cx, cur_best_cx
+            p_arr[i, j] = _cal_canyons_p(x1=x1, y1=y1, x2=x2, y2=y2)
+    return candidates[np.argmin(p_arr, axis=-1)[0]], candidates[np.argmin(p_arr, axis=-1)[1]]
+    #
+    #
+    # first_cx, first_y = candidates[0], y_of_cands[0]
+    # cur_best_p, cur_best_cx = np.inf, None
+    # for cx, cy in zip(candidates[1:], y_of_cands[1:]):
+    #     if first_cx - cx >= min_x_dis and abs(np.log(first_y / cy)) <= np.log(max_y_ratio):
+    #         return first_cx, cx
+    #     new_p = _cal_canyons_p(x1=first_cx, y1=first_y, x2=cx, y2=cy)
+    #     if cur_best_p > new_p:
+    #         cur_best_p = new_p
+    #         cur_best_cx = cx
+    #
+    # return first_cx, cur_best_cx
 
 
 def _rfastcormics_fit(x, y):
