@@ -30,10 +30,13 @@ def _cal_canyons_p(x1, y1, x2, y2, c=0.5):
     return c * 2 ** (-abs(x1-x2)) + (1-c) * 1.5 ** (((y1 / y2) if y1 > y2 else (y2 / y1)) - 1) / 55
 
 
-def find_canyons(x, y, min_x_dis=3, max_y_ratio=4, min_h_ratio=1.5, n_top=30):
+def find_canyons(x, y, min_x_dis=3, max_y_ratio=4, min_h_ratio=1.5, max_w_ratio=2, n_top=30):
+    assert len(x) == len(y)
+
     dx = x[1] - x[0]
     ypp = get_second_deriv(y, dx)
     peak = np.max(y)
+    xmin, xmax = x[y > 1e-3][0], x[y > 1e-3][-1]
 
     prev = None
     cans = []
@@ -60,7 +63,9 @@ def find_canyons(x, y, min_x_dis=3, max_y_ratio=4, min_h_ratio=1.5, n_top=30):
     p_arr = np.ones(shape=(len(candidates), len(y_of_cands))) * np.inf
     for i, (x1, y1) in enumerate(zip(candidates, y_of_cands)):
         for j, (x2, y2) in enumerate(zip(candidates, y_of_cands)):
-            if i == j and (min_h_ratio * y1 < peak and min_h_ratio * y2 < peak):
+            is_valid_h = min_h_ratio * y1 < peak and min_h_ratio * y2 < peak
+            is_valid_w = (min(x1, x2) - xmin) / (xmax - max(x1, x2)) < max_w_ratio
+            if i == j and is_valid_h and is_valid_w:
                 continue
 
             p_arr[i, j] = _cal_canyons_p(x1=x1, y1=y1, x2=x2, y2=y2)
