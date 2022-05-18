@@ -64,7 +64,8 @@ def find_canyons(x, y, min_x_dis=3, max_y_ratio=4, min_h_ratio=1.5, max_w_ratio=
     for i, (x1, y1) in enumerate(zip(candidates, y_of_cands)):
         for j, (x2, y2) in enumerate(zip(candidates, y_of_cands)):
             is_valid_h = min_h_ratio * y1 < peak and min_h_ratio * y2 < peak
-            is_valid_w = ((min(x1, x2) - xmin) / (xmax - max(x1, x2)) < max_w_ratio) and ((min(x1, x2) - xmin) / (xmax - max(x1, x2)) < 1/max_w_ratio)
+            is_valid_w = ((min(x1, x2) - xmin) / (xmax - max(x1, x2)) < max_w_ratio) and \
+                         ((min(x1, x2) - xmin) / (xmax - max(x1, x2)) > 1/max_w_ratio)
             if i == j and is_valid_h and is_valid_w:
                 continue
 
