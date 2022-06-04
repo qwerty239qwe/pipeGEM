@@ -117,6 +117,14 @@ def merge_irrevs_in_df(sol_df: pd.DataFrame,
     return sol_df
 
 
+def sep_isoenzymes(model, name_format="{rxn.id}_iso_{i}"):
+    for r in model.reactions:
+        r.gene_reaction_rule
+
+def sep_reversible_rxns(model):
+    pass
+
+
 def get_rev_arr(model):
     lbs = np.array([r.lower_bound for r in model.reactions])
     ubs = np.array([r.upper_bound for r in model.reactions])
