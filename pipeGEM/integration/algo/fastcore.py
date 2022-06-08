@@ -111,13 +111,6 @@ def fastCore(C: Union[List[str], Set[str]],
         C = set(C)
     if not isinstance(nonP, set):
         nonP = set(nonP)
-    # if scale_by_coef:
-    #     print("Use scaled epsilons")
-    #     rxn_scale_eps = pd.Series({r.id: 0.99*epsilon / max([abs(mc) for mc in r.metabolites.values()])
-    #                                for r in model.reactions})
-    # else:
-    #     rxn_scale_eps = None
-
     all_rxns = get_rxn_set(model)
     irr_rxns = get_rxn_set(model, "irreversible")
     backward_rxns = get_rxn_set(model, "backward")
@@ -323,15 +316,14 @@ def get_C_and_P_dic(expression_dic: Dict[str, Expression],  # use discrete data
                     consensus_proportion: float,
                     is_generic_model: bool):
     assert consensus_proportion > 0
-    consensus_thres = consensus_proportion * (len(sample_names) if is_generic_model else 1)
     C_dic, P_dic = {}, {}
     exp_df = pd.DataFrame({sample_name: expression_dic[sample_name].rxn_scores for sample_name in sample_names}).dropna(how="all")
     output_names = ["generic"] if is_generic_model else exp_df.columns
     if is_generic_model:
         exp_df["generic"] = exp_df.mean(axis=1)
     for sample_name in output_names:
-        C_dic[sample_name] = set(exp_df[exp_df[sample_name] >= consensus_thres].index)
-        P_dic[sample_name] = set(exp_df[exp_df[sample_name] <= -consensus_thres].index)
+        C_dic[sample_name] = set(exp_df[exp_df[sample_name] >= consensus_proportion].index)
+        P_dic[sample_name] = set(exp_df[exp_df[sample_name] <= -consensus_proportion].index)
     return {"C_dic": C_dic, "P_dic": P_dic}
 
 

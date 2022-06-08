@@ -206,13 +206,13 @@ class rFastCormics(Pipeline):
                                  expr_threshold_dic=self.expr_tol_dict,
                                  non_expr_threshold_dic=self.nexpr_tol_dict,
                                  use_interp=use_interpolate)
-        dis_exp_df = {k: Expression(model=c_model,
+        self.dis_exp_df = {k: Expression(model=c_model,
                                     data=v,
                                     missing_value=np.nan,
                                     expression_threshold=-np.inf)
-                      for k, v in discreted_df.items()}
+                            for k, v in discreted_df.items()}
 
-        C_P_dics = self.rxn_categorizer(expression_dic=dis_exp_df,
+        C_P_dics = self.rxn_categorizer(expression_dic=self.dis_exp_df,
                                         sample_names=data.columns,
                                         consensus_proportion=cons_th,
                                         is_generic_model=is_generic_model,
