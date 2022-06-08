@@ -92,13 +92,18 @@ class GeneDataDiscretizer(Pipeline):
             data_df,
             sample_names,
             expr_threshold_dic,
-            non_expr_threshold_dic
+            non_expr_threshold_dic,
+            use_interp=False,
             ) -> pd.DataFrame:
-        from pipeGEM.integration.utils import get_discretize_data
+        from pipeGEM.integration.utils import get_discretize_data, get_interpolate_data
         output = get_discretize_data(sample_names=sample_names,
                                      data_df=data_df,
                                      expr_threshold_dic=expr_threshold_dic,
-                                     non_expr_threshold_dic=non_expr_threshold_dic)
+                                     non_expr_threshold_dic=non_expr_threshold_dic) if not use_interp else \
+                 get_interpolate_data(sample_names=sample_names,
+                                      data_df=data_df,
+                                      expr_threshold_dic=expr_threshold_dic,
+                                      non_expr_threshold_dic=non_expr_threshold_dic)
         return output
 
 

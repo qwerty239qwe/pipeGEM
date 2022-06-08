@@ -1,3 +1,6 @@
+from collections import Counter
+import itertools
+
 import numpy as np
 import seaborn as sns
 
@@ -137,6 +140,13 @@ class rFastCormics(Pipeline):
             if hasattr(self, k):
                 setattr(self, k, v)
 
+    def _create_generic_task_pct_rxns(self,
+                                      task_pct_rxn_dic: dict,
+                                      cons_th=0.9):
+        cons_num = cons_th * len(task_pct_rxn_dic)
+        rxn_counter = Counter(list(itertools.chain(*task_pct_rxn_dic.values())))
+        task_pct_rxn_dic["generic"] = [k for k, v in dict(rxn_counter).items() if v >= cons_num]
+
     def run(self,
             model,
             data,
@@ -146,6 +156,9 @@ class rFastCormics(Pipeline):
             protected_rxns=None,
             rxn_score_trans=np.log2,
             not_penalized_subsystem=None,
+            is_generic_model=False,
+            use_interpolate=False,
+            cons_th=0.9,
             *args,
             **kwargs):
         # get consistent model
@@ -191,7 +204,8 @@ class rFastCormics(Pipeline):
         discreted_df = self.disc(data_df=data,
                                  sample_names=data.columns,
                                  expr_threshold_dic=self.expr_tol_dict,
-                                 non_expr_threshold_dic=self.nexpr_tol_dict)
+                                 non_expr_threshold_dic=self.nexpr_tol_dict,
+                                 use_interp=use_interpolate)
         dis_exp_df = {k: Expression(model=c_model,
                                     data=v,
                                     missing_value=np.nan,
@@ -200,10 +214,16 @@ class rFastCormics(Pipeline):
 
         C_P_dics = self.rxn_categorizer(expression_dic=dis_exp_df,
                                         sample_names=data.columns,
-                                        consensus_proportion=0.9,
-                                        is_generic_model=False,
+                                        consensus_proportion=cons_th,
+                                        is_generic_model=is_generic_model,
                                         force_core_rxns=ts_rxns)
-        for sample in data.columns:
+
+        model_names = ["generic"] if is_generic_model else data.columns
+        if is_generic_model:
+            self._create_generic_task_pct_rxns(task_pct_rxn_dic=self.task_protected_rxn_dic,
+                                               cons_th=cons_th)
+
+        for sample in model_names:
             if sample not in self.supp_c_dic or sample not in self.supp_p_dic:
                 self.supp_c_dic[sample], self.supp_p_dic[sample], _ = supp_protected_rxns_one_sample(c_model,
                                                                                                      sample,

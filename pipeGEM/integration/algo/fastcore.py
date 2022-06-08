@@ -325,11 +325,13 @@ def get_C_and_P_dic(expression_dic: Dict[str, Expression],  # use discrete data
     assert consensus_proportion > 0
     consensus_thres = consensus_proportion * (len(sample_names) if is_generic_model else 1)
     C_dic, P_dic = {}, {}
-    for sample_name in sample_names:
-        C_dic[sample_name] = {rxn for rxn, score in expression_dic[sample_name].rxn_scores.items()
-                              if score >= consensus_thres}
-        P_dic[sample_name] = {rxn for rxn, score in expression_dic[sample_name].rxn_scores.items()
-                              if score <= -consensus_thres}
+    exp_df = pd.DataFrame({sample_name: expression_dic[sample_name].rxn_scores for sample_name in sample_names}).dropna(how="all")
+    output_names = ["generic"] if is_generic_model else exp_df.columns
+    if is_generic_model:
+        exp_df["generic"] = exp_df.mean(axis=1)
+    for sample_name in output_names:
+        C_dic[sample_name] = set(exp_df[exp_df[sample_name] >= consensus_thres].index)
+        P_dic[sample_name] = set(exp_df[exp_df[sample_name] <= -consensus_thres].index)
     return {"C_dic": C_dic, "P_dic": P_dic}
 
 

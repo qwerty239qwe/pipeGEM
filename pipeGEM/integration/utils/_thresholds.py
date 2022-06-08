@@ -11,7 +11,7 @@ from pipeGEM.integration.mapping import Expression
 
 
 __all__ = ["get_rfastcormics_thresholds", "get_PROM_threshold",
-           "find_exp_threshold", "get_expression_thresholds", "get_discretize_data"]
+           "find_exp_threshold", "get_expression_thresholds", "get_discretize_data", "get_interpolate_data"]
 
 
 def gaussian(x, amp, cen, wid):
@@ -262,3 +262,15 @@ def get_discretize_data(sample_names,
                                                               if x >= exp_thres else -1 if x <= nexp_thres else 0)
 
     return disc_data
+
+
+def get_interpolate_data(sample_names,
+                         data_df,
+                         expr_threshold_dic,
+                         non_expr_threshold_dic):
+    interp_data = data_df.copy()
+    for sample_name in sample_names:
+        exp_thres, nexp_thres = expr_threshold_dic[sample_name], non_expr_threshold_dic[sample_name]
+        interp_data[sample_name] = interp_data[sample_name].apply(lambda x: np.interp(x, xp=[nexp_thres, exp_thres], fp=[-1, 1]))
+
+    return interp_data

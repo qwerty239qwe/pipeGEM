@@ -150,7 +150,7 @@ class Task:
         obj_dic = {}
 
         for k, v in sink_reqs.items():
-            model.reactions.get_by_id(k).bounds = (-1000, -1e-3) if v < 0 else (1e-3, 1000)
+            model.reactions.get_by_id(k).bounds = (-1000, max(-1e-6, v)) if v < 0 else (min(1e-6, v), 1000)
             obj_dic[model.reactions.get_by_id(k)] = 1 if v > 0 else -1
         model.objective = obj_dic
 
@@ -340,6 +340,8 @@ class TaskHandler:
             task_container_obj = TaskContainer.load(task_container)
             task_container_obj.set_all_mets_attr("compartment_parenthesis", compartment_patenthesis)
             return task_container_obj
+        task_container.set_all_mets_attr("compartment_parenthesis", compartment_patenthesis)
+
         return task_container
 
     def change_constr(self, new_constr_name, **kwargs):
@@ -522,8 +524,8 @@ class TaskTester(TaskHandler):
                 print(f"Task {ID} cannot support tasks' metabolites")
         return sol
 
-    def test_one_task(self, ID, task, model, all_mets_in_model):
-        all_met_exist, dummy_rxns, obj_rxns = task.assign(model, all_mets_in_model)
+    def test_one_task(self, ID, task, model, all_mets_in_model, **kwargs):
+        all_met_exist, dummy_rxns, obj_rxns = task.assign(model, all_mets_in_model, **kwargs)
         if not all_met_exist:
             return {'Passed': False,
                     'Should fail': task.should_fail,
@@ -629,10 +631,9 @@ class TaskValidator(TaskHandler):
             self._method_kwargs['fraction_of_optimum'] = 1.0
         self._flux_dfs = {}
 
-    def test_one_task(self, ID, task, model, all_mets_in_model):
+    def test_one_task(self, ID, task, model, all_mets_in_model, **kwargs):
         all_met_exist, dummy_rxns, obj_rxns = task.assign(model,
-                                                          all_mets_in_model,
-                                                          loose_output=True)
+                                                          all_mets_in_model, **kwargs)
         if not all_met_exist:
             return {'Passed': False,
                     'Should fail': task.should_fail,
