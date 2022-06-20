@@ -196,3 +196,67 @@ def sheet_to_comp(model, excel_file_name, raise_err=False):
             model.add_reactions([added_rxn])
 
             added_rxn.build_reaction_from_string(r[1]["reaction"])
+
+
+def create_scaling_rxns(met_id, mod, rxns_in_mod=None, scale_to=100):
+    rxn_name = f"scaling_rxn_for_{met_id}_{scale_to}"
+    met = mod.metabolites.get_by_id(met_id)
+    if rxns_in_mod is None:
+        rxns_in_mod = [r.id for r in mod.reactions]
+
+    if rxn_name in rxns_in_mod:
+        # print("The reaction is already created")
+        return mod.reactions.get_by_id(rxn_name), mod.metabolites.get_by_id(f"{met_id}_x_{scale_to}"), False
+
+    rhs_met = cobra.Metabolite(f"{met_id}_x_{scale_to}", compartment=met.compartment)
+    new_rxn = cobra.Reaction(rxn_name, name=rxn_name, lower_bound=-1e6, upper_bound=1e6)
+    new_rxn.add_metabolites({rhs_met: 1 / scale_to, met: -1})
+    # print(f"create a scaled met: {rhs_met.id} and a rxn: {new_rxn.id}")
+    return new_rxn, rhs_met, True
+
+
+def sub_met_to_scaled(rxn_id, met_id, mod, rxns_in_mod, scale_to):
+    rxn = mod.reactions.get_by_id(rxn_id)
+    new_rxn, rhs_met, is_new = create_scaling_rxns(met_id, mod, rxns_in_mod, scale_to)
+    if is_new:
+        mod.add_reactions([new_rxn])
+
+    # sub met
+    orig_c = rxn.metabolites[mod.metabolites.get_by_id(met_id)]
+    rxn.subtract_metabolites({mod.metabolites.get_by_id(met_id): orig_c})
+    rxn.add_metabolites({rhs_met: orig_c / scale_to})
+
+    return new_rxn.id
+
+
+def check_scales(mod, thres=1e3):
+    bad_scales = {}
+
+    for r in mod.reactions:
+        max_r_c, min_r_c, max_l_c, min_l_c = 0, 1e6, 0, 1e6
+
+        for m, c in r.metabolites.items():
+            if c < 0:  # lhs
+                max_l_c = max(abs(c), max_l_c)
+                min_l_c = min(abs(c), min_l_c)
+            else:
+                max_r_c = max(abs(c), max_r_c)
+                min_r_c = min(abs(c), min_r_c)
+
+        if max_r_c / min_l_c > thres or max_l_c / min_r_c > thres:
+            bad_scales[r.id] = {m.id: np.floor(np.log10(abs(c))) for m, c in r.metabolites.items()}
+    return bad_scales
+
+
+def check_rxn_scales(mod, threshold=1e3):
+    bad_scales = check_scales(mod, threshold)
+    while len(bad_scales) != 0:
+        print("Number of reactions with bad coefficients: ", len(bad_scales))
+        rxns_in_mod = [r.id for r in mod.reactions]
+        for r_id, met_d in bad_scales.items():
+            for met, c in met_d.items():
+                if c >= 2 or c <= -2:
+                    new_id = sub_met_to_scaled(r_id, met_id=met, mod=mod, rxns_in_mod=rxns_in_mod,
+                                               scale_to=100 if c >= 2 else 0.01)
+                    rxns_in_mod.append(new_id)
+        bad_scales = check_scales(mod, threshold)
