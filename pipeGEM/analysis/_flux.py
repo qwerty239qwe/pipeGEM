@@ -1,13 +1,16 @@
 from pathlib import Path
 from functools import wraps
 from typing import Union, Dict
+from itertools import chain
 
 import pandas as pd
 import numpy as np
 import cobra
+from cobra.core.solution import get_solution
 from cobra.flux_analysis.variability import flux_variability_analysis
 from cobra.flux_analysis.parsimonious import pfba
 from cobra.sampling import sampling
+from cobra.util.solver import fix_objective_as_constraint
 from optlang.symbolics import Zero
 
 from pipeGEM.integration.constraints import add_constraint, add_constraint_f, constraint_dict, post_process
@@ -281,3 +284,40 @@ class ProblemAnalyzer:
                 else:
                     vals[var_name] = val
         return pd.DataFrame({"fluxes": vals}).loc[self.col_names, :]
+
+
+def _add_pfba(
+        model,
+        objective = None,
+        fraction_of_optimum: float = 1.0,
+        reactions = None
+    ):
+    if objective is not None:
+        model.objective = objective
+    if model.solver.objective.name == "_pfba_objective":
+        raise ValueError("The model already has a pFBA objective.")
+    fix_objective_as_constraint(model, fraction=fraction_of_optimum)
+    reactions = model.reactions if reactions is None else reactions
+    reaction_variables = (
+        (rxn.forward_variable, rxn.reverse_variable) for rxn in reactions
+    )
+    variables = chain(*reaction_variables)
+    model.objective = model.problem.Objective(
+        Zero, direction="min", sloppy=True, name="_pfba_objective"
+    )
+    model.objective.set_linear_coefficients({v: 1.0 for v in variables})
+
+
+def modified_pfba(model,
+                  ignored_reactions,
+                  fraction_of_optimum: float = 1.0,
+                  objective= None,
+                  ):
+    reactions = (
+        model.reactions if ignored_reactions is None else [r for r in model.reactions if r.id not in ignored_reactions]
+    )
+    with model as m:
+        _add_pfba(m, objective=objective, fraction_of_optimum=fraction_of_optimum)
+        m.slim_optimize(error_value=None)
+        solution = get_solution(m, reactions=reactions)
+    return solution

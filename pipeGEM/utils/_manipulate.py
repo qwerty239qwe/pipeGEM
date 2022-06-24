@@ -249,6 +249,7 @@ def check_scales(mod, thres=1e3):
 
 
 def check_rxn_scales(mod, threshold=1e3):
+    # https://www.gurobi.com/documentation/9.5/refman/recommended_ranges_for_var.html
     bad_scales = check_scales(mod, threshold)
     while len(bad_scales) != 0:
         print("Number of reactions with bad coefficients: ", len(bad_scales))
