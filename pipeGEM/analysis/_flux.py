@@ -286,11 +286,12 @@ class ProblemAnalyzer:
         return pd.DataFrame({"fluxes": vals}).loc[self.col_names, :]
 
 
-def _add_pfba(
+def add_mod_pfba(
         model,
         objective = None,
         fraction_of_optimum: float = 1.0,
-        reactions = None
+        reactions = None,
+        weights = None,
     ):
     if objective is not None:
         model.objective = objective
@@ -298,26 +299,50 @@ def _add_pfba(
         raise ValueError("The model already has a pFBA objective.")
     fix_objective_as_constraint(model, fraction=fraction_of_optimum)
     reactions = model.reactions if reactions is None else reactions
-    reaction_variables = (
-        (rxn.forward_variable, rxn.reverse_variable) for rxn in reactions
-    )
-    variables = chain(*reaction_variables)
+    if weights is None:
+        reaction_var_dict = {rxn.forward_variable: 1 for rxn in reactions}
+        reaction_var_dict.update({rxn.reverse_variable: 1 for rxn in reactions})
+    else:
+        rxn_ids = [r.id for r in reactions]
+        weights = {k: v for k, v in weights.items() if k in rxn_ids}
+        reaction_var_dict = {model.reactions.get_by_id(k).forward_variable: v for k, v in weights.items()}
+        reaction_var_dict.update({model.reactions.get_by_id(k).reverse_variable: v for k, v in weights.items()})
+
     model.objective = model.problem.Objective(
         Zero, direction="min", sloppy=True, name="_pfba_objective"
     )
-    model.objective.set_linear_coefficients({v: 1.0 for v in variables})
+    model.objective.set_linear_coefficients({k: v for k, v in reaction_var_dict.items()})
+
+
+def _add_max_abs_flux(
+        model,
+        objective = None,
+        fraction_of_optimum: float = 1.0,
+        reactions = None,
+        weights = None,
+    ):
+    pass
 
 
 def modified_pfba(model,
                   ignored_reactions,
                   fraction_of_optimum: float = 1.0,
                   objective= None,
+                  weights = None,
                   ):
     reactions = (
         model.reactions if ignored_reactions is None else [r for r in model.reactions if r.id not in ignored_reactions]
     )
     with model as m:
-        _add_pfba(m, objective=objective, fraction_of_optimum=fraction_of_optimum)
+        add_mod_pfba(m,
+                  objective=objective,
+                  reactions=reactions,
+                  fraction_of_optimum=fraction_of_optimum,
+                  weights=weights)
         m.slim_optimize(error_value=None)
         solution = get_solution(m, reactions=reactions)
     return solution
+
+
+def max_abs_flux(model, ):
+    pass

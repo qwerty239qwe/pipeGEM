@@ -31,7 +31,7 @@ def LP3(J: Union[set, np.ndarray, List[str]],
             model.objective = [model.reactions.get_by_id(j) for j in J]
         else:
             model.objective = model.reactions.get_by_id(J)
-        fm = model.optimize().to_frame()["fluxes"].abs()
+        fm = model.optimize(objective_sense="maximize").to_frame()["fluxes"].abs()
     return fm[fm > 0.99*epsilon].index.to_list()
 
 
@@ -153,7 +153,6 @@ def LP7(J,
             vars.append(var)
         model.add_cons_vars(consts, sloppy=True)
         model.add_cons_vars(vars, sloppy=True)
-        # model.add_cons_vars(vars + consts)
         for con, coefs in constr_coefs.items():
             model.constraints[con].set_linear_coefficients(coefs)
 
@@ -170,6 +169,7 @@ def LP7(J,
             return fm[fm > 0.99*epsilon].index.to_list(), fm
         return fm[fm > 0.99*epsilon].index.to_list()
     return fm[fm > rxn_scale_eps[fm.index]].index.to_list()
+
 
 def LP9(K,
         P,

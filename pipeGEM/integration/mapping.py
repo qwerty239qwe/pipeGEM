@@ -184,15 +184,6 @@ class Expression:
         return {subsystem: data for subsystem, data in subsystem_score.items() if subsystem not in not_exist_subsystems}
 
 
-class GeneExpression(Expression):
-    def __init__(self, data, model, level_order, **kwargs):
-        super(GeneExpression, self).__init__(data=data, model=model, **kwargs)
-
-    def map_id(self):
-        # TODO
-        raise NotImplementedError("This class haven't be finished yet.")
-
-
 def map_data_to_rxns(data_df,
                      ref_model,
                      sample_names: Optional[List[str]] = None,
