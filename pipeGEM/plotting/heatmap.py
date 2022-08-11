@@ -8,7 +8,6 @@ import seaborn as sns
 from ._utils import save_fig, _get_subsystem_ticks
 
 
-@save_fig
 def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
                  scale: int = 1,
                  cbar_label: str = '',
@@ -60,7 +59,6 @@ def _modify_clustermap_for_subsys(g, ticks_pos, subsystems):
         label.set_transform(label.get_transform() + offset)
 
 
-@save_fig(prefix="clustermap_", dpi=150)
 def plot_clustermap(data,
                     model_groups=None,
                     group_list=None,

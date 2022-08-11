@@ -2,10 +2,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
-from pipeGEM.plotting._utils import save_fig
 
-
-@save_fig
 def plot_model_components(comp_df: pd.DataFrame,
                           order,
                           **kwargs):

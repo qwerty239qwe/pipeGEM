@@ -1,7 +1,7 @@
 from functools import partial, wraps
 
-from pipeGEM.integration.constraints._registering import constraint_dict
-from pipeGEM.integration.constraints._processing import follow_up
+from pipeGEM.integration.continuous._registering import constraint_dict
+from pipeGEM.integration.continuous._processing import follow_up
 
 
 __all__ = ["add_constraint", "add_constraint_f"]

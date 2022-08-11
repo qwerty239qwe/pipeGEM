@@ -9,7 +9,7 @@ from cobra.flux_analysis import flux_variability_analysis
 import pandas as pd
 import numpy as np
 
-from pipeGEM.analysis import Problem
+from pipeGEM.core import Problem
 
 
 def convert_to_without_or(model: cobra.Model):

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
-from pipeGEM.plotting._utils import save_fig, _set_default_ax
+from pipeGEM.plotting._utils import _set_default_ax
 from pipeGEM.analysis import prepare_PCA_dfs, prepare_embedding_dfs
 
 
@@ -55,7 +55,6 @@ def plot_PCA(df,
     return pca_df
 
 
-@save_fig(prefix="", dpi=150)
 def plot_embedding(df,
                    groups: dict = None,
                    title=None,
@@ -107,7 +106,6 @@ def plot_embedding(df,
     return plotting_kws
 
 
-@save_fig(prefix="PCA_score_2D_", dpi=150)
 def plot_2D_PCA_score(pca_df,
                       groups = None,
                       features: dict = None,
@@ -146,7 +144,6 @@ def plot_2D_PCA_score(pca_df,
     return plotting_kws
 
 
-@save_fig(prefix="PCA_score_3D_", dpi=150)
 def plot_3D_PCA_score(pca_df,
                       groups,
                       palette="muted",
@@ -176,7 +173,6 @@ def plot_3D_PCA_score(pca_df,
     return plotting_kws
 
 
-@save_fig(prefix="PCA_screeplot_", dpi=150)
 def plot_PCA_screeplot(exp_var_df,
                        palette="muted",
                        fig_title=None,
@@ -207,7 +203,6 @@ def plot_PCA_screeplot(exp_var_df,
     return plotting_kws
 
 
-@save_fig(prefix="PCA_loading_plot_", dpi=150)
 def plot_PCA_loading(component_df: pd.DataFrame,
                      n_feature=30,
                      fig_title=None,

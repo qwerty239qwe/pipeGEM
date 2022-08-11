@@ -7,6 +7,7 @@ import pandas as pd
 import cobra
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, manhattan_distances
 
+import pipeGEM
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
 from pipeGEM.plotting.categorical import plot_model_components
@@ -14,6 +15,7 @@ from pipeGEM.plotting.heatmap import plot_heatmap, plot_clustermap
 from pipeGEM.plotting import plot_fba, plot_fva, plot_sampling
 from pipeGEM.plotting.scatter import plot_PCA, plot_embedding
 from pipeGEM.utils import is_iter, calc_jaccard_index
+from pipeGEM.analysis import flux_analyzers
 
 
 class Group(GEMComposite):
@@ -82,7 +84,7 @@ class Group(GEMComposite):
             else:
                 ValueError("Input list must only contain Group or Model objects")
         elif isinstance(value, cobra.Model):
-            self._group.append(Model(model=value, name_tag=key))
+            self._group.append(Model.from_cobra_model(model=value, name=key))
         elif isinstance(value, Model):
             self._group.append(value)
         else:
@@ -156,80 +158,16 @@ class Group(GEMComposite):
             subs[g] = set(rxns)
         return subs
 
-    def do_analysis(self, **kwargs) -> None:
-        """
-        Perform analysis on all the objects in this group
-
-        Parameters
-        ----------
-        kwargs: dict
-            Keyword arguments of the analysis,
-
-            basic inputs-
-            method: str
-                The name of performed analysis
-            constr: str
-                The name of applied constraints
-        Returns
-        -------
-        None
-        """
-        for g in self._group:
-            g.do_analysis(**kwargs)
-
-    def get_flux(self, aggregate="concat", as_dict=True, **kwargs) -> Dict[str, pd.DataFrame]:
-        """
-        Get flux dataframe in this object,
-        The output of this function could be a dataframe(FBA, pFBA, sampling), or two dataframes (FVA)
-        The shape of the dataframes also depend on the method and aggregation method users specified,
-        method -
-            FBA or pFBA: return a dict contains a dataframe with shape = (n_rxns, n_models) when aggregate = 'concat',
-                otherwise the shape will be (n_rxns, 1)
-            FVA: return a dict contains two dataframes with shape = (n_rxns, n_models) when aggregate = 'concat',
-                otherwise the shape of each frame will be (n_rxns, 1)
-            sampling: return a dict contains n dataframes with shape = (n_rxns, n_models) when aggregate = 'concat',
-                otherwise the shape of each frame will be (n_rxns, 1)
-
-        Parameters
-        ----------
-        as_dict
-        aggregate: str
-            The name of aggregation method, choose from: ["concat", "mean", "sum", "min", "max", "weighted_mean"]
-
-        kwargs
-
-        Returns
-        -------
-
-        """
-        if aggregate not in self.agg_methods:
-            raise ValueError("This aggregation method is not exist")
-
-        dfs: Dict[str, Dict[str,
-                            Union[pd.DataFrame, pd.Series]]] = \
-            {g.name_tag: g.get_flux(as_dict=as_dict, **kwargs) for g in self._group}
-        col_names = list(list(dfs.values())[0].keys())
-        grouped_dfs = {c: pd.concat([dfs[g.name_tag][c] for g in self._group], axis=1)
-                       for c in col_names}
-
-        # TODO: fix - violate open-close principle
-        if aggregate in ["mean", "sum", "min", "max", "weighted_mean", "absmin", "absmax"]:
-            for k, v in grouped_dfs.items():
-                first_agg = {a: a for a in self.agg_methods}
-                first_agg.update({"weighted_mean": "sum", "absmin": "abs", "absmax": "abs"})
-                if aggregate in ["absmin", "absmax"]:
-                    grouped_dfs[k] = getattr(v, first_agg[aggregate])()
-                else:
-                    grouped_dfs[k] = getattr(v, first_agg[aggregate])(axis=1)
-                grouped_dfs[k] = grouped_dfs[k].to_frame()
-                grouped_dfs[k].columns = [self.name_tag]
-                if aggregate == "weighted_mean":
-                    grouped_dfs[k] = grouped_dfs[k] / [g.size for g in self._group]
-                elif aggregate == "absmin":
-                    grouped_dfs[k] = grouped_dfs[k].min()
-                elif aggregate == "absmax":
-                    grouped_dfs[k] = grouped_dfs[k].max()
-        return grouped_dfs
+    def do_flux_analysis(self, method, aggregate_method="concat", solver="gurobi", **kwargs):
+        results = []
+        for c in self._group:
+            if c.__class__ == self.__class__:
+                result = c.do_flux_analysis(method=method, aggregate_method=aggregate_method,
+                                            solver=solver, **kwargs)
+            else:
+                result = c.do_flux_analysis(method=method, solver=solver, **kwargs)
+            results.append(result)
+        return results[0].__class__.aggregate(results, method=aggregate_method, log={"name": self.name_tag})
 
     def tget(self,
              tag: Union[str, list]) -> List[GEMComposite]:
@@ -311,17 +249,26 @@ class Group(GEMComposite):
     def _form_group(self, group_dict) -> list:
         group_lis = []
         max_g = 0
-        for name, comp in group_dict.items():
-            if isinstance(comp, dict):
-                g = Group(group=comp, name_tag=name, data=self.data)
-                max_g = max(max_g, g.tree_level)
-                group_lis.append(g)
-            elif isinstance(comp, list):
-                group_lis.extend(comp)
-                max_g = max([c.tree_level for c in group_lis])
-            else:
-                group_lis.append(Model(model=comp, name_tag=name, data=self.data))
-                max_g = max([g.tree_level for g in group_lis] + [1])
+        if isinstance(group_dict, list):
+            if not all([isinstance(c, pipeGEM.Model) for c in group_dict]):
+                raise ValueError("The input list should be a list of pipeGEM.Model")
+            group_lis = [c for c in group_dict]
+            max_g = max([g.tree_level for g in group_lis] + [1])
+        else:
+            for name, comp in group_dict.items():
+                if isinstance(comp, dict):
+                    g = Group(group=comp, name_tag=name, data=self.data)
+                    max_g = max(max_g, g.tree_level)
+                    group_lis.append(g)
+                elif isinstance(comp, list):
+                    group_lis.extend(comp)
+                    max_g = max([c.tree_level for c in group_lis])
+                elif isinstance(comp, cobra.Model):
+                    group_lis.append(Model(model=comp, name_tag=name))
+                    max_g = max([g.tree_level for g in group_lis] + [1])
+                elif isinstance(comp, pipeGEM.Model):
+                    group_lis.append(comp)
+                    max_g = max([g.tree_level for g in group_lis] + [1])
         self._lvl = max_g + 1
         return group_lis
 
@@ -515,51 +462,6 @@ class Group(GEMComposite):
                 processed["group"] = c.name_tag
                 fluxes[k][c.name_tag] = processed
         return {fname: pd.concat(list(fdfs.values()), axis=0).fillna(0) for fname, fdfs in fluxes.items() }
-
-    def plot_flux(self,
-                  method,
-                  constr,
-                  rxn_ids = None,
-                  rxn_index = None,
-                  subsystems = None,
-                  tags: Union[str, List[str]] = "all",
-                  get_model_level: bool = True,
-                  aggregation_method="mean",
-                  **kwargs
-                  ):
-        """
-        Plot the flux analysis results stored in the model
-
-        Parameters
-        ----------
-        method: str
-        constr: str
-        rxn_ids: optional, list of str
-        rxn_index: optional, list of str
-        subsystems: optional, str of list of str
-        tags: str or a list of str
-        get_model_level: bool, default = True
-        aggregation_method: str, default = 'mean'
-        kwargs
-
-        Returns
-        -------
-
-        """
-        rxn_ids = rxn_ids if rxn_ids is not None else []
-        rxn_ids += self._check_rxn_id(self.tget(tags if tags != "all" else None)[0], rxn_index, subsystems)
-        fluxes = self._process_flux(method, constr, tags, get_model_level, aggregation_method)
-        if method in ["FBA", "pFBA"]:
-            plot_fba(flux_df=fluxes["fluxes"], rxn_ids=rxn_ids, group_layer="group", **kwargs)
-        elif method == "FVA":
-            if aggregation_method == ["concat", "sum"]:
-                raise ValueError("This aggregation method is not appropriate, choose from mean, absmin, absmax")
-            plot_fva(min_flux_df=fluxes["minimum"],
-                     max_flux_df=fluxes["maximum"], rxn_ids=rxn_ids, group_layer="group", **kwargs)
-        elif method == "sampling":
-            plot_sampling(sampling_flux_df=fluxes, rxn_ids=rxn_ids, group_layer="group", **kwargs)
-        else:
-            raise NotImplementedError()
 
     def plot_flux_emb(self,
                       method,

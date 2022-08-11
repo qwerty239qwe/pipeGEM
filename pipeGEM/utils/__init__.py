@@ -4,3 +4,4 @@ from ._class import *
 from ._manipulate import *
 from ._calc import *
 from ._warning import usage_warning
+from ._scaling import *

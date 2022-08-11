@@ -6,7 +6,7 @@ import numpy as np
 from numpy import linalg as LA
 from optlang.symbolics import Zero
 
-from pipeGEM.core import Problem
+from pipeGEM.analysis import Problem
 
 
 def LP3(J: Union[set, np.ndarray, List[str]],
@@ -177,6 +177,7 @@ def LP9(K,
         model: cobra.Model,
         epsilon,
         min_v,
+        scaling_factor = 1,
         rxn_scale_eps=None) -> list:
     """
     LP9 minimizes the L1 norm of fluxes in the penalty set P, subject to a minimum flux constraint on the set K.
@@ -198,7 +199,6 @@ def LP9(K,
     -------
         The result rxn ids list
     """
-    scaling_factor = 1e4
     assert min_v > 0
     assert len(set(P) & set(K)) == 0
     with model:
@@ -231,26 +231,15 @@ def LP9(K,
         model.solver.update()
         for r in model.reactions:
             if r.id in K:
+                r.upper_bound = max(r.upper_bound, min_v) * scaling_factor
                 r.lower_bound = min_v * scaling_factor
             else:
                 r.lower_bound *= scaling_factor
             r.upper_bound *= scaling_factor
-        # for k in K:  # to maintain
-            # k_name = f"const_K_LP9_{rxn.id}"
-            # vi >= eps (for all i in K)
-            # kconst = prob.Constraint(rxn.flux_expression,
-            #                          name=k_name, lb=min_v * scaling_factor)
-            # constr_coefs[k_name] = dict()
-            # constr_coefs[k_name][rxn.forward_variable] = 1
-            # constr_coefs[k_name][rxn.reverse_variable] = -1
-            #
-            # consts.append(kconst)
-        # model.add_cons_vars(vars + consts)
         for con, coefs in constr_coefs.items():
             con.set_linear_coefficients(coefs)
         model.objective = prob.Objective(Zero, sloppy=True)
         model.objective.set_linear_coefficients({v: -1.0 for v in objs})  # sum of zi
-        # print(len(model.constraints), len(model.variables))
 
         try:
             sol = model.optimize(objective_sense="maximize", raise_error=True)

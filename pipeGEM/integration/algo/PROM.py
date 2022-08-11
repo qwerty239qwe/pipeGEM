@@ -10,7 +10,12 @@ import pandas as pd
 import numpy as np
 
 from pipeGEM.core import Problem
-from pipeGEM.integration.utils import get_PROM_threshold, quantile_norm
+from pipeGEM.integration.utils import get_PROM_threshold
+
+
+def quantile_norm(df: pd.DataFrame) -> pd.DataFrame:
+    rank_mean = df.stack().groupby(df.rank(method='first').stack().astype(int)).mean()
+    return df.rank(method='min').stack().astype(int).map(rank_mean).unstack()
 
 
 def _check_regulators(data_df, regulation_df) -> dict:

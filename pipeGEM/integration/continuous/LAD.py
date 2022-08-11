@@ -7,7 +7,7 @@ import pandas as pd
 from cobra.util import add_absolute_expression
 
 from pipeGEM.utils import make_irrev_rxn, merge_irrevs_in_df
-from pipeGEM.integration.constraints import register
+from pipeGEM.integration.continuous import register
 
 
 @register

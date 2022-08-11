@@ -13,172 +13,104 @@ from cobra.sampling import sampling
 from cobra.util.solver import fix_objective_as_constraint
 from optlang.symbolics import Zero
 
-from pipeGEM.integration.constraints import add_constraint, add_constraint_f, constraint_dict, post_process
 from .._constant import var_type_dict
+from ._analysis import *
+from pipeGEM.analysis._gapsplit import gapsplit
+from pipeGEM.utils import ObjectFactory
 
 
-ANALYSIS_METHODS = {}
-
-
-def register_analysis(name: str):
-    def register(func):
-        assert name not in ANALYSIS_METHODS, "Name collision: " + name
-        ANALYSIS_METHODS[name] = func
-
-        @wraps(func)
-        def do_work(*args, **kwargs):
-            return func(*args, **kwargs)
-        return do_work
-    return register
-
-
-@register_analysis("FBA")
-def _fba(model, **kwargs):
-    return model.optimize(**kwargs)
-
-
-@register_analysis("FVA")
-def _fva(model, is_loopless=True, fraction_of_optimum=0.8, **kwargs):
-    return flux_variability_analysis(model, loopless=is_loopless, fraction_of_optimum=fraction_of_optimum, **kwargs)
-
-
-@register_analysis("pFBA")
-def _pfba(model, fraction_of_optimum=1.0, **kwargs):
-    return pfba(model, fraction_of_optimum=fraction_of_optimum)
-
-
-@register_analysis("sampling")
-def _sampling(model, obj_lb_ratio=0.75, n=5000, **kwargs):
-    obj_lb = model.slim_optimize() * obj_lb_ratio
-    with model:
-        biom = model.problem.Constraint(model.objective.expression, obj_lb)
-        model.solver.add(biom)
-        return sampling.sample(model, n=n, **kwargs)
-
-
-@add_constraint_f
-def flux_analysis(model, method, **kwargs):
-    assert method in ANALYSIS_METHODS, "The method must in " + ",".join([m for m in ANALYSIS_METHODS])
-    return ANALYSIS_METHODS[method](model, **kwargs)
+class FluxAnalyzers(ObjectFactory):
+    def __init__(self):
+        super().__init__()
 
 
 class FluxAnalyzer:
     def __init__(self,
-                 model: cobra.Model,
-                 rxn_expr_score=None,
-                 solver: str = 'gurobi'):
-        self.method_dicts = {'FBA': getattr(self, '_fba'),
-                             'FVA': getattr(self, '_fva'),
-                             'pFBA': getattr(self, '_pfba'),
-                             'sampling': getattr(self, '_sampling')}
+                 model,
+                 analysis_obj: "FluxAnalysis",
+                 solver = "glpk"):
         self.model = model
         self.model.solver = solver
-        if not rxn_expr_score:
-            self.rxn_expr_score = rxn_expr_score
-        elif isinstance(rxn_expr_score, dict):
-            self.rxn_expr_score = rxn_expr_score
-        else:
-            self.rxn_expr_score = rxn_expr_score.rxn_scores
-        self._df = {constr: {name: None
-                             for name, method in self.method_dicts.items()}
-                    for constr, _ in constraint_dict.items()}
+        self._solver_name = solver
+        self._analysis_obj = analysis_obj
 
-    @add_constraint
-    def do_analysis(self,
-                    method: str,
-                    constr,
-                    postprocess_kwargs=None,
-                    **kwargs) -> None:
-        if postprocess_kwargs is None:
-            postprocess_kwargs = {}
-        if method not in self.method_dicts:
-            raise ValueError('This method is not available, please choose one of the method below: '
-                             '\n [FBA, FVA, pFBA, sampling]')
-        self._df[constr][method] = post_process(self.method_dicts[method](model=self.model,
-                                                                          **kwargs),
-                                                constr=constr,
-                                                **postprocess_kwargs)
+    @property
+    def solver_name(self):
+        return self._solver_name
 
-    def get_flux(self,
-                 method: str,
-                 constr: str = "default",
-                 keep_rc: bool = False,
-                 **kwargs) -> pd.DataFrame:
-        """
-        Get stored flux analysis result.
-        If the result is not found, do the flux analysis and return the result.
+    def analysis_func(self, **kwargs):
+        raise NotImplementedError
 
-        Parameters
-        ----------
-        method: str
-            The flux analysis method
-        constr: str
-            Applied additional constraint type
-        keep_rc: bool
-            If the returned dataframe contains reduced costs column
-        Returns
-        -------
-        flux_df: pd.DataFrame
-            Flux result stored in a pd.DataFrame,
-            expected rows: reactions
-            expected columns: depends on the method,
-                FBA and pFBA: [fluxes, [reduced_costs]],
-                FVA: [maximum, minimum],
-                samping: [0, 1, ..., n] (n = number of samples)
-        """
-        if self._df[constr][method] is None:
-            self.do_analysis(method=method, constr=constr, **kwargs)
-        df = self._df[constr][method].to_frame() \
-            if not isinstance(self._df[constr][method], pd.DataFrame) else self._df[constr][method]
-        return df if keep_rc or "reduced_costs" not in df.columns else df.drop(columns=["reduced_costs"])
+    def analyze(self, **kwargs) -> "FluxAnalysis":
+        self._analysis_obj.add_result(self.analysis_func(**kwargs))
+        return self._analysis_obj
 
-    def get_sol(self, method=None, constr="default"):
-        if method not in ["pFBA", "FBA"]:
-            raise AttributeError("This method doesn't have cobra.Solution, use get_flux instead")
 
-        if method is not None:
-            if not isinstance(self._df[constr][method], cobra.Solution):
-                self.do_analysis(methods=method, const=constr)
-            return self._df[constr][method]
-        return self._df[constr]
+class FBA_Analyzer(FluxAnalyzer):
+    def __init__(self, model, solver, log=None):
+        super().__init__(model=model,
+                         solver=solver,
+                         analysis_obj=FBA_Analysis(log=log))
 
-    def save_analysis(self, file_path):
-        root_path = Path(file_path) if isinstance(file_path, str) else file_path
-        for constr, method_df_dic in self._df.items():
-            saved_df_path = (root_path / Path(constr.value))
-            saved_df_path.mkdir(parents=True, exist_ok=True)
-            for method, df_dic in method_df_dic.items():
-                if df_dic is not None:
-                    df_dic.to_csv((saved_df_path / Path(method)).with_suffix(".tsv"), sep='\t')
+    def analysis_func(self, **kwargs):
+        return self.model.optimize(**kwargs)
 
-    def load_analysis(self, file_path):
-        root_path = Path(file_path) if isinstance(file_path, str) else file_path
-        for constr, method_df_dic in self._df.items():
-            saved_df_path = (root_path / Path(constr.value))
-            for method, _ in method_df_dic.items():
-                if (saved_df_path / Path(method)).exists():
-                    method_df_dic[method] = pd.read_csv((saved_df_path / Path(method)).with_suffix(".tsv"),
-                                                        sep='\t', index_col=0)
 
-    @staticmethod
-    def _fba(model, **kwargs):
-        return model.optimize(**kwargs)
+class pFBA_Analyzer(FBA_Analyzer):
+    def __init__(self, model, solver, log=None):
+        super().__init__(model=model,
+                         solver=solver,
+                         log=log)
 
-    @staticmethod
-    def _fva(model, is_loopless=True, fraction_of_optimum=0.8, **kwargs):
-        return flux_variability_analysis(model, loopless=is_loopless, fraction_of_optimum=fraction_of_optimum, **kwargs)
+    def analysis_func(self, fraction_of_optimum=1.0, **kwargs):
+        return pfba(model=self.model,
+                    fraction_of_optimum=fraction_of_optimum,
+                    **kwargs)
 
-    @staticmethod
-    def _pfba(model, fraction_of_optimum=1.0, **kwargs):
-        return pfba(model, fraction_of_optimum=fraction_of_optimum)
 
-    @staticmethod
-    def _sampling(model, obj_lb_ratio=0.75, n=5000, **kwargs):
-        obj_lb = model.slim_optimize() * obj_lb_ratio
-        with model:
-            biom = model.problem.Constraint(model.objective.expression, obj_lb)
-            model.solver.add(biom)
-            return sampling.sample(model, n=n, **kwargs).T
+class FVA_Analyzer(FluxAnalyzer):
+    def __init__(self, model, solver, log=None):
+        super().__init__(model=model,
+                         solver=solver,
+                         analysis_obj=FVA_Analysis(log=log))
+
+    def analysis_func(self,
+                      is_loopless=True,
+                      fraction_of_optimum=0,
+                      **kwargs):
+        return flux_variability_analysis(self.model,
+                                         loopless=is_loopless,
+                                         fraction_of_optimum=fraction_of_optimum,
+                                         **kwargs)
+
+
+class SamplingAnalyzer(FluxAnalyzer):
+    def __init__(self, model, solver, log=None):
+        super().__init__(model=model,
+                         solver=solver,
+                         analysis_obj=SamplingAnalysis(log=log))
+
+    def analysis_func(self,
+                      obj_lb_ratio=0.75,
+                      n=5000,
+                      **kwargs):
+        obj_lb = self.model.slim_optimize() * obj_lb_ratio
+        with self.model:
+            biom = self.model.problem.Constraint(self.model.objective.expression, obj_lb)
+            self.model.solver.add(biom)
+            if kwargs.get("method") == "gapsplit":
+                kwargs["gurobi_direct"] = (self.solver_name == "gurobi")
+                kwargs.pop("method")
+                return gapsplit(self.model, n=n, **kwargs)
+
+            return sampling.sample(self.model, n=n, **kwargs)
+
+
+flux_analyzers = FluxAnalyzers()
+flux_analyzers.register("FBA", FBA_Analyzer)
+flux_analyzers.register("FVA", FVA_Analyzer)
+flux_analyzers.register("pFBA", pFBA_Analyzer)
+flux_analyzers.register("sampling", SamplingAnalyzer)
 
 
 class ProblemAnalyzer:
@@ -292,6 +224,7 @@ def add_mod_pfba(
         fraction_of_optimum: float = 1.0,
         reactions = None,
         weights = None,
+        direction = "min"
     ):
     if objective is not None:
         model.objective = objective
@@ -303,13 +236,17 @@ def add_mod_pfba(
         reaction_var_dict = {rxn.forward_variable: 1 for rxn in reactions}
         reaction_var_dict.update({rxn.reverse_variable: 1 for rxn in reactions})
     else:
+        if any([np.isnan(x) for x in weights.values()]):
+            invalid = [k for k, v in weights.items() if np.isnan(v)]
+            print(f"NaN detected: {invalid}")
+            raise ValueError("weights dict contains NaN")
         rxn_ids = [r.id for r in reactions]
         weights = {k: v for k, v in weights.items() if k in rxn_ids}
         reaction_var_dict = {model.reactions.get_by_id(k).forward_variable: v for k, v in weights.items()}
         reaction_var_dict.update({model.reactions.get_by_id(k).reverse_variable: v for k, v in weights.items()})
 
     model.objective = model.problem.Objective(
-        Zero, direction="min", sloppy=True, name="_pfba_objective"
+        Zero, direction=direction, sloppy=True, name="_pfba_objective"
     )
     model.objective.set_linear_coefficients({k: v for k, v in reaction_var_dict.items()})
 
@@ -325,20 +262,22 @@ def _add_max_abs_flux(
 
 
 def modified_pfba(model,
-                  ignored_reactions,
+                  ignored_reactions=None,
                   fraction_of_optimum: float = 1.0,
                   objective= None,
                   weights = None,
+                  direction = "min"
                   ):
     reactions = (
         model.reactions if ignored_reactions is None else [r for r in model.reactions if r.id not in ignored_reactions]
     )
     with model as m:
         add_mod_pfba(m,
-                  objective=objective,
-                  reactions=reactions,
-                  fraction_of_optimum=fraction_of_optimum,
-                  weights=weights)
+                     objective=objective,
+                     reactions=reactions,
+                     fraction_of_optimum=fraction_of_optimum,
+                     weights=weights,
+                     direction=direction)
         m.slim_optimize(error_value=None)
         solution = get_solution(m, reactions=reactions)
     return solution

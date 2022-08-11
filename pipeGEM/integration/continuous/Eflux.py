@@ -1,23 +1,21 @@
 from typing import Dict, List, Callable, Union
 
-import pandas as pd
 import cobra
 import numpy as np
 
 from pipeGEM.utils import select_rxns_from_model
 from pipeGEM.utils.transform import exp_x
-from pipeGEM.integration.constraints import register
+from pipeGEM.integration.continuous import register
+from pipeGEM.analysis import EFluxAnalysis
 
 
 @register
-def Eflux(model: cobra.Model,
-          rxn_expr_score: Dict[str, float],
-          max_ub: float = 1000,
-          min_lb: float = .03,
-          ignore: Union[str, List[str], None] = None,
-          plot_exp: bool = False,
-          get_details: bool = True,
-          transform: Callable = exp_x):
+def apply_EFlux(model: cobra.Model,
+                rxn_expr_score: Dict[str, float],
+                max_ub: float = 1000,
+                min_lb: float = .03,
+                ignore: Union[str, List[str], None] = None,
+                transform: Callable = exp_x):
     """
     Parameters
     ----------
@@ -56,7 +54,7 @@ def Eflux(model: cobra.Model,
     trans_min_exp = transform(min_exp)
     denominator = transform(max_exp) - trans_min_exp
     trans_rxn_exp_dict = {k: min_lb + ((max_ub - min_lb) * (transform(v) - trans_min_exp) / denominator)
-    if not np.isnan(v) else v
+                          if not np.isnan(v) else v
                           for k, v in rxn_expr_score.items()}
     r_bounds_dict = {}
     for r in model.reactions:
@@ -66,17 +64,7 @@ def Eflux(model: cobra.Model,
             if not np.isnan(trans_rxn_exp_dict[r.id]) and (trans_rxn_exp_dict[r.id] < r.upper_bound):
                 r.upper_bound = trans_rxn_exp_dict[r.id]
         r_bounds_dict[r.id] = r.bounds
-    # if plot_exp:
-    #     from cobrave.plotting import plot_Eflux_scatter
-    #     plot_Eflux_scatter(rxn_expr_score, r_bounds_dict)
-    if get_details:
-        return r_bounds_dict
 
-
-def _Eflux_follow_up(r_bounds_dict, **kwargs):
-    sol_df = kwargs.get("sol_df").copy()
-    sol_df["lower_bound"] = sol_df.index.to_series().apply(
-        lambda x: r_bounds_dict[x][0] if x in r_bounds_dict else None)
-    sol_df["upper_bound"] = sol_df.index.to_series().apply(
-        lambda x: r_bounds_dict[x][1] if x in r_bounds_dict else None)
-    return sol_df
+    result = EFluxAnalysis(log={"name": model.name, "max_ub": max_ub, "min_lb": min_lb, "ignored_rxns": ignore})
+    result.add_result(rxn_bounds=r_bounds_dict, rxn_scores=rxn_expr_score)
+    return result

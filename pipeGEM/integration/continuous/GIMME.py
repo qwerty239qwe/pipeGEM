@@ -7,17 +7,16 @@ import numpy as np
 import pandas as pd
 
 from pipeGEM.utils import make_irrev_rxn, merge_irrevs_in_df
-from pipeGEM.integration.constraints import register
-from pipeGEM.analysis import add_mod_pfba
+from pipeGEM.integration.continuous import register
+from pipeGEM.analysis import add_mod_pfba, GIMMEAnalysis
 
 
 @register
-def GIMME(model: cobra.Model,
-          rxn_expr_score: Dict[str, float],
-          low_exp: float,
-          high_exp: float,
-          obj_frac: float = 0.8,
-          get_details: bool = True):
+def apply_GIMME(model: cobra.Model,
+                rxn_expr_score: Dict[str, float],
+                low_exp: float,
+                high_exp: float,
+                obj_frac: float = 0.8):
     """
     GLF implementation
 
@@ -57,21 +56,16 @@ def GIMME(model: cobra.Model,
     #             (-1 if r_exp <= low_exp else 0)
     #             for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)
     #             for mapped_r_id in rev_map_to_irrev[r_id]}
-
     exp_range = high_exp - low_exp
     obj_dict = {r_id: (high_exp - r_exp) / exp_range
                 if low_exp < r_exp < high_exp else
                 (1 if r_exp <= low_exp else 0)
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)}
-    # fix_objective_as_constraint(model, fraction=obj_frac)
-    # model.objective = model.problem.Objective(Zero, sloppy=True)
-    # model.objective = {
-    #     model.reactions.get_by_id(k): v for k, v in obj_dict.items() if v != 0
-    # }
 
     add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac)
-    if get_details:
-        return obj_dict
+    result = GIMMEAnalysis(log={"name": model.name, "low_exp": low_exp, "high_exp": high_exp, "obj_frac": obj_frac})
+    result.add_result(obj_dict, rxn_expr_score)
+    return result
 
 
 def _GIMME_post_process(sol_df, forward_prefix="_F_", backward_prefix="_R_"):

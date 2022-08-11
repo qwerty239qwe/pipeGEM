@@ -121,8 +121,7 @@ def load_test_model(name: str = "e_coli_core.xml",
 
 
 def save_model(model: cobra.Model,
-               output_file_name: Union[str, PathLike],
-               output_extension: str) -> None:
+               output_file_name: Union[str, PathLike]) -> None:
     """
     Save a cobra.Model
 
@@ -141,13 +140,14 @@ def save_model(model: cobra.Model,
     if isinstance(output_file_name, str):
         output_file_name = Path(output_file_name)
 
+    output_extension = output_file_name.suffix
     if output_extension == ".mat":
         cobra.io.save_matlab_model(model, output_file_name.with_suffix(output_extension))
     elif output_extension == ".json":
         cobra.io.json.save_json_model(model, str(output_file_name.with_suffix(output_extension)))
     elif output_extension == ".xml":
-        cobra.io.write_sbml_model(model, output_file_name.with_suffix(output_extension))
-    elif output_extension == ".yaml":
+        cobra.io.write_sbml_model(model, str(output_file_name.with_suffix(output_extension)))
+    elif output_extension == ".yaml" or output_extension == ".yml":
         cobra.io.yaml.save_yaml_model(model, output_file_name.with_suffix(output_extension))
     else:
         raise ValueError(f"Invalid file extension: {output_extension}")
@@ -168,10 +168,10 @@ def load_model(model_file_path: str) -> cobra.Model:
     if fn_path.suffix == ".xml":
         return cobra.io.read_sbml_model(str(fn_path))
     elif fn_path.suffix == ".mat":
-        return cobra.io.load_matlab_model(fn_path)
+        return cobra.io.load_matlab_model(str(fn_path))
     elif fn_path.suffix == ".json":
         return cobra.io.load_json_model(str(fn_path))
-    elif fn_path.suffix == ".yaml":
+    elif fn_path.suffix == ".yaml" or fn_path.suffix == ".yml":
         return cobra.io.load_yaml_model(fn_path)
     else:
         raise ValueError(f"Invalid file extension: {fn_path.suffix}")

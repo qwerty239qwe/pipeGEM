@@ -30,7 +30,7 @@ def _cal_canyons_p(x1, y1, x2, y2, c=0.5):
     return c * 2 ** (-abs(x1-x2)) + (1-c) * 1.5 ** (((y1 / y2) if y1 > y2 else (y2 / y1)) - 1) / 55
 
 
-def find_canyons(x, y, min_x_dis=3, max_y_ratio=4, min_h_ratio=1.5, max_w_ratio=2, n_top=100):
+def find_canyons(x, y, min_h_ratio=1.5, max_w_ratio=2, n_top=100):
     assert len(x) == len(y)
 
     dx = x[1] - x[0]
@@ -69,7 +69,6 @@ def find_canyons(x, y, min_x_dis=3, max_y_ratio=4, min_h_ratio=1.5, max_w_ratio=
             if i >= j or is_invalid_h or is_invalid_w:
                 continue
             p_arr[i, j] = _cal_canyons_p(x1=x1, y1=y1, x2=x2, y2=y2)
-    print("best p score is", np.min(p_arr))
     arg_min = np.where(p_arr == np.min(p_arr))
     return candidates[arg_min[0][0]], candidates[arg_min[1][0]]
     #
@@ -118,12 +117,14 @@ def _get_y_by_nearest_x(x, y, c):
 
 
 def _bimodal_fit(x, y, amp_ratio_tol=4, var_ratio_tol=2, mean_diff_tol=4):
-    c1, c2 = find_canyons(x, y, min_x_dis=mean_diff_tol, max_y_ratio=amp_ratio_tol)
+    c1, c2 = find_canyons(x, y)
     c1, c2 = min(c1, c2), max(c1, c2)
     print("original guess: ", c1, c2)
     init_vals = (1, c1, 1, 1, c2, 1)
     init_val_displayed = (_get_y_by_nearest_x(x, y, c1), c1, 1, _get_y_by_nearest_x(x, y, c2), c2, 1)
     grid = [(5 + 20 * i, 5 + 20 * j) for i in range(0, 4) for j in range(0, 4)]
+    covar = None
+    p = init_val_displayed
     try:
         found_best = False
         it = 0
@@ -143,11 +144,8 @@ def _bimodal_fit(x, y, amp_ratio_tol=4, var_ratio_tol=2, mean_diff_tol=4):
             warnings.warn("Fail to find proper parameters, use initial guess")
             p = init_val_displayed
             covar = None
-
     except RuntimeError:
         warnings.warn("Fail to optimize")
-        p = init_val_displayed
-        covar = None
 
     A1, mu1, wid1, A2, mu2, wid2 = p
     print("fitted Amps: ", A1, A2)
@@ -180,15 +178,7 @@ def get_rfastcormics_thresholds(dat: np.ndarray,
     zscored_x = (x - best_vals_right[1]) / sigma
     zscored_left_thres = (best_vals_left[1] - best_vals_right[1]) / sigma  # if the threshold is lower than -3, pick -3
     if plot_dist:
-
         fig, ax = plt.subplots(figsize=(8, 6))
-        # axes[0].plot(zscored_x, y, label="Data")
-        # axes[0].plot(zscored_x, right_c, label="Fitted expressed distribution")
-        # axes[0].plot(zscored_x, left_c, label="Fitted non-expressed distribution")
-        # axes[0].plot([0, 0], [0, np.max(y)])
-        # axes[0].plot([zscored_left_thres, zscored_left_thres], [0, np.max(y)])
-        # axes[0].legend()
-
         ax.plot(x, y, label="Data")
         if not use_first_guess:
             right_c = gaussian(x, *tuple(best_vals_right))
@@ -204,28 +194,6 @@ def get_rfastcormics_thresholds(dat: np.ndarray,
     print("Fitted values: ")
     print(best_vals_right[1], best_vals_left[1])
     return best_vals_right[1], best_vals_left[1]
-
-
-def find_exp_threshold(model: cobra.Model,
-                       gene_data_dict: dict,
-                       transform=np.log2,
-                       threshold=1e-4,
-                       plot_dist=False):
-    if transform:
-        threshold = transform(threshold)
-        trans_data_dict = {i: transform(v) if v != 0 else threshold - 1 for i, v in gene_data_dict.items()}
-        trans_data_arr = np.array(list(trans_data_dict.values()))
-    else:
-        trans_data_dict = gene_data_dict.copy()
-        trans_data_arr = np.array(list(trans_data_dict.values()))
-    expr = Expression(model, trans_data_dict, expression_threshold=threshold, method='mCADRE')
-    rxn_scores_dict = expr.rxn_scores  # want to recognize no gene related rxns and zero expr rxns
-    hi, lo = get_rfastcormics_thresholds(trans_data_arr, threshold, plot_dist=plot_dist)
-    for rxn, exp in rxn_scores_dict.items():
-        if exp == 0:
-            rxn_scores_dict[rxn] = hi
-
-    return hi, lo, rxn_scores_dict
 
 
 def get_expression_thresholds(data_df,

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import cobra
 
-from pipeGEM.utils._selection import get_objective_rxn
+from pipeGEM.utils._selection import get_objective_rxn, get_not_met_exs, get_organic_exs
 
 
 def _join_str(main_list, glue_pos, glue_str='and'):
@@ -198,66 +198,93 @@ def sheet_to_comp(model, excel_file_name, raise_err=False):
             added_rxn.build_reaction_from_string(r[1]["reaction"])
 
 
-def create_scaling_rxns(met_id, mod, rxns_in_mod=None, scale_to=100):
-    rxn_name = f"scaling_rxn_for_{met_id}_{scale_to}"
-    met = mod.metabolites.get_by_id(met_id)
-    if rxns_in_mod is None:
-        rxns_in_mod = [r.id for r in mod.reactions]
 
-    if rxn_name in rxns_in_mod:
-        # print("The reaction is already created")
-        return mod.reactions.get_by_id(rxn_name), mod.metabolites.get_by_id(f"{met_id}_x_{scale_to}"), False
-
-    rhs_met = cobra.Metabolite(f"{met_id}_x_{scale_to}", compartment=met.compartment)
-    new_rxn = cobra.Reaction(rxn_name, name=rxn_name, lower_bound=-1e6, upper_bound=1e6)
-    new_rxn.add_metabolites({rhs_met: 1 / scale_to, met: -1})
-    # print(f"create a scaled met: {rhs_met.id} and a rxn: {new_rxn.id}")
-    return new_rxn, rhs_met, True
-
-
-def sub_met_to_scaled(rxn_id, met_id, mod, rxns_in_mod, scale_to):
-    rxn = mod.reactions.get_by_id(rxn_id)
-    new_rxn, rhs_met, is_new = create_scaling_rxns(met_id, mod, rxns_in_mod, scale_to)
-    if is_new:
-        mod.add_reactions([new_rxn])
-
-    # sub met
-    orig_c = rxn.metabolites[mod.metabolites.get_by_id(met_id)]
-    rxn.subtract_metabolites({mod.metabolites.get_by_id(met_id): orig_c})
-    rxn.add_metabolites({rhs_met: orig_c / scale_to})
-
-    return new_rxn.id
+def apply_medium_constraint(model,
+                            mets_in_medium,
+                            exclude_others: bool = True,
+                            except_rxns: List[str] = None) -> list:
+    # remove all carbon sources but medium composition
+    if except_rxns is None:
+        except_rxns = []
+    if exclude_others:
+        to_ko = get_not_met_exs(model, mets_in_medium, get_objective_rxn(model) + except_rxns)
+    else:  # rFastCormic original function
+        to_ko = get_organic_exs(model, mets_in_medium, get_objective_rxn(model) + except_rxns)
+    constraint_rxns = []
+    for r in to_ko:
+        if r.lower_bound != 0:
+            constraint_rxns.append(r.id)
+            print("apply constraint to ", r.id)
+        r.lower_bound = 0
+    return constraint_rxns
 
 
-def check_scales(mod, thres=1e3):
-    bad_scales = {}
-
-    for r in mod.reactions:
-        max_r_c, min_r_c, max_l_c, min_l_c = 0, 1e6, 0, 1e6
-
-        for m, c in r.metabolites.items():
-            if c < 0:  # lhs
-                max_l_c = max(abs(c), max_l_c)
-                min_l_c = min(abs(c), min_l_c)
-            else:
-                max_r_c = max(abs(c), max_r_c)
-                min_r_c = min(abs(c), min_r_c)
-
-        if max_r_c / min_l_c > thres or max_l_c / min_r_c > thres:
-            bad_scales[r.id] = {m.id: np.floor(np.log10(abs(c))) for m, c in r.metabolites.items()}
-    return bad_scales
+def flip_direction(model, to_flip: List[str]):
+    for rxn_id in to_flip:
+        rxn = model.reactions.get_by_id(rxn_id)
+        rxn.lower_bound, rxn.upper_bound = -rxn.upper_bound if rxn.upper_bound != 0 else 0, -rxn.lower_bound if rxn.lower_bound != 0 else 0
+        rxn.subtract_metabolites({
+            met: 2 * c for met, c in rxn.metabolites.items()
+        })
 
 
-def check_rxn_scales(mod, threshold=1e3):
-    # https://www.gurobi.com/documentation/9.5/refman/recommended_ranges_for_var.html
-    bad_scales = check_scales(mod, threshold)
-    while len(bad_scales) != 0:
-        print("Number of reactions with bad coefficients: ", len(bad_scales))
-        rxns_in_mod = [r.id for r in mod.reactions]
-        for r_id, met_d in bad_scales.items():
-            for met, c in met_d.items():
-                if c >= 2 or c <= -2:
-                    new_id = sub_met_to_scaled(r_id, met_id=met, mod=mod, rxns_in_mod=rxns_in_mod,
-                                               scale_to=100 if c >= 2 else 0.01)
-                    rxns_in_mod.append(new_id)
-        bad_scales = check_scales(mod, threshold)
+def remove_drug_rxns_from_human_gem(mod):
+    drugs = ['pravastatin', 'Gliclazide', 'atorvastatin', 'fluvastatin', 'fluvastain','fluvstatin',
+             'simvastatin', 'cyclosporine',
+             'acetaminophen','cerivastatin','Tacrolimus', 'ibuprofen', 'lovastatin','Losartan','nifedipine',
+             'pitavastatin','rosuvastatin','Torasemide','Midazolam']
+    drugs = [d.lower() for d in drugs]
+
+    m_list = []
+    for m in mod.metabolites:
+        if m.name.lower() in drugs:
+            m_list.append(m)
+
+    print(f"Removing {len(m_list)} mets from the model..")
+    mod.remove_metabolites(m_list, destructive=True)
+
+    isolated_mets = []
+    for m in mod.metabolites:
+        if len(m.reactions) == 0:
+            isolated_mets.append(m)
+
+    mod.remove_metabolites(isolated_mets, True)
+
+
+def remove_AA_triplet_rxns_from_human_gem(mod):
+    aa_caps = ['Alanine', 'Arginine', 'Asparagine', 'Aspartate', 'Cysteine',
+               'Glutamine', 'Glutamate', 'Glycine', 'Histidine',
+               'Isoleucine', 'Leucine', 'Lysine', 'Methionine', 'Metheonine',
+               'Phenylalanine', 'Proline', 'Serine', 'Threonine',
+               'Tryptophan', 'Tyrosine', 'Valine']
+    aa_prefs = ['Alanyl', 'Alaninyl', 'Alanine',
+                'Arginyl', 'Asparaginyl', 'Aspartyl',
+                'Cystyl', 'Cystinyl', 'Cysteinyl',
+                'Glutaminyl', 'Glutamyl', 'Glutamatsyl',
+                'Glycyl', 'Histidyl', 'Histidinyl', 'Isoleucyl',
+                'Isolecyl', 'Leucyl', 'Lysyl', 'Lysine', 'Methionyl', 'Methioninyl', 'Phenylalanyl',
+                'Phenylalanine', 'Phenylalaninyl', 'Prolyl', 'Seryl', 'Threonyl', 'Tryptophanyl',
+                'Tyrosyl', 'Tyrosinyl', 'Valyl']
+    aa_caps = [i.lower() for i in aa_caps]
+    aa_prefs = [i.lower() for i in aa_prefs]
+    single_trip_name = 'argtyrval'
+    to_remove = []
+
+    for m in mod.metabolites:
+        if m.name.lower() == single_trip_name:
+            print(m.name, " is found")
+            to_remove.append(m)
+        split_name = m.name.split("-")
+        if len(split_name) <= 1:
+            continue
+        if all([n.lower() in aa_prefs for n in split_name[:-1]]) and (split_name[-1].lower() in aa_caps):
+            to_remove.append(m)
+    print(f"Removing {len(to_remove)} mets from the model..")
+    mod.remove_metabolites(to_remove, destructive=True)
+
+    isolated_mets = []
+    for m in mod.metabolites:
+        if len(m.reactions) == 0:
+            isolated_mets.append(m)
+
+    mod.remove_metabolites(isolated_mets, True)

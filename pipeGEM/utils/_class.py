@@ -3,6 +3,9 @@ class ObjectFactory:
     def __init__(self):
         self._builders = {}
 
+    def __getitem__(self, item):
+        return self._builders[item]
+
     def register(self, name, builder):
         self._builders[name] = builder
 

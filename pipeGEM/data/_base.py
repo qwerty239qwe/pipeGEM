@@ -13,4 +13,5 @@ class BaseData:
         self._hooked_attr = {}
 
     def align(self, model):
-        raise NotImplementedError
+        raise NotImplementedError()
+

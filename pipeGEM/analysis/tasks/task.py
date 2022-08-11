@@ -9,10 +9,8 @@ import cobra
 from cobra.flux_analysis.parsimonious import pfba
 from cobra.exceptions import Infeasible
 
-from pipeGEM.analysis import FluxAnalyzer
-from pipeGEM.integration.utils import find_exp_threshold
 from pipeGEM.integration.mapping import Expression
-from pipeGEM.analysis.tasks import *
+from pipeGEM.analysis import flux_analyzers, TaskAnalysis
 from ._var import TASKS_FILE_PATH
 
 
@@ -144,12 +142,12 @@ class Task:
                 all_fine = False
         return all_fine
 
-    def setup_sinks(self,
-                    model,
-                    sink_reqs):
+    def setup_support_flux_exp(self,
+                               model,
+                               rxn_fluxes):
         obj_dic = {}
 
-        for k, v in sink_reqs.items():
+        for k, v in rxn_fluxes.items():
             model.reactions.get_by_id(k).bounds = (-1000, max(-1e-6, v)) if v < 0 else (min(1e-6, v), 1000)
             obj_dic[model.reactions.get_by_id(k)] = 1 if v > 0 else -1
         model.objective = obj_dic
@@ -261,13 +259,13 @@ class TaskContainer:
         new_task = {}
         new_task.update(other.tasks)
         new_task.update(self.tasks)
-        return TaskContainer(new_task)
+        return self.__class__(new_task)
 
     def items(self):
         return self.tasks.items()
 
     def subset(self, items):
-        return TaskContainer(tasks={name: task for name, task in self.tasks.items() if name in items})
+        return self.__class__(tasks={name: task for name, task in self.tasks.items() if name in items})
 
     @classmethod
     def load(cls, file_path=TASKS_FILE_PATH):
@@ -289,50 +287,13 @@ class TaskContainer:
 
 class TaskHandler:
     def __init__(self,
-                 model: cobra.Model,
+                 model,
                  tasks_path_or_container: Union[TaskContainer, str],
-                 model_compartment_parenthesis: str,
-                 method: str = 'pFBA',
-                 constr: str = 'GIMME',
-                 method_kwargs: dict = None,
-                 constr_kwargs: dict = None,
-                 solver="glpk"
+                 model_compartment_parenthesis: str = "[{}]"
                  ):
         self.model = model
         self.tasks = self._init_task_container(tasks_path_or_container,
                                                compartment_patenthesis=model_compartment_parenthesis)
-        self.analyzer = FluxAnalyzer(model=self.model, solver=solver)
-        self.consider_sink = False
-
-        self._method = method
-        self._method_kwargs = {} if method_kwargs is None else method_kwargs
-
-        self._constr = constr
-        self._constr_kwargs = {} if constr_kwargs is None else constr_kwargs
-
-        self._result_df = pd.DataFrame(columns=['Passed', 'Should fail',
-                                                'Missing mets', 'Status', 'Obj_value'])
-        self._expr_th, self._non_expr_th, self._rxn_score = 0, 0, {}
-
-    def _load_stuffs(self, task_id, task_results):
-        raise NotImplementedError()
-
-    @classmethod
-    def load_test_result(cls, file_name, **kwargs):
-        with open(file_name) as json_file:
-            data = json.load(json_file)
-            task_tester = cls(**kwargs)
-            result_dic = {k: { task_id: task_results[k] for task_id, task_results in data.items()}
-                          for k in ['Passed', 'Should fail',
-                                    'Missing mets', 'Status', 'Obj_value', 'Obj_rxns', 'Sink Status']}
-            task_tester._result_df = pd.DataFrame(result_dic)
-
-            for task_id, task_results in data.items():
-                task_tester._load_stuffs(task_id, task_results)
-
-    @property
-    def result_df(self):
-        return self._result_df
 
     @staticmethod
     def _init_task_container(task_container, compartment_patenthesis):
@@ -341,70 +302,88 @@ class TaskHandler:
             task_container_obj.set_all_mets_attr("compartment_parenthesis", compartment_patenthesis)
             return task_container_obj
         task_container.set_all_mets_attr("compartment_parenthesis", compartment_patenthesis)
-
         return task_container
 
-    def change_constr(self, new_constr_name, **kwargs):
-        self._constr = new_constr_name
-        self._constr_kwargs = kwargs
+    def _get_sink_result(self, sol_df, dummy_rxns, fail_threshold):
+        passed_rxns = sol_df[(abs(sol_df['fluxes']) >= fail_threshold)].index.to_list()
+        dummy_rxn_id_list = [r.id for r in dummy_rxns]
+        return {"rxn_supps": [rxn for rxn in passed_rxns if rxn not in dummy_rxn_id_list]}
 
-    def update_gene_data(self,
-                         gene_data_dict: Union[dict, pd.Series],
-                         transform=np.log2,
-                         threshold=1e-4):
-        if isinstance(gene_data_dict, pd.Series):
-            gene_data_dict = {gid: gexp
-                              for gid, gexp in
-                              zip(gene_data_dict.index, gene_data_dict.values)}
+    def _get_test_result(self, sol_df, dummy_rxns, fail_threshold) -> dict:
+        passed_rxns = sol_df[(abs(sol_df['fluxes']) >= fail_threshold)].index.to_list()
+        dummy_rxn_id_list = [r.id for r in dummy_rxns]
+        sup_rxns = [rxn for rxn in passed_rxns if rxn not in dummy_rxn_id_list]
+        return {"task_support_rxns": sup_rxns,
+                "task_support_rxn_fluxes": dict(zip(sup_rxns,
+                                                    sol_df.loc[sup_rxns, "fluxes"].values))}
 
-        self._expr_th, self._non_expr_th, self._rxn_score = find_exp_threshold(self.model,
-                                                                               gene_data_dict,
-                                                                               transform, threshold)
-        self.analyzer.rxn_expr_score = self._rxn_score
-        if self._constr == "GIMME":
-            self._constr_kwargs['rxn_expression_dict'] = self._rxn_score
-            self._constr_kwargs['low_exp'], self._constr_kwargs['high_exp'] = self._non_expr_th, self._expr_th
+    def test_one_task(self, task, model, all_mets_in_model, method, method_kws, solver, fail_threshold, **kwargs):
+        all_met_exist, dummy_rxns, obj_rxns = task.assign(model, all_mets_in_model, **kwargs)
+        if not all_met_exist:
+            return {'Passed': False,
+                    'Should fail': task.should_fail,
+                    'Missing mets': True,
+                    'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": obj_rxns}
+        if method == "pFBA":
+            model.objective = {rxn: 1 for rxn in obj_rxns}
 
-    def update_thresholds(self,
-                          express_thres,
-                          non_express_thres,
-                          rxn_scores):
-        self._expr_th = express_thres if express_thres is not None else self._expr_th
-        self._non_expr_th = non_express_thres if non_express_thres is not None else self._non_expr_th
-        self._rxn_score = rxn_scores if rxn_scores is not None else self._rxn_score
-        if self._constr == "GIMME":
-            self._constr_kwargs['rxn_expression_dict'] = self._rxn_score
-            self._constr_kwargs['low_exp'], self._constr_kwargs['high_exp'] = self._non_expr_th, self._expr_th
+        analyzer = flux_analyzers[method](model=model, solver=solver)
+        sol = model.optimize(raise_error=False, objective_sense="minimize")
+        true_status = sol.status
+        if true_status == 'optimal':
+            try:
+                result = analyzer.analyze(**(method_kws if method_kws is not None else {}))
+                result = self._get_test_result(result.df, dummy_rxns, fail_threshold)
+            except Infeasible:
+                true_status = "infeasible"
+                result = {}
+                print("get an unexpected result")
+        else:
+            result = {}
 
-    def _get_test_result(self, ID, sol_df, dummy_rxns):
-        raise NotImplementedError()
+        return {'Passed': (((true_status == 'optimal') != task.should_fail) and all_met_exist),
+                'Should fail': task.should_fail,
+                'Missing mets': not all_met_exist,
+                'Status': true_status,
+                'Obj_value': sol.objective_value,
+                "Obj_rxns": obj_rxns, **result}
 
-    def _add_sink_result(self, ID, sol_df, dummy_rxns):
-        raise NotImplementedError()
+    @staticmethod
+    def _test_task_sinks_utils(ID, task, model, rxn_fluxes):
+        with model:
+            task.setup_support_flux_exp(model, rxn_fluxes=rxn_fluxes)
+            try:
+                sol = pfba(model)
+            except Infeasible:
+                sol = None
+                print(f"Task {ID} cannot support tasks' metabolites")
+        return sol
 
-    def test_one_task(self, ID, task, model, all_mets_in_model):
-        raise NotImplementedError()
-
-    def _test_task_sinks_utils(self, ID, task, model):
-        raise NotImplementedError()
-
-    def test_task_sinks(self, ID, task, model):
-        supp_sol = self._test_task_sinks_utils(ID, task, model)
+    def test_task_sinks(self, ID, task, model, fail_threshold, rxn_fluxes):
+        supp_sol = self._test_task_sinks_utils(ID, task, model, rxn_fluxes)
         supp_status = supp_sol.status if supp_sol is not None else "infeasible"
         if supp_status == "optimal":
             status = "optimal"
-            self._add_sink_result(ID, supp_sol.to_frame(), [])
+            result = self._get_sink_result(supp_sol.to_frame(), [], fail_threshold)
         else:
             status = "support rxns infeasible"
-        return status
+            result = {}
+        return {"Sink Status": status, "Passed": status == "optimal", **result}
 
-    def test_all(self, test_sink=True, task_ids="all", verbosity=0):
+    def test_tasks(self,
+                   method="pFBA",
+                   method_kws=None,
+                   solver="gurobi",
+                   get_support_rxns=True,
+                   task_ids="all",
+                   verbosity=0,
+                   fail_threshold=1e-6,
+                   log=None):
         # maybe needs some modifications
         boundary = [r.id for r in self.model.exchanges] + \
                    [r.id for r in self.model.demands] + \
                    [r.id for r in self.model.sinks]
         task_info = {}
-        self.consider_sink = test_sink
         all_mets_in_model = [m.id for m in self.model.metabolites]
         for ID, task in self.tasks.items():
             if task_ids != "all" and ID not in task_ids:
@@ -420,143 +399,55 @@ class TaskHandler:
                 elif verbosity >= 1:
                     print(f'Task {ID} - ', end='')
                 # add dummy reactions to the model
-                task_info[ID] = self.test_one_task(ID, task, model, all_mets_in_model)
-            if task_info[ID]['Passed'] and not task.should_fail and test_sink:
-                task_info[ID]['Sink Status'] = self.test_task_sinks(ID, task, self.model)
-                task_info[ID]['Passed'] = (task_info[ID]['Status'] == task_info[ID]['Sink Status'] == "optimal")
+                task_info[ID] = self.test_one_task(task=task,
+                                                   model=model,
+                                                   all_mets_in_model=all_mets_in_model,
+                                                   method=method,
+                                                   method_kws=method_kws,
+                                                   solver=solver,
+                                                   fail_threshold=fail_threshold)
+            if task_info[ID]['Passed'] and not task.should_fail and get_support_rxns:
+                sup_exp_result = self.test_task_sinks(ID, task, self.model,
+                                                      fail_threshold,
+                                                      rxn_fluxes=task_info[ID]["task_support_rxn_fluxes"])
+                task_info[ID].update(sup_exp_result)
             if verbosity >= 2:
                 print('status: ', task_info[ID]['Status'],
                       'should fail: ', task.should_fail,
                       'Passed: ', task_info[ID]['Passed'])
             elif verbosity >= 1:
                 print('Passed' if task_info[ID]['Passed'] else 'Failed')
-        self._result_df = pd.DataFrame(data=task_info).T
+        result_df = pd.DataFrame(data=task_info).T
         score = len(self.tasks) if task_ids == "all" else len(task_ids)
-
         for ID, info in task_info.items():
             if not info['Passed']:
                 if verbosity >= 1:
                     print(f'Task {ID} is not correct')
                 score -= 1
         print(f'score of the model: {score} / {len(self.tasks) if task_ids == "all" else len(task_ids)}')
+        log = {"method": method,
+               "method_kws": method_kws,
+
+               **(log if log is not None else {})}
+        task_result = TaskAnalysis(log=log)
+        task_result.add_result(result_df=result_df, score=score)
+        return task_result
 
 
 class TaskTester(TaskHandler):
     def __init__(self,
                  model: cobra.Model,
                  task_container: Union[str, TaskContainer] = TASKS_FILE_PATH,
-                 model_compartment_parenthesis="[{}]",
-                 method='pFBA',
-                 constr='GIMME',
-                 fail_tol=1e-6,
-                 method_kwargs: dict = None,
-                 constr_kwargs: dict = None,
-                 solver: str = "glpk"
+                 model_compartment_parenthesis="[{}]"
                  ):
 
         super().__init__(model=model,
                          tasks_path_or_container=task_container,
-                         model_compartment_parenthesis=model_compartment_parenthesis,
-                         method=method,
-                         constr=constr,
-                         method_kwargs=method_kwargs,
-                         constr_kwargs=constr_kwargs,
-                         solver=solver
+                         model_compartment_parenthesis=model_compartment_parenthesis
                          )
-        self.tol = fail_tol
-        if method == 'pFBA':
-            self._method_kwargs['fraction_of_optimum'] = 1.0
-
-        self._protected_rxns: Union[Dict[str, List[str]], dict] = {}
-        self._protected_rxn_reqs: Union[Dict[str, Dict], dict] = {}
-        self._passed_rxn_sinks: Union[Dict[str, List[str]], dict] = {}
 
         self._tasks_scores = {}
         self._passed_tasks_list = []
-
-    def save_test_result(self, file_name):
-        result_dic = {}
-        for c in self.result_df.columns:
-            for k, v in self.result_df[c].to_dict().items():
-                if k not in result_dic:
-                    result_dic[k] = {}
-                if c != "Obj_rxns":
-                    result_dic[k][c] = v if not pd.isna(v) else None
-                else:
-                    result_dic[k][c] = [vi.id for vi in v]
-
-        for attr_name, attr in zip(["protected_rxns", "protected_rxn_reqs", "protected_rxn_sinks"],
-                                   [self._protected_rxns, self._protected_rxn_reqs, self._passed_rxn_sinks]):
-            for k, v in attr.items():
-                result_dic[k][attr_name] = v
-
-        with open(file_name, "w") as f:
-            json.dump(result_dic, f)
-
-    @property
-    def protected_rxns(self):
-        return self._protected_rxns
-
-    @property
-    def passed_rxns_req(self):
-        return self._protected_rxn_reqs
-
-    @property
-    def tasks_scores(self):
-        return self._tasks_scores
-
-    @property
-    def passed_tasks_list(self):
-        return self._passed_tasks_list
-
-    def _load_stuffs(self, task_id, task_results):
-        self._protected_rxns[task_id] = task_results["protected_rxns"]
-        self._protected_rxn_reqs[task_id] = task_results["protected_rxn_reqs"]
-        self._passed_rxn_sinks[task_id] = task_results["protected_rxn_sinks"]
-
-    def _test_task_sinks_utils(self, ID, task, model):
-        with model:
-            task.setup_sinks(model, sink_reqs=self.passed_rxns_req[ID])
-            try:
-                sol = pfba(model)
-            except Infeasible:
-                sol = None
-                print(f"Task {ID} cannot support tasks' metabolites")
-        return sol
-
-    def test_one_task(self, ID, task, model, all_mets_in_model, **kwargs):
-        all_met_exist, dummy_rxns, obj_rxns = task.assign(model, all_mets_in_model, **kwargs)
-        if not all_met_exist:
-            return {'Passed': False,
-                    'Should fail': task.should_fail,
-                    'Missing mets': True,
-                    'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": obj_rxns}
-        if self._method == "pFBA":
-            model.objective = {rxn: 1 for rxn in obj_rxns}
-        sol = model.optimize(raise_error=False, objective_sense="minimize")
-        true_status = sol.status
-        if true_status == 'optimal':
-            try:
-                kws = {}
-                kws.update(self._constr_kwargs)
-                kws.update(self._method_kwargs)
-                self.analyzer.do_analysis(method=self._method,
-                                          constr=self._constr,
-                                          **kws)
-                sol_df = self.analyzer.get_flux(method=self._method,
-                                                constr=self._constr,
-                                                keep_rc=False)
-                self._get_test_result(ID, sol_df, dummy_rxns)
-            except Infeasible:
-                true_status = "infeasible"
-                print("get an unexpected result")
-
-        return {'Passed': (((true_status == 'optimal') != task.should_fail) and all_met_exist),
-                'Should fail': task.should_fail,
-                'Missing mets': not all_met_exist,
-                'Status': true_status,
-                'Obj_value': sol.objective_value,
-                "Obj_rxns": obj_rxns}
 
     def get_all_protected_rxns(self) -> list:
         return list(set([r for ind in self._passed_tasks_list if not self.tasks[ind].should_fail
@@ -564,16 +455,6 @@ class TaskTester(TaskHandler):
                         [r for ind in self._passed_tasks_list if not self.tasks[ind].should_fail
                          for r in self._passed_rxn_sinks[ind]] if self.consider_sink else []))
 
-    def _add_sink_result(self, ID, sol_df, dummy_rxns):
-        passed_rxns = sol_df[(abs(sol_df['fluxes']) >= self.tol)].index.to_list()
-        dummy_rxn_id_list = [r.id for r in dummy_rxns]
-        self._passed_rxn_sinks[ID] = [rxn for rxn in passed_rxns if rxn not in dummy_rxn_id_list]
-
-    def _get_test_result(self, ID, sol_df, dummy_rxns) -> None:
-        passed_rxns = sol_df[(abs(sol_df['fluxes']) >= self.tol)].index.to_list()
-        dummy_rxn_id_list = [r.id for r in dummy_rxns]
-        self._protected_rxns[ID] = [rxn for rxn in passed_rxns if rxn not in dummy_rxn_id_list]
-        self._protected_rxn_reqs[ID] = dict(zip(self._protected_rxns[ID], sol_df.loc[self._protected_rxns[ID], "fluxes"].values))
 
     def map_expr_to_tasks(self,
                           expression_threshold = None,
@@ -607,82 +488,11 @@ class TaskTester(TaskHandler):
                                    if exp_score - self._non_expr_th >= coef * (self._expr_th - self._non_expr_th)]
 
 
-class TaskValidator(TaskHandler):
-    def __init__(self,
-                 model,
-                 task_container: Union[str, TaskContainer] = TASKS_FILE_PATH,
-                 model_compartment_parenthesis="[{}]",
-                 method: str = "pFBA",
-                 constr: str = "None",
-                 method_kwargs: dict = None,
-                 constr_kwargs: dict = None,
-                 solver: str = "glpk"
-                 ):
-        super().__init__(model=model,
-                         tasks_path_or_container=task_container,
-                         model_compartment_parenthesis=model_compartment_parenthesis,
-                         method=method,
-                         constr=constr,
-                         method_kwargs=method_kwargs,
-                         constr_kwargs=constr_kwargs,
-                         solver=solver
-                         )
-        if method == 'pFBA':
-            self._method_kwargs['fraction_of_optimum'] = 1.0
-        self._flux_dfs = {}
-
-    def test_one_task(self, ID, task, model, all_mets_in_model, **kwargs):
-        all_met_exist, dummy_rxns, obj_rxns = task.assign(model,
-                                                          all_mets_in_model, **kwargs)
-        if not all_met_exist:
-            return {'Passed': False,
-                    'Should fail': task.should_fail,
-                    'Missing mets': True,
-                    'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": obj_rxns}
-        if self._method == "pFBA":
-            model.objective = {rxn: 1 for rxn in obj_rxns}
-        sol = model.optimize(raise_error=False)
-        true_status = sol.status
-        if true_status == 'optimal':
-            try:
-                kws = {}
-                kws.update(self._constr_kwargs)
-                kws.update(self._method_kwargs)
-                self.analyzer.do_analysis(method=self._method,
-                                          constr=self._constr,
-                                          **kws)
-                sol_df = self.analyzer.get_flux(method=self._method,
-                                                constr=self._constr,
-                                                keep_rc=False)
-                self._get_test_result(ID, sol_df, dummy_rxns)
-            except Infeasible:
-                true_status = "infeasible"
-                print("get an unexpected result")
-
-        return {'Passed': (((true_status == 'optimal') != task.should_fail) and all_met_exist),
-                'Should fail': task.should_fail,
-                'Missing mets': not all_met_exist,
-                'Status': true_status,
-                'Obj_value': sol.objective_value,
-                "Obj_rxns": obj_rxns}
-
-    @property
-    def flux_dfs(self):
-        return self._flux_dfs
-
-    def _get_test_result(self, ID, sol_df, dummy_rxns):
-        dummy_rxn_id_list = [r.id for r in dummy_rxns]
-        df = sol_df.loc[[r for r in sol_df.index.to_list()
-                         if r not in dummy_rxn_id_list], :]
-        self._flux_dfs[ID] = df
-
-
 def get_task_protection_rxns(ref_model,
                              sample_names: List[str],
                              expr_threshold_dic: Dict[str, float],
                              non_expr_threshold_dic: Dict[str, float],
                              expression_dic: Dict[str, Expression],
-                             constr="default",
                              task_file_path=TASKS_FILE_PATH,
                              model_compartment_format="[{}]",
                              added_protected_rxns: List[str] = None,
@@ -693,20 +503,15 @@ def get_task_protection_rxns(ref_model,
         task_kwargs = {}
     protected_rxns = {sample: [] for sample in sample_names}
     task_scores = {}
-    constr = "None" if constr is None else constr
     model_tester = TaskTester(ref_model,
-                              constr=constr,
                               task_container=task_file_path,
                               model_compartment_parenthesis=model_compartment_format,
                               **task_kwargs)
-    if constr not in ["GIMME"]:
-        model_tester.test_all()
+    model_tester.test_tasks()
     for sample in sample_names:
         model_tester.update_thresholds(express_thres=expr_threshold_dic[sample],
                                        non_express_thres=non_expr_threshold_dic[sample],
                                        rxn_scores=expression_dic[sample].rxn_scores)
-        if constr in ["GIMME"]:
-            model_tester.test_all()
         model_tester.map_expr_to_tasks()
         protected_rxns[sample].extend(model_tester.get_all_protected_rxns())
         task_scores[sample] = model_tester.tasks_scores

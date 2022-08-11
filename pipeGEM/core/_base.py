@@ -5,7 +5,8 @@ class GEMComposite:
     _is_leaf = None
 
     def __init__(self,
-                 name_tag):
+                 name_tag,
+                 **kwargs):
         self._lvl = 0
         self._name_tag = name_tag
         self._order = -1
@@ -57,10 +58,7 @@ class GEMComposite:
     def order(self):
         return self._order
 
-    def get_flux(self, as_dict=False, **kwargs):
-        raise NotImplementedError()
-
-    def do_analysis(self, **kwargs) -> None:
+    def do_flux_analysis(self, **kwargs):
         raise NotImplementedError()
 
     @property

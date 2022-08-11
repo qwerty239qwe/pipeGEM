@@ -1,12 +1,12 @@
 import pandas as pd
 import cobra
 
-from pipeGEM.core._model import Model
-from pipeGEM.core._group import Group
+from pipeGEM.core import Model
+from pipeGEM.core import Group
 
 
 def test_get_model(ecoli_core):
-    return Model(model=ecoli_core, name_tag="ecoli")
+    return Model.from_cobra_model(model=ecoli_core, name="ecoli")
 
 
 def test_get_group(ecoli_core):

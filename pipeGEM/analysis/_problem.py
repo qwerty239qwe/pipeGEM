@@ -5,10 +5,8 @@ import pandas as pd
 import cobra
 import scipy.sparse
 
-
-from . import Model
-from .._constant import var_type_dict, csense_dict
-from ..analysis import ProblemAnalyzer
+from pipeGEM._constant import var_type_dict, csense_dict
+from pipeGEM.analysis import ProblemAnalyzer
 
 
 class DimensionMismatchedError(ValueError):
@@ -26,7 +24,7 @@ class Problem:
             for k, v in infered.items():
                 setattr(self, k, v)
         else:
-            if isinstance(model, Model):
+            if hasattr(model, "cobra_model"):
                 self._model: cobra.Model = model.cobra_model
             else:
                 self._model: cobra.Model = model
@@ -112,7 +110,7 @@ class Problem:
 
     @model.setter
     def model(self, model):
-        if isinstance(model, Model):
+        if hasattr(model, "cobra_model"):
             self._model = model.cobra_model
         else:
             self._model = model

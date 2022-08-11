@@ -8,39 +8,37 @@ import seaborn as sns
 
 from ._utils import save_fig, draw_significance
 from ._prep import prep_fva_plotting_data, prep_flux_df, filter_fva_df
-from pipeGEM.analysis import StatisticAnalyzer
+# from pipeGEM.analysis import StatisticAnalyzer
 
 
-@save_fig(dpi=300)
 def plot_fba(flux_df: pd.DataFrame,
              rxn_ids: Union[List[str], Dict[str, str]],
              kind: str = "bar",
              palette: Union[str] = "deep",
-             group_layer: str = "",
+             model_hue: bool = False,
              filter_all_zeros: bool = True,
              fig_title: str = None,
              threshold: float = 1e-6,
              vertical: bool = True,
              name_format: str = "{method}_result.png",
+             flux_unit: str = "($m$mol/hr/gDW)",
              verbosity: int = 0,
              **kwargs
              ):
-    model_df, flux_df = prep_flux_df(flux_df, rxn_ids)
+    flux_df = flux_df.loc[rxn_ids, [c for c in flux_df.columns if c != "reduced_costs"]]
     if filter_all_zeros:
-        all_zeros_rxn = flux_df.loc[:, (abs(flux_df) < threshold).all(axis=0)].columns.to_list()
+        n_all_zeros_rxn = flux_df.query(f"fluxes < {threshold}").shape[0]
         if verbosity > 0:
-            print(f"Reactions contain zeros fluxes: {all_zeros_rxn}, were removed from the plot")
-        flux_df = flux_df.loc[:, (abs(flux_df) > threshold).any(axis=0)]
-    flux_df = pd.concat([flux_df, model_df.loc[:, [group_layer]]], axis=1)
-    flux_df = flux_df.melt(id_vars=[group_layer],
-                           var_name=["Reactions"],
-                           value_name=r'Flux ($\mu$mol/min/gDW)')
+            print(f"Found reactions contain zeros fluxes: {n_all_zeros_rxn} rxns were removed from the plot")
+        flux_df = flux_df.query(f"fluxes > {threshold}")
+    flux_df.index.name = "Reactions"
+    flux_df = flux_df.reset_index().rename(columns={"fluxes": f'Flux {flux_unit}'})
     x_var = "Reactions" if vertical else r'Flux ($\mu$mol/min/gDW)'
     y_var = "Reactions" if not vertical else r'Flux ($\mu$mol/min/gDW)'
     g = sns.catplot(data=flux_df,
                     x=x_var,
                     y=y_var,
-                    hue=group_layer,
+                    hue="name" if model_hue else None,
                     kind=kind,
                     palette=palette,
                     height=6, aspect=2)
@@ -56,30 +54,26 @@ def plot_fba(flux_df: pd.DataFrame,
     return plot_kws
 
 
-@save_fig(dpi=300)
-def plot_fva(min_flux_df: pd.DataFrame,
-             max_flux_df: pd.DataFrame,
+def plot_fva(fva_df: pd.DataFrame,
              rxn_ids: Union[List[str], Dict[str, str]],
-             group_layer: str = "",
              fig_title: str = None,
              filter_all_zeros: bool = True,
+             model_hue: bool = False,
              threshold: float = 1e-6,
              vertical: bool = True,
              name_format: str = "{method}_result.png",
              verbosity: int = 0,
              **kwargs
              ):
-    model_df_min, min_flux_df = prep_flux_df(min_flux_df, rxn_ids)
-    model_df_max, max_flux_df = prep_flux_df(max_flux_df, rxn_ids)
+    fva_df = fva_df.loc[rxn_ids, :]
     if filter_all_zeros:
-        min_flux_df, max_flux_df = filter_fva_df(min_df=min_flux_df, max_df=max_flux_df,
-                                                 threshold=threshold, verbosity=verbosity)
-    ready_df = prep_fva_plotting_data(min_flux_df, max_flux_df, model_df_max[group_layer])
+        fva_df = filter_fva_df(fva_df=fva_df, threshold=threshold, verbosity=verbosity)
+    ready_df = prep_fva_plotting_data(fva_df)
     fig, ax = plt.subplots()
     sns.boxplot(data=ready_df,
                 x="Reactions" if vertical else "Flux",
                 y="Flux" if vertical else "Reactions",
-                hue="model",
+                hue="name" if model_hue else None,
                 ax=ax,
                 whis=10,
                 linewidth=0)
@@ -94,7 +88,6 @@ def plot_fva(min_flux_df: pd.DataFrame,
     return plot_kws
 
 
-@save_fig(dpi=300)
 def plot_one_sampling(flux_df,
                       r: str,
                       color_maps,
@@ -123,28 +116,29 @@ def plot_one_sampling(flux_df,
                        linestyle='--',
                        label=f'median ({grp})')
     elif plotting_style == "catplot":
-        if plot_significance:
-            grp_df = flux_df[[r, group_layer, "n"]]
-            grp_df = grp_df.pivot(index="n", columns=group_layer).T.reset_index().set_index("group").drop(columns=["level_0"]).T
-            stat = StatisticAnalyzer(grp_df)
-            do_comp = True
-            num_significance = 0
-            if grp_df.shape[1] >= 3:
-                stat_value, p_value = stat.kruskal_test()
-                print(f"Kruskal Wallis test result: stat: {stat_value}, p-value {p_value}")
-                do_comp = (p_value < stat.alpha_list[0])  # p < 0.05
-            if do_comp:
-                post_hoc_df = stat.post_hocs()
-                for i, j in itertools.combinations(range(grp_df.shape[1]), 2):
-                    stars = sum([post_hoc_df.iloc[i, j] < alpha for alpha in stat.alpha_list])
-                    if stars >= 1:
-                        draw_significance(ax, [i, j],
-                                          [grp_df.values.max() +
-                                           (ax.get_ylim()[1] - ax.get_ylim()[0]) *
-                                           (num_significance + 1) * 0.08
-                                           for _ in range(2)],
-                                          stars)
-                        num_significance += 1
+        # if plot_significance:
+        #     grp_df = flux_df[[r, group_layer, "n"]]
+        #     grp_df = grp_df.pivot(index="n", columns=group_layer).T.reset_index().set_index("group").drop(columns=["level_0"]).T
+        #     stat = StatisticAnalyzer(grp_df)
+        #     do_comp = True
+        #     num_significance = 0
+        #     if grp_df.shape[1] >= 3:
+        #         stat_value, p_value = stat.kruskal_test()
+        #         print(f"Kruskal Wallis test result: stat: {stat_value}, p-value {p_value}")
+        #         do_comp = (p_value < stat.alpha_list[0])  # p < 0.05
+        #     if do_comp:
+        #         post_hoc_df = stat.post_hocs()
+        #         for i, j in itertools.combinations(range(grp_df.shape[1]), 2):
+        #             stars = sum([post_hoc_df.iloc[i, j] < alpha for alpha in stat.alpha_list])
+        #             if stars >= 1:
+        #                 draw_significance(ax, [i, j],
+        #                                   [grp_df.values.max() +
+        #                                    (ax.get_ylim()[1] - ax.get_ylim()[0]) *
+        #                                    (num_significance + 1) * 0.08
+        #                                    for _ in range(2)],
+        #                                   stars)
+        #                 num_significance += 1
+        pass
     plot_kws = {
                 "g": facet.fig,
                } # TODO: fix saving function (add name_format)

@@ -8,8 +8,7 @@ import numpy as np
 import pandas as pd
 
 from pipeGEM.integration.mapping import Expression
-from pipeGEM.integration.utils import get_rxn_set, flip_direction
-from pipeGEM.utils import get_rxns_in_subsystem
+from pipeGEM.utils import get_rxn_set, flip_direction, get_rxns_in_subsystem
 from ._LP import LP3, LP7, LP9, non_convex_LP7, non_convex_LP3
 
 
@@ -19,7 +18,7 @@ def find_sparse_mode(J, P, nonP, model, singleJ, epsilon):
         # print(f"find_sparse_mode of single reaction: {singleJ}")
     supps, v = LP7(J if singleJ is None else singleJ,
                    model, epsilon, use_abs=False, return_min_v=True)
-    K = np.intersect1d(list(J), supps)
+    K = np.intersect1d(list(J), supps)  # J might not be an irrv set
     if singleJ is not None and len(singleJ & set(K)) == 0:
         warn(f"Singleton {singleJ} flux cannot be generated in LP7")
     if K.shape[0] == 0:
@@ -128,7 +127,7 @@ def fastCore(C: Union[List[str], Set[str]],
         track_irrev = False
         if len(invalid_part) != 0:
             track_irrev = True
-            warn(f"Inconsistent irreversible core reactions (They should be included in A): Total: {len(invalid_part)}")
+            warn(f"Inconsistent irreversible core reactions (They should be included in A): Total: {invalid_part}")
         J = C - A  # reactions to be added to the model
         with tqdm(total=len(J)) as pbar:
             n_j = len(J)
@@ -235,12 +234,9 @@ def supp_protected_rxns(ref_model,
         if protected_rxns[sample_name]:
             result = supp_protected_rxns_one_sample(ref_model,
                                                     sample_name,
-                                                    protected_rxns[
-                                                        sample_name],
-                                                    C_dic[
-                                                        sample_name],
-                                                    P_dic[
-                                                        sample_name],
+                                                    protected_rxns[sample_name],
+                                                    C_dic[sample_name],
+                                                    P_dic[sample_name],
                                                     epsilon_for_fastcore,
                                                     None)
             C_dic[sample_name], P_dic[sample_name], supp_dic[sample_name] = result

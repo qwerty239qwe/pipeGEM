@@ -1,5 +1,5 @@
-from ._utils import *
-from .categorical import *
+from pipeGEM.plotting._utils import *
+from pipeGEM.plotting.categorical import *
 from pipeGEM.plotting.heatmap import *
 from pipeGEM.plotting._flux import *
 
