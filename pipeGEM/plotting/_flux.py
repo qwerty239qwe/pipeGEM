@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from ._utils import save_fig, draw_significance
-from ._prep import prep_fva_plotting_data, prep_flux_df, filter_fva_df
+from ._prep import prep_fva_plotting_data, filter_fva_df
 # from pipeGEM.analysis import StatisticAnalyzer
 
 
@@ -25,16 +25,16 @@ def plot_fba(flux_df: pd.DataFrame,
              verbosity: int = 0,
              **kwargs
              ):
-    flux_df = flux_df.loc[rxn_ids, [c for c in flux_df.columns if c != "reduced_costs"]]
+    flux_df = flux_df.loc[flux_df["Reaction"].isin(rxn_ids), [c for c in flux_df.columns if c != "reduced_costs"]]
     if filter_all_zeros:
         n_all_zeros_rxn = flux_df.query(f"fluxes < {threshold}").shape[0]
         if verbosity > 0:
             print(f"Found reactions contain zeros fluxes: {n_all_zeros_rxn} rxns were removed from the plot")
         flux_df = flux_df.query(f"fluxes > {threshold}")
-    flux_df.index.name = "Reactions"
+    #flux_df.index.name = "Reactions"
     flux_df = flux_df.reset_index().rename(columns={"fluxes": f'Flux {flux_unit}'})
-    x_var = "Reactions" if vertical else r'Flux ($\mu$mol/min/gDW)'
-    y_var = "Reactions" if not vertical else r'Flux ($\mu$mol/min/gDW)'
+    x_var = "Reaction" if vertical else f'Flux {flux_unit}'
+    y_var = "Reaction" if not vertical else f'Flux {flux_unit}'
     g = sns.catplot(data=flux_df,
                     x=x_var,
                     y=y_var,

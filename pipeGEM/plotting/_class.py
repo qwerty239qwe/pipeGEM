@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from ._flux import plot_fba, plot_fva, plot_sampling
 from .curve import plot_rFastCormic_thresholds, plot_percentile_thresholds
+from .heatmap import plot_heatmap
 
 
 class BasePlotter:
@@ -105,15 +106,13 @@ class FVAPlotter(BasePlotter):
         super(FVAPlotter, self).__init__(dpi, prefix)
 
     def plot_func(self,
-                  min_flux_df: pd.DataFrame,
-                  max_flux_df: pd.DataFrame,
+                  fva_df: pd.DataFrame,
                   rxn_ids: Union[List[str], Dict[str, str]],
                   **kwargs
                   ):
-        return plot_fva(min_flux_df=min_flux_df,
-                 max_flux_df=max_flux_df,
-                 rxn_ids=rxn_ids,
-                 **kwargs)
+        return plot_fva(fva_df=fva_df,
+                        rxn_ids=rxn_ids,
+                        **kwargs)
 
 
 class SamplingPlotter(BasePlotter):
@@ -153,3 +152,25 @@ class PercentileThresholdPlotter(BasePlotter):
 
         return plot_percentile_thresholds(data=data,
                                           exp_th=exp_th, *args, **kwargs)
+
+
+class ComponentComparisonPlotter(BasePlotter):
+    def __init__(self, dpi=150, prefix="component_"):
+        super().__init__(dpi, prefix)
+
+    def plot_func(self,
+                  result,
+                  xticklabels=True,
+                  yticklabels=True,
+                  scale=1,
+                  cbar_label='Jaccard Index',
+                  cmap='magma',
+                  *args,
+                  **kwargs):
+        return plot_heatmap(data=result,
+                            xticklabels=xticklabels,
+                            yticklabels=yticklabels,
+                            scale=scale,
+                            cbar_label=cbar_label,
+                            cmap=cmap,
+                            **kwargs)

@@ -1,5 +1,5 @@
-from pipeGEM.plotting._class import FBAPlotter, FVAPlotter, pFBAPlotter, SamplingPlotter, rFastCormicThresholdPlotter, PercentileThresholdPlotter
-from pipeGEM.utils import ObjectFactory
+from pipeGEM.plotting import FBAPlotter, FVAPlotter, SamplingPlotter, \
+    rFastCormicThresholdPlotter, PercentileThresholdPlotter, ComponentComparisonPlotter
 from functools import wraps
 from time import time
 
@@ -55,14 +55,15 @@ class FluxAnalysis(BaseAnalysis):
         if method == "concat":
             dfs = []
             for a in analyses:
-                one_df = a.df.reset_index().rename(columns={"index": "Reaction"})
+                one_df = a.result.reset_index().rename(columns={"index": "Reaction"})
                 one_df["name"] = a.log["name"]
                 dfs.append(one_df)
             new._df = pd.concat(dfs, axis=0)
+            new._df["name"] = pd.Categorical(new._df["name"])
         else:
             dfs = []
             for a in analyses:
-                one_df = a.df["fluxes"]
+                one_df = a.result["fluxes"]
                 one_df.name = f"fluxes_{a.log['name']}"
                 dfs.append(one_df)
             new._df = pd.concat(dfs, axis=1)
@@ -82,7 +83,7 @@ class FBA_Analysis(FluxAnalysis):
         super().__init__(log)
 
     @property
-    def df(self):
+    def result(self):
         return self._df
 
     @property
@@ -109,20 +110,45 @@ class FVA_Analysis(FluxAnalysis):
         super().__init__(log)
         self._df = None
 
+    @classmethod
+    def aggregate(cls, analyses, method, log, **kwargs):
+        new = cls(log=log)
+        if method == "concat":
+            dfs = []
+            for a in analyses:
+                one_df = a.result.reset_index().rename(columns={"index": "Reaction"})
+                one_df["name"] = a.log["name"]
+                dfs.append(one_df)
+            new._df = pd.concat(dfs, axis=0)
+            new._df["name"] = pd.Categorical(new._df["name"])
+        else:
+            min_dfs, max_dfs = [], []
+            for a in analyses:
+                min_df, max_df = a.result["minimum"], a.result["maximum"]
+                min_df.name, max_df.name = f"minimum_{a.log['name']}", f"maximum_{a.log['name']}"
+                min_dfs.append(min_df)
+                max_dfs.append(max_df)
+            new_min_df, new_max_df = pd.concat(min_dfs, axis=1), pd.concat(max_dfs, axis=1)
+            new_min_df, new_max_df = getattr(new_min_df, method)(axis=1).to_frame(), getattr(new_max_df, method)(axis=1).to_frame()
+            new._df = {"minimum": new_min_df, "maximum": new_max_df}
+        return new
+
     def add_result(self, result):
         self._df = result
 
     @property
-    def df(self):
+    def result(self):
         return self._df
 
     def plot(self,
+             rxn_ids,
              dpi=150,
              prefix="FVA_",
              *args,
              **kwargs):
         pltr = FVAPlotter(dpi=dpi, prefix=prefix)
-        pltr.plot(fva_df=self._df,
+        pltr.plot(rxn_ids=rxn_ids,
+                  flux_df=self._df,
                   *args,
                   **kwargs)
 
@@ -139,6 +165,10 @@ class SamplingAnalysis(FluxAnalysis):
             for a in analyses:
                 new._df_dic.update(a._df_dic)
         return new
+
+    @property
+    def result(self):
+        return self._df_dic
 
     def add_result(self, result):
         self._df_dic = result.melt(var_name="rxn_id", value_name="flux")
@@ -350,7 +380,7 @@ class rFastCormicThresholdAnalysis(BaseAnalysis):
         return self._nonexp_th
 
     def plot(self,
-             dpi,
+             dpi=150,
              prefix="",
              *args,
              **kwargs):
@@ -380,7 +410,7 @@ class PercentileThresholdAnalysis(BaseAnalysis):
         return self._exp_th
 
     def plot(self,
-             dpi,
+             dpi=150,
              prefix="",
              *args,
              **kwargs):
@@ -423,6 +453,25 @@ class rFastCormicAnalysis(BaseAnalysis):
 class ComparisonAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
+
+
+class ComponentComparisonAnalysis(ComparisonAnalysis):
+    def __init__(self, log):
+        super().__init__(log)
+        self._result = None
+
+    def add_result(self, result):
+        self._result = result
+
+    def plot(self,
+             dpi=150,
+             prefix="",
+             *args,
+             **kwargs):
+        pltr = ComponentComparisonPlotter(dpi=dpi, prefix=prefix)
+        pltr.plot(result=self._result,
+                  *args,
+                  **kwargs)
 
 
 def combine(analyses, method, log, **kwargs):

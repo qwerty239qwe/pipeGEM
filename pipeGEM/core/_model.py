@@ -21,7 +21,7 @@ class Model(GEMComposite):
     _is_leaf = True
 
     def __init__(self,
-                 name_tag = None,
+                 name_tag: str = None,
                  model = None):
         """
         Main model used to store cobra.Model and its name, omics data, and analyzer
