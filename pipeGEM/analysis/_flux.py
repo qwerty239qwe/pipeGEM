@@ -14,7 +14,7 @@ from cobra.util.solver import fix_objective_as_constraint
 from optlang.symbolics import Zero
 
 from .._constant import var_type_dict
-from ._analysis import *
+from .results import *
 from pipeGEM.analysis._gapsplit import gapsplit
 from pipeGEM.utils import ObjectFactory
 

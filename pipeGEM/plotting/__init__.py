@@ -8,4 +8,5 @@ __all__ = ["plot_heatmap", "plot_fba", "plot_fva", "plot_sampling", "plot_cluste
            "FBAPlotter", "FVAPlotter",
            "SamplingPlotter",
            "rFastCormicThresholdPlotter",
-           "PercentileThresholdPlotter"]
+           "PercentileThresholdPlotter",
+           "ComponentComparisonPlotter"]
