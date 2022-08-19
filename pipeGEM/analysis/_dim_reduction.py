@@ -34,7 +34,7 @@ def prepare_PCA_dfs(feature_df,
     Parameters
     ----------
     feature_df: a pd.DataFrame
-        The feature dataframe, the rows are the features of each data
+        A dataframe, the rows are features and the columns are samples
     transform_func: optional, callable
         A function that will be performed on the dataframe before analysis
     n_components: optional, int

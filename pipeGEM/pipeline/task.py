@@ -7,12 +7,12 @@ import numpy as np
 from ._base import Pipeline
 from .threshold import BimodalThreshold
 from ..integration.mapping import Expression
-from pipeGEM.analysis.tasks import TaskTester, TASKS_FILE_PATH
+from pipeGEM.analysis.tasks import TaskHandler, TASKS_FILE_PATH
 
 
 class ReactionTester(Pipeline):
     def __init__(self,
-                 task_tester: Optional[TaskTester] = None,
+                 task_tester: Optional[TaskHandler] = None,
                  task_file_path=TASKS_FILE_PATH,
                  model_compartment_format="[{}]",
                  constr_name = "default",
@@ -33,10 +33,7 @@ class ReactionTester(Pipeline):
             test_sink: bool = True,
             **kwargs) -> (List[str], Dict[str, float]):
         if self.model_tester is None or reset_tester:
-            self.model_tester = TaskTester(ref_model,
-                                           solver=self.solver,
-                                           constr=self.constr_name,
-                                           task_container=self.task_file_path,
+            self.model_tester = TaskHandler(ref_model,
                                            model_compartment_parenthesis=self.model_compartment_format,
                                            **kwargs)
             self.model_tester.test_all(test_sink=test_sink)
@@ -53,7 +50,7 @@ class TaskScoringPipeLine(Pipeline):
     def __init__(self,
                  saved_dist_plot_format = None,
                  use_first_guess = True,
-                 task_tester: Optional[TaskTester] = None,
+                 task_tester: Optional[TaskHandler] = None,
                  task_file_path=TASKS_FILE_PATH,
                  model_compartment_format="[{}]",
                  constr_name = "default",

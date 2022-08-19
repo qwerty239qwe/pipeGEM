@@ -1,17 +1,37 @@
 import pandas as pd
 
+from typing import Optional
 from ._base import *
-from pipeGEM.plotting import FBAPlotter, FVAPlotter, SamplingPlotter
+from pipeGEM.plotting import FBAPlotter, FVAPlotter, SamplingPlotter, DimReductionPlotter
+
+
+class NotAggregatedError(Exception):
+    pass
 
 
 class FluxAnalysis(BaseAnalysis):
     def __init__(self, log):
         super(FluxAnalysis, self).__init__(log)
         self._sol = None
-        self._df = None
+        self._df: Optional[pd.DataFrame] = None
 
     @classmethod
     def aggregate(cls, analyses, method, log, **kwargs):
+        """
+        Returns a aggregated dataframe,
+        if concat method is used, return a df with 'name' column representing the model name
+
+        Parameters
+        ----------
+        analyses
+        method
+        log
+        kwargs
+
+        Returns
+        -------
+
+        """
         new = cls(log=log)
         if method == "concat":
             dfs = []
@@ -63,6 +83,22 @@ class FBA_Analysis(FluxAnalysis):
         pltr = FBAPlotter(dpi, prefix)
         pltr.plot(flux_df=self._df,
                   *args,
+                  **kwargs)
+
+    def plot_dim_reduction(self,
+                           dpi=150,
+                           prefix="FBA_dim_reduction_",
+                           method="PCA",
+                           **kwargs):
+        if "name" not in self._df:
+            raise NotAggregatedError("This analysis result contains only 1 model's fluxes, "
+                                     "please use Group.do_flux_analysis to get a proper result for dim reduction")
+
+        flux_df = self._df.pivot(columns="name", values="fluxes")
+        pltr = DimReductionPlotter(dpi, prefix)
+        pltr.plot(flux_df=flux_df,
+                  group=self.log["group"],
+                  method=method,
                   **kwargs)
 
 

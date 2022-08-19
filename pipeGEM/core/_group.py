@@ -153,7 +153,11 @@ class Group(GEMComposite):
             subs[g] = set(rxns)
         return subs
 
-    def do_flux_analysis(self, method, aggregate_method="concat", solver="gurobi", **kwargs):
+    def _get_group_model(self, group_strategy):
+        if group_strategy == "top":
+            return {g.name_tag: self._ravel_group(g) if not g.is_leaf else [g.name_tag] for g in self._group}
+
+    def do_flux_analysis(self, method, aggregate_method="concat", solver="gurobi", group_strategy="top", **kwargs):
         results = []
         for c in self._group:
             if c.__class__ == self.__class__:
@@ -162,7 +166,9 @@ class Group(GEMComposite):
             else:
                 result = c.do_flux_analysis(method=method, solver=solver, **kwargs)
             results.append(result)
-        return results[0].__class__.aggregate(results, method=aggregate_method, log={"name": self.name_tag})
+        return results[0].__class__.aggregate(results, method=aggregate_method,
+                                              log={"name": self.name_tag,
+                                                   "group": self._get_group_model(group_strategy)})
 
     def _ravel_group(self, comp_list):
         sel_models = []
@@ -479,36 +485,6 @@ class Group(GEMComposite):
                 processed["group"] = c.name_tag
                 fluxes[k][c.name_tag] = processed
         return {fname: pd.concat(list(fdfs.values()), axis=0).fillna(0) for fname, fdfs in fluxes.items() }
-
-    def plot_flux_emb(self,
-                      method,
-                      constr,
-                      dr_method="PCA",
-                      rxn_ids="all",
-                      rxn_index=None,
-                      subsystems=None,
-                      show_groups = True,
-                      get_model_level = False,
-                      tags: Union[str, List[str]] = "all",
-                      aggregation_method="mean",
-                      **kwargs
-                      ):
-        # rxn_ids = rxn_ids if rxn_ids is not None else []
-        # rxn_ids += self._check_rxn_id(self.tget(tags if tags != "all" else None)[0], rxn_index, subsystems)
-        fluxes = self._process_flux(method, constr, tags, get_model_level, aggregation_method, show_groups)
-        if method in ["FBA", "pFBA"]:
-            df: pd.DataFrame = fluxes["fluxes"]
-        elif method == "sampling":
-            df: pd.DataFrame = pd.concat(list(fluxes.values()), axis=0)
-        else:
-            raise NotImplementedError()
-        groups = dict(df["group"].to_frame().reset_index(drop=True).reset_index().groupby("group")["index"].apply(list).iteritems())
-
-        df = df.drop(columns=["model", "group"]).reset_index(drop=True)
-        if dr_method == "PCA":
-            plot_PCA(df=df.T, groups=groups, **kwargs)
-        else:
-            plot_embedding(df=df.T, reducer=dr_method, groups=groups, **kwargs)
 
     def plot_flux_heatmap(self,
                           method,

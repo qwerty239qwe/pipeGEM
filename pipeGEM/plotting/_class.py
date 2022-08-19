@@ -7,6 +7,7 @@ import pandas as pd
 from ._flux import plot_fba, plot_fva, plot_sampling
 from .curve import plot_rFastCormic_thresholds, plot_percentile_thresholds
 from .heatmap import plot_heatmap
+from .scatter import plot_PCA, plot_embedding
 
 
 class BasePlotter:
@@ -125,8 +126,8 @@ class SamplingPlotter(BasePlotter):
                   **kwargs
                   ):
         return plot_sampling(sampling_flux_df=flux_df_dic,
-                      rxn_ids=rxn_ids,
-                      **kwargs)
+                             rxn_ids=rxn_ids,
+                             **kwargs)
 
 
 class rFastCormicThresholdPlotter(BasePlotter):
@@ -174,3 +175,26 @@ class ComponentComparisonPlotter(BasePlotter):
                             cbar_label=cbar_label,
                             cmap=cmap,
                             **kwargs)
+
+
+class DimReductionPlotter(BasePlotter):
+    def __init__(self, dpi=150, prefix="dim_reduction_"):
+        super().__init__(dpi, prefix)
+
+    def plot_func(self,
+                  method,
+                  flux_df,
+                  groups,
+                  *args,
+                  **kwargs):
+        if method == "PCA":
+            plot_PCA(flux_df,
+                     groups=groups,
+                     *args,
+                     **kwargs)
+        else:
+            plot_embedding(flux_df,
+                           groups=groups,
+                           reducer=method,
+                           *args,
+                           **kwargs)
