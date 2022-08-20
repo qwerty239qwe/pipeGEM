@@ -1,8 +1,10 @@
 import pandas as pd
 
-from typing import Optional
+from typing import Optional, Union
 from ._base import *
 from pipeGEM.plotting import FBAPlotter, FVAPlotter, SamplingPlotter, DimReductionPlotter
+from pipeGEM.analysis import prepare_PCA_dfs, prepare_embedding_dfs
+from .dim_reduction import PCA_Analysis, EmbeddingAnalysis
 
 
 class NotAggregatedError(Exception):
@@ -85,21 +87,35 @@ class FBA_Analysis(FluxAnalysis):
                   *args,
                   **kwargs)
 
-    def plot_dim_reduction(self,
-                           dpi=150,
-                           prefix="FBA_dim_reduction_",
-                           method="PCA",
-                           **kwargs):
-        if "name" not in self._df:
+    def dim_reduction(self,
+                      method="PCA",
+                      **kwargs
+                      ) -> Union[PCA_Analysis, EmbeddingAnalysis]:
+        if "group" not in self._df:
             raise NotAggregatedError("This analysis result contains only 1 model's fluxes, "
                                      "please use Group.do_flux_analysis to get a proper result for dim reduction")
 
         flux_df = self._df.pivot(columns="name", values="fluxes")
-        pltr = DimReductionPlotter(dpi, prefix)
-        pltr.plot(flux_df=flux_df,
-                  group=self.log["group"],
-                  method=method,
-                  **kwargs)
+        if method == "PCA":
+            final_df, exp_var_df, component_df = prepare_PCA_dfs(flux_df.T,
+                                                                 **kwargs)
+            result = PCA_Analysis(log={**kwargs, **self.log})
+            result.add_result({"PC": final_df, "exp_var": exp_var_df, "components": component_df})
+            return result
+        else:
+            emb_df = prepare_embedding_dfs(flux_df.T,
+                                           reducer=method,
+                                           **kwargs)
+            result = EmbeddingAnalysis(log={**kwargs, **self.log})
+            result.add_result(emb_df)
+            return result
+
+
+    def hclust(self):
+        pass
+
+    def corr(self):
+        pass
 
 
 class FVA_Analysis(FluxAnalysis):

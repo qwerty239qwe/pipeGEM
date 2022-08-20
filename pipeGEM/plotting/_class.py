@@ -7,7 +7,6 @@ import pandas as pd
 from ._flux import plot_fba, plot_fva, plot_sampling
 from .curve import plot_rFastCormic_thresholds, plot_percentile_thresholds
 from .heatmap import plot_heatmap
-from .scatter import plot_PCA, plot_embedding
 
 
 class BasePlotter:
@@ -187,6 +186,7 @@ class DimReductionPlotter(BasePlotter):
                   groups,
                   *args,
                   **kwargs):
+        from .scatter import plot_PCA, plot_embedding
         if method == "PCA":
             plot_PCA(flux_df,
                      groups=groups,

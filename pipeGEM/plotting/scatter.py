@@ -6,21 +6,18 @@ import seaborn as sns
 import pandas as pd
 
 from pipeGEM.plotting._utils import _set_default_ax
-from pipeGEM.analysis import prepare_PCA_dfs, prepare_embedding_dfs
 
 
-def plot_PCA(df,
+def plot_PCA(data,
              groups = None,
              title=None,
-             transform_func=None,
-             standardize=True,
              plot_2D=True,
              plot_score=True,
              plot_scree=True,
              plot_loading=False,
              sheet_file_name=None,
              **kwargs):
-    pca_df, exp_var_df, component_df = prepare_PCA_dfs(df, transform_func=transform_func, standardize=standardize)
+    pca_df, exp_var_df, component_df = data["PC"], data["exp_var"], data["components"]
 
     if groups is None:
         groups = {m: [m] for m in pca_df.columns}
@@ -55,12 +52,10 @@ def plot_PCA(df,
     return pca_df
 
 
-def plot_embedding(df,
+def plot_embedding(embedding_df,
                    groups: dict = None,
                    title=None,
                    palette="muted",
-                   transform_func=None,
-                   standardize=True,
                    plot_2D=True,
                    reducer="UMAP",
                    figsize=(7, 7),
@@ -74,13 +69,6 @@ def plot_embedding(df,
             del kwargs[k]
     colors = sns.color_palette(palette)
     fig, ax = plt.subplots(figsize=figsize)
-    kwargs = kwargs if kwargs is not None else {}
-    embedding_df = prepare_embedding_dfs(df,
-                                         reducer=reducer,
-                                         n_components=2 if plot_2D else 3,
-                                         standardize=standardize,
-                                         transform_func=transform_func,
-                                         **kwargs)
     if sheet_file_name is not None:
         embedding_df.to_csv(sheet_file_name)
 

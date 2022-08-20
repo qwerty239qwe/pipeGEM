@@ -80,7 +80,7 @@ def prepare_PCA_dfs(feature_df,
 
 def prepare_embedding_dfs(feature_df,
                           transform_func=None,
-                          n_components=2,
+                          n_components=3,
                           reducer="TSNE",
                           standardize=True, **kwargs):
     """
