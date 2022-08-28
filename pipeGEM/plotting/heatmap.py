@@ -50,6 +50,34 @@ def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
     return plotting_kws
 
 
+def plot_heatmap2(data: Union[pd.DataFrame, np.ndarray],
+                  scale: int = 1,
+                  row_color_dict = None,
+                  row_color_order = None,
+                  col_color_dict = None,
+                  col_color_order = None,
+                  cbar_label: str = '',
+                  cbar_kw: Dict[str, Any] = None,
+                  row_palette: str = "muted",
+                  col_palette: str = "muted",
+                  annotate: bool = True,
+                  fig_title: str = None,
+                  ):
+    if cbar_kw is None:
+        cbar_kw = {}
+    cbar_kw.update({"label": cbar_label})
+    grid_kws = {"width_ratios": (.9, .05), "wspace": .3}
+    fig, (ax, cbar_ax) = plt.subplots(1, 2, figsize=(data.shape[0] * scale, data.shape[1] * scale),
+                                      gridspec_kw=grid_kws)
+
+    if row_color_dict is not None:
+        row_colors = sns.color_palette(row_palette)
+
+
+    ax.set_title(fig_title)
+    plotting_kws = {"g": fig}
+    return plotting_kws
+
 def _modify_clustermap_for_subsys(g, ticks_pos, subsystems):
     g.ax_heatmap.yaxis.set_ticks(ticks_pos)
     g.ax_heatmap.yaxis.set_ticklabels(subsystems)

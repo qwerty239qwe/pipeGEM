@@ -20,14 +20,27 @@ class GIMMEAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
         self._rxn_coefficents = None
+        self._rxn_scores = None
+        self._fluxes = None
+        self._model = None
+
+    @property
+    def result_model(self):
+        return self._model
 
     @property
     def rxn_coefficents(self):
         return self._rxn_coefficents
 
-    def add_result(self, rxn_coefficents, rxn_scores):
+    @property
+    def flux_result(self):
+        return self._fluxes
+
+    def add_result(self, rxn_coefficents, rxn_scores, fluxes=None, model=None):
         self._rxn_coefficents = rxn_coefficents
-        self._rxn_scores =rxn_scores
+        self._rxn_scores = rxn_scores
+        self._fluxes = fluxes if fluxes is not None else self._fluxes
+        self._model = model
 
 
 class RIPTiDePruningAnalysis(BaseAnalysis):
@@ -38,7 +51,7 @@ class RIPTiDePruningAnalysis(BaseAnalysis):
         self._obj_dict = None
 
     @property
-    def model(self):
+    def result_model(self):
         return self._model
 
     def add_result(self, model, removed_rxns, obj_dict):

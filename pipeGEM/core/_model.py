@@ -168,10 +168,7 @@ class Model(GEMComposite):
         if isinstance(integrator, str):
             integrator_init_kwargs = {} if integrator_init_kwargs is None else integrator_init_kwargs
             integrator = integrator_factory.create(integrator, model=self._model, **integrator_init_kwargs)
-        if hasattr(integrator, "apply"):
-            integrator.apply(data=self._gene_data[data_name], **kwargs)
-        else:
-            return integrator.integrate(data=self._gene_data[data_name], **kwargs)
+        return integrator.integrate(data=self._gene_data[data_name], **kwargs)
 
     def get_RAS(self, data_name, method="mean"):
         return self._gene_data[data_name].calc_rxn_score_stat([r.id for r in self._model.reactions])

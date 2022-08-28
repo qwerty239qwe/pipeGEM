@@ -16,14 +16,20 @@ def apply_GIMME(model: cobra.Model,
                 rxn_expr_score: Dict[str, float],
                 low_exp: float,
                 high_exp: float,
-                obj_frac: float = 0.8):
+                protected_rxns = None,
+                obj_frac: float = 0.8,
+                remove_zero_fluxes: bool = False,
+                flux_threshold: float = 1e-6,
+                return_fluxes: bool = True,
+                keep_context: bool = False
+                ):
     """
     GLF implementation
 
     Parameters
     ----------
     model: cobra.Model
-        The analyzed model, should has set RMF
+        A model with objective function
     rxn_expr_score: Dict[str, float]
         A dict with rxn_ids as keys and expression values as values
     low_exp: float
@@ -38,33 +44,30 @@ def apply_GIMME(model: cobra.Model,
     -------
     None
     """
-    # forward_prefix, backward_prefix = "_F_", "_R_"
-    # rev_map_to_irrev = {r.id: [r.id] for r in model.reactions}
-    #
-    # for r in model.reactions:
-    #     if r.reversibility:
-    #         new_rxns = make_irrev_rxn(model,
-    #                                   r.id,
-    #                                   forward_prefix=forward_prefix,
-    #                                   backward_prefix=backward_prefix)
-    #         r.knock_out()
-    #         new_rxns[0].objective_coefficient = r.objective_coefficient
-    #         rev_map_to_irrev[r.id] = [nr.id for nr in new_rxns]
-
-    # obj_dict = {mapped_r_id: (r_exp - high_exp) / exp_range
-    #             if low_exp < r_exp < high_exp else
-    #             (-1 if r_exp <= low_exp else 0)
-    #             for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)
-    #             for mapped_r_id in rev_map_to_irrev[r_id]}
     exp_range = high_exp - low_exp
     obj_dict = {r_id: (high_exp - r_exp) / exp_range
                 if low_exp < r_exp < high_exp else
                 (1 if r_exp <= low_exp else 0)
-                for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)}
+                for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp) and r_id not in protected_rxns}
+    with model:
+        add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac)
+        sol = model.optimize("minimize")
 
-    add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac)
+    flux_df = sol.to_frame()
+    if remove_zero_fluxes:
+        new_model = model.copy()
+        to_remove = set(flux_df[abs(flux_df["fluxes"]) <= flux_threshold].index.to_list()) - set(protected_rxns)
+        new_model.remove_reactions(list(to_remove), remove_orphans=True)
+
+    if keep_context:
+        rxns_in_model = [r.id for r in model.reactions]
+        add_mod_pfba(model, weights={k: v for k, v in obj_dict.items() if k in rxns_in_model},
+                     fraction_of_optimum=obj_frac) # some are probably removed
+
     result = GIMMEAnalysis(log={"name": model.name, "low_exp": low_exp, "high_exp": high_exp, "obj_frac": obj_frac})
-    result.add_result(obj_dict, rxn_expr_score)
+    result.add_result(obj_dict, rxn_expr_score,
+                      fluxes=flux_df if return_fluxes else None,
+                      model=new_model if remove_zero_fluxes else None)
     return result
 
 
