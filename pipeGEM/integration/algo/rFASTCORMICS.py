@@ -1,7 +1,9 @@
-from pipeGEM.analysis import rFastCormicsThreshold, rFastCormicAnalysis, timing, FastCCAnalysis, rFastCormicThresholdAnalysis
+from pipeGEM.analysis import rFastCormicsThreshold, rFastCormicAnalysis, timing, FastCCAnalysis, \
+    rFastCormicThresholdAnalysis
 from pipeGEM.utils import get_rxns_in_subsystem
 from pipeGEM.integration.algo import fastcore
 from pipeGEM.integration.algo.fastcore import fastcc
+from pipeGEM.integration.utils import parse_predefined_threshold
 
 
 @timing
@@ -16,19 +18,10 @@ def apply_rFASTCORMICS(model,
                        threshold: float = 1e-6):
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
 
-    if predefined_threshold is None:
-        th_finder = rFastCormicsThreshold()
-        th_result = th_finder.find_threshold(gene_data, use_first_guess=use_heuristic_th)
-        non_exp_th = th_result.non_exp_th
-        exp_th = th_result.exp_th
-    else:
-        th_result = predefined_threshold
-        if isinstance(th_result, rFastCormicThresholdAnalysis):
-            non_exp_th = th_result.non_exp_th
-            exp_th = th_result.exp_th
-        else:
-            non_exp_th = th_result["non_exp_th"].exp_th if hasattr(th_result["non_exp_th"], "exp_th") else th_result["non_exp_th"]
-            exp_th = th_result["exp_th"].exp_th if hasattr(th_result["exp_th"], "exp_th") else th_result["exp_th"]
+    threshold_dic = parse_predefined_threshold(predefined_threshold,
+                                               gene_data=gene_data,
+                                               use_heuristic_th=use_heuristic_th)
+    th_result, exp_th, non_exp_th = threshold_dic["th_result"], threshold_dic["exp_th"], threshold_dic["non_exp_th"]
 
     if consistent_checking_method == "fastcc":
         cons_obj = FastCCAnalysis(log={"threshold": threshold})

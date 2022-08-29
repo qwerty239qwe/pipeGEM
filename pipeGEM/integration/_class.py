@@ -2,6 +2,7 @@ from pipeGEM.integration.continuous.GIMME import apply_GIMME
 from pipeGEM.integration.continuous.Eflux import apply_EFlux
 from pipeGEM.integration.algo.rFASTCORMICS import apply_rFASTCORMICS
 from pipeGEM.integration.continuous.RIPTiDe import apply_RIPTiDe_pruning, apply_RIPTiDe_sampling
+from pipeGEM.integration.algo.CORDA import apply_CORDA
 from pipeGEM.utils import ObjectFactory
 
 
@@ -85,6 +86,17 @@ class rFASTCORMICS(GeneDataIntegrator):
                                   **kwargs)
 
 
+class CORDA(GeneDataIntegrator):
+    def __init__(self, model):
+        super().__init__(model)
+
+    def integrate(self, data, **kwargs):
+        return apply_CORDA(model=self._model,
+                           data=data,
+                           **kwargs)
+
+
+
 integrator_factory = Integrators()
 integrator_factory.register("GIMME", GIMME)
 integrator_factory.register("EFlux", EFlux)
@@ -92,3 +104,4 @@ integrator_factory.register("RIPTiDePruning", RIPTiDePruning)
 integrator_factory.register("RIPTiDeSampling", RIPTiDeSampling)
 integrator_factory.register("RIPTiDe", RIPTiDe)
 integrator_factory.register("rFASTCORMICS", rFASTCORMICS)
+integrator_factory.register("CORDA", CORDA)

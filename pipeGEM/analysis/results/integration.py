@@ -97,3 +97,25 @@ class rFastCormicAnalysis(BaseAnalysis):
         self._noncore_rxns = noncore_rxns
         self._nonP_rxns = nonP_rxns
         self._threshold_analysis = threshold_analysis
+
+
+class CORDA_Analysis(BaseAnalysis):
+    def __init__(self, log):
+        super().__init__(log)
+        self._model = None
+        self._conf_scores = None
+        self._threshold_analysis = None
+
+    @property
+    def threshold_analysis(self):
+        return self._threshold_analysis
+
+    @property
+    def result_model(self):
+        return self._model
+
+    def add_result(self, model, conf_scores, threshold_analysis):
+        self._model = model
+        self._conf_scores = conf_scores
+        self._threshold_analysis = threshold_analysis
+

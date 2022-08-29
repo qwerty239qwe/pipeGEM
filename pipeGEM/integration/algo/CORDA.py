@@ -4,511 +4,262 @@ from typing import Dict, List
 
 import pandas as pd
 import numpy as np
+from scipy import interpolate
 import cobra
+from optlang.symbolics import Zero
 
-from pipeGEM.utils import get_objective_rxn, make_irrev_rxn
-
-
-def _corso_check_sol(model,
-                     objective_sense,
-                     constraint_option,
-                     constraint_val,
-                     obj_val,
-                     sol_df,
-                     obj_ids=None):
-    if obj_ids is None:
-        obj_ids = get_objective_rxn(model)
-    if constraint_option == "percentage":
-        constraint_val = abs(constraint_val)
-        obj_vals = {obj_id: (sol_df.loc[obj_id, "fluxes"] if isinstance(sol_df, pd.DataFrame) else sol_df[obj_id]) *
-                             constraint_val / 100 for obj_id in obj_ids}
-    elif constraint_option == "value":
-        if objective_sense == "maximum":
-            assert obj_val > constraint_val, 'Objective Flux not attainable'
-            obj_vals = {obj_id: constraint_val for obj_id in obj_ids}
-        elif objective_sense == "minimum":
-            assert obj_val < constraint_val, 'Objective Flux not attainable'
-            obj_vals = {obj_id: constraint_val for obj_id in obj_ids}
-        else:
-            raise ValueError("objective_sense should be chosen from maximum and minimum")
-    else:
-        raise ValueError("Invalid constraint_option")
-    return obj_vals
+from pipeGEM.analysis import timing, CORDA_Analysis
+from pipeGEM.integration.utils import parse_predefined_threshold
 
 
-def corsoFBA(model,
-             objective_sense: str = "maximum",
-             constraint_val: float = 1,
-             constraint_option: str = "percentage",
-             rxn_cost_dict: Dict[str, float] = None,
-             orig_rev_rxns: List[str] = None,
-             penalty_met_id: str = None,
-             penalty_rxn_id: str = None,
-             noise_level: float = 1e-2) -> (float, pd.DataFrame):
-    assert constraint_option in ["percentage", "value"]
-    sol = model.optimize(objective_sense=objective_sense)
-    sol_df = sol.to_frame()
-    if sol.objective_value < 1e-6:
-        return 0, pd.DataFrame(np.zeros(shape=(sol_df.shape[0], 1)), index=sol_df.index, columns=["fluxes"])
+class CORDABuilder:
+    def __init__(self,
+                 model,
+                 conf_scores,
+                 mocks=None,
+                 n_iters=np.inf,
+                 penalty_factor=100,
+                 penalty_increase_factor=1.1,
+                 upper_bound=1e6,
+                 support_flux_value=1,
+                 threshold=1e-6):
+        self._model = model
+        self._conf_scores = conf_scores
+        self._n = n_iters
+        self._n_redundancies = {}
+        self._pf = penalty_factor
+        self._pif = penalty_increase_factor
+        self._upper_bound = upper_bound
+        self._sf = support_flux_value
+        self._infeasible_rxns = []
+        self._threshold = threshold
+        self._mocks = mocks if mocks is not None else []
+        self._bounds = {r.id: r.bounds for r in model.reactions}
+        for r in model.reactions:
+            r.upper_bound = self._upper_bound if r.upper_bound > threshold else r.upper_bound
+            r.lower_bound = -self._upper_bound if -r.lower_bound > threshold else r.lower_bound
 
-    obj_vals = _corso_check_sol(model, objective_sense, constraint_option, constraint_val, sol.objective_value, sol_df)
+    @property
+    def model(self):
+        return self._model
 
-    with model:
-        if penalty_met_id is None:
-            pseudo_met = cobra.Metabolite(id="pseudo_met")
-        else:
-            pseudo_met = model.metabolites.get_by_id(penalty_met_id)
+    @property
+    def conf_scores(self):
+        return self._conf_scores
 
-        if orig_rev_rxns is not None:
-            rev_rxns = orig_rev_rxns
-        else:
-            rev_rxns = [r.id for r in model.reactions if r.reversibility is True]
-            for r_id in rev_rxns:
-                make_irrev_rxn(model, r_id)
-                model.reactions.get_by_id(r_id).knock_out()
+    def _get_support_rxns(self,
+                          var_ids,
+                          keep_if_support=None,
+                          penalize_medium_score=True,
+                          support_redundancies=True):
+        penalty_dic = {var_id: (1 if penalize_medium_score else 0)
+                       if self._conf_scores[var_id] >= 0 else self._pf
+                       for var_id in var_ids if self._conf_scores[var_id] <= 2}
 
-        noises = np.random.uniform(0, noise_level, size=(len(model.reactions)))
-        for i, r in enumerate(model.reactions):
-            r.add_metabolites({
-                pseudo_met: noises[i] + (rxn_cost_dict[r.id] if r.id in rxn_cost_dict else rxn_cost_dict[r.id[3:]])
-            })
+        n_iters = self._n if support_redundancies else 1
+        all_support_vars = set()
 
-        if penalty_rxn_id is None:
-            pseudo_met_ex = cobra.Reaction(id="EX_pseudo_met", lower_bound=0, upper_bound=np.inf)
-            pseudo_met_ex.add_metabolites({
-                pseudo_met: -1
-            })
-            model.add_reactions([pseudo_met_ex])
-        else:
-            pseudo_met_ex = model.reactions.get_by_id(penalty_rxn_id)
-        model.objective.set_linear_coefficients({pseudo_met_ex.forward_variable: 1.0,
-                                                 pseudo_met_ex.reverse_variable: -1.0})  # added
-        all_rxn_ids = [r.id for r in model.reactions]
-        for rxn_id, obj_val in obj_vals.items():
-            obj_r = model.reactions.get_by_id(rxn_id)
-            obj_r.lower_bound, obj_r.upper_bound = obj_val, obj_val
-            if f"_R_{obj_r.id}" in all_rxn_ids:
-                model.reactions.get_by_id(f"_R_{obj_r.id}").knock_out()
-            if f"_F_{obj_r.id}" in all_rxn_ids:
-                model.reactions.get_by_id(f"_F_{obj_r.id}").knock_out()
+        if keep_if_support is not None:
+            eval_vars = [i for i, c in self._conf_scores.items() if c < 0]
+            n_sups = pd.DataFrame({"n": np.zeros(shape=(len(eval_vars),))}, index=eval_vars)
 
-        new_sol = model.optimize(objective_sense="minimum").to_frame()
-
-        added_rxns = []
-        for r_id in rev_rxns:
-            if r_id not in obj_vals:
-                new_sol.loc[r_id, "fluxes"] = new_sol.loc[f"_F_{r_id}", "fluxes"] - new_sol.loc[f"_R_{r_id}", "fluxes"]
-                added_rxns.extend([f"_F_{r_id}", f"_R_{r_id}"])
-        new_sol[new_sol["fluxes"] < 1e-8] = 0
-    return sol.objective_value, new_sol.loc[[s for s in sol.to_frame().index.to_list()
-                                             if s != penalty_rxn_id and s not in added_rxns], :]
-
-
-def _pred_corsoFBA(model,
-                   obj_ids,
-                   sol_val,
-                   sol_dic,
-                   penalty_met_id,
-                   penalty_rxn_id,
-                   orig_rxns: List[str],
-                   orig_rev_rxns: List[str] = None,
-                   objective_sense: str = "maximum",
-                   constraint_val: float = 1,
-                   constraint_option: str = "percentage",
-                   rxn_cost_dict: Dict[str, float] = None,
-                   noise_level: float = 1e-2):
-    """This is the version that takes predefined / precomputed arguments"""
-    assert constraint_option in ["percentage", "value"]
-    obj_vals = _corso_check_sol(model, objective_sense, constraint_option, constraint_val, sol_val, sol_dic, obj_ids)
-
-    with model:
-        pseudo_met = model.metabolites.get_by_id(penalty_met_id)
-        noises = np.random.uniform(0, noise_level, size=(len(model.reactions)))
-        for i, r in enumerate(model.reactions):
-            if r.id == penalty_rxn_id:
+        for var_id in var_ids:
+            self._model.objective = Zero
+            var = self._model.variables[var_id]
+            if var.ub < self._threshold:
+                self._infeasible_rxns.append(var_id)
+                self._conf_scores[var_id] = -1
                 continue
-            r.add_metabolites({
-                pseudo_met: noises[i] + (rxn_cost_dict[r.id] if r.id in rxn_cost_dict else rxn_cost_dict[r.id[3:]])
-            })
+            old_bounds = (var.lb, var.ub)
+            var.lb = max(self._sf, var.lb)
+            var.ub = self._upper_bound
+            cur_penalty = {self._model.variables[k]: v for k, v in penalty_dic.items()}
+            all_support_vars_for_v = set()
+            for i in range(n_iters):
+                self._model.objective.set_linear_coefficients(cur_penalty)
+                sol = self._model.solver.optimize()
+                if sol != "optimal":
+                    self._infeasible_rxns.append(var_id)
+                    self._conf_scores[var_id] = -1
+                    break
+                sol = self._model.solver.primal_values
+                support_vars = set([v for v in sol if sol[v] > self._threshold
+                                    and self._conf_scores[v] <= 2 and v != var_id])
+                new_sups = support_vars - all_support_vars_for_v
+                all_support_vars_for_v |= support_vars
+                if keep_if_support is not None:
+                    n_sups.loc[set(eval_vars) & support_vars, "n"] += 1
 
-        pseudo_met_ex = model.reactions.get_by_id(penalty_rxn_id)
-        model.objective.set_linear_coefficients({pseudo_met_ex.forward_variable: 1.0,
-                                                 pseudo_met_ex.reverse_variable: -1.0})  # added
-        all_rxn_ids = [r.id for r in model.reactions]
-        for rxn_id, obj_val in obj_vals.items():
-            obj_r = model.reactions.get_by_id(rxn_id)
-            obj_r.lower_bound, obj_r.upper_bound = obj_val, obj_val
-            if f"_R_{obj_r.id}" in all_rxn_ids:
-                model.reactions.get_by_id(f"_R_{obj_r.id}").knock_out()
-            if f"_F_{obj_r.id}" in all_rxn_ids:
-                model.reactions.get_by_id(f"_F_{obj_r.id}").knock_out()
+                if len(new_sups) == 0:
+                    self._n_redundancies[var_id] = i+1 if support_redundancies else self._n_redundancies[var_id]
+                    break
+                for v in new_sups:
+                    if self._model.variables[v] in cur_penalty:
+                        cur_penalty[self._model.variables[v]] = cur_penalty[self._model.variables[v]] * self._pif
+            all_support_vars |= all_support_vars_for_v
+            var.lb, var.ub = old_bounds
+        if keep_if_support is None:
+            return all_support_vars
+        return all_support_vars, set(n_sups.query(f"n >= {keep_if_support}").index)
 
-        new_sol = model.optimize(objective_sense="minimum").to_frame()
+    def build(self,
+              keep_if_support=5):
+        hi_supports = self._get_support_rxns([i for i, c in self._conf_scores.items() if c >= 3])
+        for i in hi_supports:
+            self._conf_scores[i] = 3
 
-        added_rxns = []
-        for r_id in orig_rev_rxns:
-            if r_id not in obj_vals:
-                new_sol.loc[r_id, "fluxes"] = new_sol.loc[f"_F_{r_id}", "fluxes"] - new_sol.loc[f"_R_{r_id}", "fluxes"]
-                added_rxns.extend([f"_F_{r_id}", f"_R_{r_id}"])
-        new_sol[new_sol["fluxes"] < 1e-8] = 0
-    return new_sol.loc[orig_rxns, :]
+        m_l_supports, to_keeps = self._get_support_rxns([i
+                                                         for i, c in self._conf_scores.items() if 0 <= c < 3],
+                                                        keep_if_support=keep_if_support,
+                                                        penalize_medium_score=False)
+        for i in to_keeps:
+            self._conf_scores[i] = 3
+        low_confs = [i for i, c in self._conf_scores.items() if i < 0]
+        for vid in low_confs:
+            v = self._model.variables[vid]
+            v.ub = max(0.0, v.lb)
 
+        self._model.objective = Zero
 
-def find_supp_rxns_by_corsoFBA(model,
-                               sol_val,
-                               sol_dic,
-                               rxn_to_check: str,
-                               rxn_sets: Dict[str, set],
-                               rxn_to_rxn_set_dfs: Dict[str, pd.DataFrame],
-                               rxn_cost_dict,
-                               orig_rxns,
-                               orig_rev_rxns,
-                               penalty_met_id,
-                               penalty_rxn_id,
-                               n_times: int = 5,
-                               constraint_val: float = 1.,
-                               constraint_option: str = "percentage",
-                               noise_level: float = 1e-2,
-                               flux_thres: float = 1e-6,
-                               direction="maximum") -> (bool, Dict[str, set]):
-    assert direction in ["maximum", "minimum"]
-    assert len(rxn_sets) == len(rxn_to_rxn_set_dfs)
-    supp_rxns_dict = {set_name: set() for set_name in rxn_sets}
-    for i in range(n_times):
-        if i == 0 and sol_val < flux_thres:
-            return True, supp_rxns_dict
-        flux_df = _pred_corsoFBA(model,
-                                 obj_ids=[rxn_to_check],
-                                 sol_val=sol_val,
-                                 sol_dic=sol_dic,
-                                 penalty_met_id=penalty_met_id,
-                                 penalty_rxn_id=penalty_rxn_id,
-                                 orig_rxns=orig_rxns,
-                                 orig_rev_rxns=orig_rev_rxns,
-                                 objective_sense=direction,
-                                 constraint_val=constraint_val,
-                                 constraint_option=constraint_option,
-                                 rxn_cost_dict=rxn_cost_dict,
-                                 noise_level=noise_level)
-        all_supp_rxns = set(flux_df[abs(flux_df["fluxes"]) > flux_thres].index)
-        for set_name, rxn_set in rxn_sets.items():
-            supp_rxns_dict[set_name] |= (rxn_set & all_supp_rxns)
-            rxn_to_rxn_set_dfs[set_name].loc[rxn_to_check, supp_rxns_dict[set_name]] = 1
-    return False, supp_rxns_dict
+        #TODO
+        for v in self._model.variables:
+            if 0 < self._conf_scores[v.name] < 3:
+                self._model.objective.set_linear_coefficients({v: 1})
+                sol = self._model.solver.optimize()
+                if sol == "optimal" and self._model.objective.value > self._sf:
+                    self._conf_scores[v.name] = 3
+            self._model.objective.set_linear_coefficients({v: 0})
 
+        for vid, conf in self._conf_scores.items():
+            if 0 < conf < 3:
+                self._model.variables[vid].ub = 0.0
+            elif conf == 0:
+                self._conf_scores[vid] = -1
+        hi_supports = self._get_support_rxns([i for i, c in self._conf_scores.items() if c >= 3],
+                                             penalize_medium_score=False,
+                                             support_redundancies=False)
+        for i in hi_supports:
+            self._conf_scores[i] = 3
 
-def get_rxn_cost_dict(sample: str,
-                      HC_rxn_dic,
-                      MC_rxn_dic,
-                      NC_rxn_dic,
-                      OT_rxn_dic,
-                      HC_score,
-                      MC_score,
-                      NC_score,
-                      OT_score):
-    rxn_cost_dict = {r: HC_score for r in HC_rxn_dic[sample]}
-    rxn_cost_dict.update({r: OT_score for r in OT_rxn_dic[sample]})
-    rxn_cost_dict.update({r: MC_score for r in MC_rxn_dic[sample]})
-    rxn_cost_dict.update({r: NC_score for r in NC_rxn_dic[sample]})
-    return rxn_cost_dict
+        to_remove = []
+        for rxn in self._model.reactions:
+            conf = max(self._conf_scores[rxn.id], self._conf_scores[rxn.reverse_id])
+            if conf == 3 and rxn not in self._mocks:
+                rxn.bounds = self._bounds[rxn.id]
+            else:
+                to_remove.append(rxn)
+        self._model.remove_reactions(to_remove, remove_orphans=True)
+        return self._model
 
 
-def get_relation_df(set_0, set_1) -> pd.DataFrame:
-    return pd.DataFrame(np.zeros((len(set_0), len(set_1))), index=list(set_0), columns=list(set_1))
+def _add_prod_met_rxns(model,
+                       met_prod,
+                       conf_scores,
+                       upper_bound):
+    mocks = []
+    conf_scores = {k: v for k, v in conf_scores.items()}
+    for mid in met_prod:
+        r = cobra.Reaction("EX_CORDA_" + mid)
+        r.notes["mock"] = mid
+        r.upper_bound = upper_bound
+        model.add_reactions([r])
+        mocks.append(r)
+        r.add_metabolites({model.metabolites.get_by_id(mid): -1})
+        conf_scores[r.id] = 3
+    return mocks, conf_scores
 
 
-def find_HC_supp_rxns(sample_names,
-                      ref_model,
-                      penalty_met_id,
-                      penalty_rxn_id,
-                      HC_rxn_dic,
-                      MC_rxn_dic,
-                      NC_rxn_dic,
-                      OT_rxn_dic,
-                      HC_score,
-                      MC_score,
-                      NC_score,
-                      OT_score):
-    HC_to_MC_df_dic, HC_to_NC_df_dic = {}, {}
-    modified_model = ref_model.copy()
-    orig_rxns = [r.id for r in ref_model.reactions]
-    rev_rxns = [r.id for r in modified_model.reactions if r.reversibility is True]
-    penalty_met = cobra.Metabolite(id=penalty_met_id)
-    penalty_rxn = cobra.Reaction(id=penalty_rxn_id)
-    penalty_rxn.add_metabolites({
-        penalty_met: -1
-    })
-    modified_model.add_reactions([penalty_rxn])
-    for r_id in rev_rxns:
-        make_irrev_rxn(modified_model, r_id)
-        modified_model.reactions.get_by_id(r_id).knock_out()
-    for r in modified_model.reactions:
-        r.add_metabolites({penalty_met: 1e-7})
+class DiscreteStrategy:
+    def __init__(self,
+                 exp_thres,
+                 nonexp_thres,
+                 rxn_scores):
+        self._exp = exp_thres
+        self._nexp = nonexp_thres
+        self._rxn_scores = rxn_scores
 
-    for sample in sample_names:
-        print("processing ", sample)
-        blocked_HC_rxns = set()
-        rxn_cost_dict = get_rxn_cost_dict(sample=sample,
-                                          HC_rxn_dic=HC_rxn_dic,
-                                          MC_rxn_dic=MC_rxn_dic,
-                                          NC_rxn_dic=NC_rxn_dic,
-                                          OT_rxn_dic=OT_rxn_dic,
-                                          HC_score=HC_score,
-                                          MC_score=MC_score,
-                                          NC_score=NC_score,
-                                          OT_score=OT_score)
-        HC_to_MC_df = get_relation_df(HC_rxn_dic[sample], MC_rxn_dic[sample])
-        HC_to_NC_df = get_relation_df(HC_rxn_dic[sample], NC_rxn_dic[sample])
-        print("Number of HC rxns to check: ", len(HC_rxn_dic[sample]))
-        with modified_model as model:
-            assert (len(rxn_cost_dict) + len(rev_rxns) * 2 + 1) == len(model.reactions), f"{len(rxn_cost_dict) + len(rev_rxns) + 1} != {len(model.reactions)}"
-            supp_rxns_dict = {"MC": set(), "NC": set()}
-            for i, HC_rxn in enumerate(HC_rxn_dic[sample]):
-                print(i, ", checking: ", HC_rxn)
-                model.objective = HC_rxn
-                rxn_sets = {"MC": MC_rxn_dic[sample], "NC": NC_rxn_dic[sample]}
-                rxn_to_rxn_set_dfs = {"MC": HC_to_MC_df, "NC": HC_to_NC_df}
-                is_blocked = True
-                for dir in ["maximum", "minimum"]:
-                    rxn = model.reactions.get_by_id(HC_rxn)
-                    if (dir == "maximum" and rxn.upper_bound > 0) or (dir == "minimum" and rxn.lower_bound < 0):
-                        obj_val = model.slim_optimize()
-                        obj_dic = {HC_rxn: obj_val}
-                        flag, supp_dict = find_supp_rxns_by_corsoFBA(model,
-                                                                     sol_val=obj_val,
-                                                                     sol_dic=obj_dic,
-                                                                     rxn_to_check=HC_rxn,
-                                                                     rxn_sets=rxn_sets,
-                                                                     rxn_to_rxn_set_dfs=rxn_to_rxn_set_dfs,
-                                                                     rxn_cost_dict=rxn_cost_dict,
-                                                                     orig_rev_rxns=rev_rxns,
-                                                                     orig_rxns=orig_rxns,
-                                                                     penalty_met_id=penalty_met_id,
-                                                                     penalty_rxn_id=penalty_rxn_id,
-                                                                     direction=dir)
-                        supp_rxns_dict["MC"] |= supp_dict["MC"]
-                        supp_rxns_dict["NC"] |= supp_dict["NC"]
-                        is_blocked = (is_blocked and flag)
-                if is_blocked:
-                    blocked_HC_rxns.add(HC_rxn)
-        HC_rxn_dic[sample] -= blocked_HC_rxns
-        HC_to_MC_df = HC_to_MC_df.loc[HC_rxn_dic[sample], :]
-        HC_to_NC_df = HC_to_NC_df.loc[HC_rxn_dic[sample], :]
-        for name, supp_rxns in supp_rxns_dict.items():
-            HC_rxn_dic[sample] |= supp_rxns
-            if name == "MC":
-                MC_rxn_dic[sample] -= supp_rxns
-            elif name == "NC":
-                NC_rxn_dic[sample] -= supp_rxns
-        HC_to_MC_df_dic[sample] = HC_to_MC_df
-        HC_to_NC_df_dic[sample] = HC_to_NC_df
-
-    return {"HC_to_MC_df_dic": HC_to_MC_df_dic,
-            "HC_to_NC_df_dic": HC_to_NC_df_dic,
-            "HC_rxn_dic": HC_rxn_dic,
-            "MC_rxn_dic": MC_rxn_dic,
-            "NC_rxn_dic": NC_rxn_dic,
-            "modified_model": modified_model,
-            "orig_rxns": orig_rxns,
-            "rev_rxns": rev_rxns}
+    def transform(self):
+        raise NotImplementedError()
 
 
-def find_MC_supp_rxns(sample_names,
-                      modified_model,
-                      rev_rxns,
-                      orig_rxns,
-                      penalty_met_id,
-                      penalty_rxn_id,
-                      HC_rxn_dic,
-                      MC_rxn_dic,
-                      NC_rxn_dic,
-                      OT_rxn_dic,
-                      HC_score,
-                      MC_score,
-                      NC_score,
-                      OT_score,
-                      NC_rescue_thres):
-    blocked_MC_rxns_dic = {}
-    MC_to_NC_df_dic = {}
-    MC_rxn_dic = copy.deepcopy(MC_rxn_dic)
-    NC_rxn_dic = copy.deepcopy(NC_rxn_dic)
-    for sample in sample_names:
-        blocked_MC_rxns = set()
-        rxn_cost_dict = get_rxn_cost_dict(sample=sample,
-                                          HC_rxn_dic=HC_rxn_dic,
-                                          MC_rxn_dic=MC_rxn_dic,
-                                          NC_rxn_dic=NC_rxn_dic,
-                                          OT_rxn_dic=OT_rxn_dic,
-                                          HC_score=HC_score,
-                                          MC_score=MC_score,
-                                          NC_score=NC_score,
-                                          OT_score=OT_score)
-        MC_to_NC_df = get_relation_df(MC_rxn_dic[sample], NC_rxn_dic[sample])
-        with modified_model as model:
-            for MC_rxn in MC_rxn_dic[sample]:
-                model.objective = MC_rxn
-                rxn_sets = {"NC": NC_rxn_dic[sample]}
-                rxn_to_rxn_set_dfs = {"NC": MC_to_NC_df}
-                is_blocked = True
-                for dir in ["maximum", "minimum"]:
-                    rxn = model.reactions.get_by_id(MC_rxn)
-                    if (dir == "maximum" and rxn.upper_bound > 0) or (dir == "minimum" and rxn.lower_bound < 0):
-                        obj_val = model.slim_optimize()
-                        obj_dic = {MC_rxn: obj_val}
-                        flag, supp_dict = find_supp_rxns_by_corsoFBA(model,
-                                                                     rxn_to_check=MC_rxn,
-                                                                     sol_val=obj_val,
-                                                                     sol_dic=obj_dic,
-                                                                     rxn_sets=rxn_sets,
-                                                                     rxn_to_rxn_set_dfs=rxn_to_rxn_set_dfs,
-                                                                     rxn_cost_dict=rxn_cost_dict,
-                                                                     orig_rev_rxns=rev_rxns,
-                                                                     orig_rxns=orig_rxns,
-                                                                     penalty_met_id=penalty_met_id,
-                                                                     penalty_rxn_id=penalty_rxn_id,
-                                                                     direction=dir)
-                        is_blocked = (is_blocked and flag)
-                if is_blocked:
-                    blocked_MC_rxns.add(MC_rxn)
-        MC_rxn_dic[sample] -= blocked_MC_rxns
-        MC_to_NC_df = MC_to_NC_df.loc[MC_rxn_dic[sample], :]
-        NC_score = MC_to_NC_df.sum(axis=1)
-        NC_score.index = MC_to_NC_df.columns
-        rescued_NC = set(NC_score[NC_score > NC_rescue_thres].index)
-        remained_NC = MC_to_NC_df.columns
-        MC_rxn_dic[sample] |= rescued_NC
-        NC_rxn_dic[sample] -= rescued_NC
-        MC_to_NC_df = MC_to_NC_df.loc[:, rescued_NC]
-        MC_to_NC_df = pd.concat([MC_to_NC_df,
-                                 pd.DataFrame(np.zeros(len(rescued_NC),
-                                                       len(remained_NC)),
-                                              columns=remained_NC, index=list(rescued_NC))], axis=0)
-        MC_to_NC_df_dic[sample] = MC_to_NC_df
+class LinearDiscreteStrategy(DiscreteStrategy):
+    def __init__(self,
+                 exp_thres,
+                 nonexp_thres,
+                 rxn_scores
+                 ):
+        super().__init__(exp_thres,
+                         nonexp_thres,
+                         rxn_scores)
 
-    return {"MC_to_NC_df_dic": MC_to_NC_df_dic,
-            "blocked_MC_rxns_dic": blocked_MC_rxns_dic,
-            "MC_rxn_dic": MC_rxn_dic,
-            "NC_rxn_dic": NC_rxn_dic}
+    def transform(self):
+        f = interpolate.interp1d([self._exp, self._nexp], [3, -1], fill_value='extrapolate')
+        return {r: f(v) if np.isfinite(v) else 0 for r, v in self._rxn_scores.items()}
 
 
-def check_MC_feasibility(sample_names,
-                         ref_model,
-                         HC_rxn_dic,
-                         MC_rxn_dic,
-                         NC_rxn_dic,
-                         MC_to_NC_df_dic,
-                         flux_thres):
-    blocked_MC_rxns = set()
-    blocked_NCs_dic = {}
-    MC_rxn_dic = copy.deepcopy(MC_rxn_dic)
-    HC_rxn_dic = copy.deepcopy(HC_rxn_dic)
-    for sample in sample_names:
-        with ref_model as model:
-            for r in NC_rxn_dic[sample]:
-                model.reactions.get_by_id(r).knock_out()
+discrete_strategies = {"linear": LinearDiscreteStrategy}
 
-            blocked_NCs_dic[sample] = set()
-            for MC_rxn in MC_rxn_dic[sample]:
-                MC_rxn_r = model.reactions.get_by_id(MC_rxn)
-                model.objective = MC_rxn
-                is_blocked = ((MC_rxn_r.lower_bound >= 0 or
-                               abs(model.optimize(objective_sense="minimum").objective_value) < flux_thres) and
-                              (MC_rxn_r.upper_bound <= 0 or
-                               abs(model.optimize(objective_sense="maximum").objective_value) < flux_thres))
+@timing
+def apply_CORDA(model,
+                data,
+                predefined_threshold = None,
+                use_heuristic_th = False,
+                discrete_strategy_name: str = "linear",
+                protected_rxns=None,
+                n_iters=np.inf,
+                penalty_factor=100,
+                penalty_increase_factor=1.1,
+                keep_if_support=5,
+                met_prod = None,
+                upper_bound=1e6,
+                threshold=1e-6,
+                support_flux_value=1,
+                ) -> CORDA_Analysis:
+    mocks = []
+    threshold_dic = parse_predefined_threshold(predefined_threshold,
+                                               gene_data=data.gene_data,
+                                               use_heuristic_th=use_heuristic_th)
+    th_result, exp_th, non_exp_th = threshold_dic["th_result"], threshold_dic["exp_th"], threshold_dic["non_exp_th"]
+    transformer = discrete_strategies[discrete_strategy_name](exp_th, non_exp_th, data.rxn_scores)
+    conf_scores = transformer.transform()
+    model = model.copy()
+    # check
+    if met_prod is not None:
+        mocks, conf_scores = _add_prod_met_rxns(model,
+                                                met_prod,
+                                                conf_scores,
+                                                upper_bound)
+    for r in model.reactions:
+        if r.objective_coefficient != 0:
+            conf_scores[r.id] = 3
 
-                if is_blocked:
-                    blocked_MC_rxns.add(MC_rxn)
-                    related_NC = MC_to_NC_df_dic[sample].loc[MC_rxn, :]
-                    blocked_NCs_dic[sample] = set(related_NC[related_NC > 0].columns)
-        MC_rxn_dic[sample] -= blocked_MC_rxns
-        HC_rxn_dic[sample] |= MC_rxn_dic[sample]
-    return {"blocked_NCs_dic": blocked_NCs_dic,
-            "HC_rxn_dic": HC_rxn_dic,
-            "MC_rxn_dic": MC_rxn_dic}
+    if protected_rxns is not None:
+        for r in protected_rxns:
+            conf_scores[r] = 3
 
+    var_conf_scores = {r: conf for r, conf in conf_scores.items()}
+    var_conf_scores.update({model.reactions.get_by_id(r).reverse_id: conf for r, conf in conf_scores.items()})
 
-def find_HC_supp_OT_rxns(sample_names,
-                         modified_model,
-                         rev_rxns,
-                         orig_rxns,
-                         penalty_met_id,
-                         penalty_rxn_id,
-                         HC_rxn_dic,
-                         MC_rxn_dic,
-                         NC_rxn_dic,
-                         OT_rxn_dic,
-                         HC_score,
-                         MC_score,
-                         NC_score,
-                         OT_score,):
-    HC_rxn_dic = copy.deepcopy(HC_rxn_dic)
-    OT_rxn_dic = copy.deepcopy(OT_rxn_dic)
-    for sample in tqdm(sample_names):
-        rxn_cost_dict = get_rxn_cost_dict(sample=sample,
-                                          HC_rxn_dic=HC_rxn_dic,
-                                          MC_rxn_dic=MC_rxn_dic,
-                                          NC_rxn_dic=NC_rxn_dic,
-                                          OT_rxn_dic=OT_rxn_dic,
-                                          HC_score=HC_score,
-                                          MC_score=MC_score,
-                                          NC_score=NC_score,
-                                          OT_score=OT_score)
-        HC_to_OT_df = get_relation_df(HC_rxn_dic[sample], OT_rxn_dic[sample])
-        with modified_model as model:
-            for r in model.reactions:
-                if r.id not in HC_rxn_dic[sample] and r.id not in OT_rxn_dic[sample]:
-                    r.knock_out()
-
-            for HC_rxn in tqdm(HC_rxn_dic[sample]):
-                rxn_sets = {"OT": OT_rxn_dic[sample]}
-                rxn_to_rxn_set_dfs = {"OT": HC_to_OT_df}
-                model.objective = HC_rxn
-                for dir in ["maximum", "minimum"]:
-                    rxn = model.reactions.get_by_id(HC_rxn)
-                    if (dir == "maximum" and rxn.upper_bound > 0) or (dir == "minimum" and rxn.lower_bound < 0):
-                        obj_val = model.slim_optimize()
-                        obj_dic = {HC_rxn: obj_val}
-                        flag, supp_dict = find_supp_rxns_by_corsoFBA(model,
-                                                                     sol_val=obj_val,
-                                                                     sol_dic=obj_dic,
-                                                                     rxn_to_check=HC_rxn,
-                                                                     rxn_sets=rxn_sets,
-                                                                     rxn_to_rxn_set_dfs=rxn_to_rxn_set_dfs,
-                                                                     rxn_cost_dict=rxn_cost_dict,
-                                                                     orig_rev_rxns=rev_rxns,
-                                                                     orig_rxns=orig_rxns,
-                                                                     penalty_met_id=penalty_met_id,
-                                                                     penalty_rxn_id=penalty_rxn_id,
-                                                                     direction=dir)
-                        assert not flag, "HC reactions should be feasible in the step 7"
-
-        OT_score = HC_to_OT_df.sum(axis=1)
-        OT_score.index = HC_to_OT_df.columns
-        ot_add_to_hc_rxns = set(OT_score[OT_score != 0].index)
-        HC_rxn_dic[sample] |= ot_add_to_hc_rxns
-        OT_rxn_dic[sample] -= ot_add_to_hc_rxns
-    return {"HC_rxn_dic": HC_rxn_dic,
-            "OT_rxn_dic": OT_rxn_dic}
-
-
-def classify_CORDA_rxns(ref_model,
-                        sample_names,
-                        expression_dic,
-                        used_rxn_thres):
-    all_rxn_ids = set([r.id for r in ref_model.reactions])
-    HC_rxn_dic, MC_rxn_dic, NC_rxn_dic, OT_rxn_dic = {}, {}, {}, {}
-    for sample, exp in expression_dic.items():
-        if sample in sample_names:
-            HC_rxn_dic[sample] = {r for r, v in exp.rxn_scores.items()
-                                  if used_rxn_thres["HC"][0] > v >= used_rxn_thres["HC"][1]}
-            MC_rxn_dic[sample] = {r for r, v in exp.rxn_scores.items()
-                                  if used_rxn_thres["MC"][0] > v >= used_rxn_thres["MC"][1] and
-                                  r not in HC_rxn_dic[sample]}
-            NC_rxn_dic[sample] = {r for r, v in exp.rxn_scores.items()
-                                  if used_rxn_thres["NC"][0] > v >= used_rxn_thres["NC"][1] and
-                                  r not in HC_rxn_dic[sample]}
-            OT_rxn_dic[sample] = all_rxn_ids - HC_rxn_dic[sample] - MC_rxn_dic[sample] - NC_rxn_dic[sample]
-    return {"HC_rxn_dic": HC_rxn_dic,
-            "MC_rxn_dic": MC_rxn_dic,
-            "NC_rxn_dic": NC_rxn_dic,
-            "OT_rxn_dic": OT_rxn_dic}
+    # init corda builder and build the model
+    corda_builder = CORDABuilder(model,
+                                 conf_scores=var_conf_scores,
+                                 mocks=mocks,
+                                 n_iters=n_iters,
+                                 penalty_factor=penalty_factor,
+                                 penalty_increase_factor=penalty_increase_factor,
+                                 upper_bound=upper_bound,
+                                 support_flux_value=support_flux_value,
+                                 threshold=threshold
+                                 )
+    result_model = corda_builder.build(keep_if_support=keep_if_support)
+    conf_scores = corda_builder.conf_scores
+    result = CORDA_Analysis(log={"n_iters": n_iters,
+                                 "penalty_factor": penalty_factor,
+                                 "penalty_increase_factor": penalty_increase_factor,
+                                 "keep_if_support": keep_if_support,
+                                 "met_prod": met_prod,
+                                 "upper_bound": upper_bound,
+                                 "threshold": threshold,
+                                 "support_flux_value": support_flux_value})
+    result.add_result(model=result_model, conf_scores=conf_scores)
+    return result
