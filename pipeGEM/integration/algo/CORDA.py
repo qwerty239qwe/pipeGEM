@@ -1,4 +1,6 @@
 import copy
+import warnings
+
 from tqdm import tqdm
 from typing import Dict, List
 
@@ -25,7 +27,7 @@ class CORDABuilder:
                  threshold=1e-6):
         self._model = model
         self._conf_scores = conf_scores
-        self._n = n_iters
+        self._n = n_iters if np.isfinite(n_iters) else len(model.reactions)
         self._n_redundancies = {}
         self._pf = penalty_factor
         self._pif = penalty_increase_factor
@@ -63,7 +65,7 @@ class CORDABuilder:
             eval_vars = [i for i, c in self._conf_scores.items() if c < 0]
             n_sups = pd.DataFrame({"n": np.zeros(shape=(len(eval_vars),))}, index=eval_vars)
 
-        for var_id in var_ids:
+        for vi, var_id in enumerate(var_ids):
             self._model.objective = Zero
             var = self._model.variables[var_id]
             if var.ub < self._threshold:
@@ -71,8 +73,8 @@ class CORDABuilder:
                 self._conf_scores[var_id] = -1
                 continue
             old_bounds = (var.lb, var.ub)
-            var.lb = max(self._sf, var.lb)
             var.ub = self._upper_bound
+            var.lb = max(self._sf, var.lb)
             cur_penalty = {self._model.variables[k]: v for k, v in penalty_dic.items()}
             all_support_vars_for_v = set()
             for i in range(n_iters):
@@ -98,6 +100,8 @@ class CORDABuilder:
                         cur_penalty[self._model.variables[v]] = cur_penalty[self._model.variables[v]] * self._pif
             all_support_vars |= all_support_vars_for_v
             var.lb, var.ub = old_bounds
+            if vi % 100 == 0:
+                print(f"{vi} / {len(var_ids)}")
         if keep_if_support is None:
             return all_support_vars
         return all_support_vars, set(n_sups.query(f"n >= {keep_if_support}").index)
@@ -107,28 +111,31 @@ class CORDABuilder:
         hi_supports = self._get_support_rxns([i for i, c in self._conf_scores.items() if c >= 3])
         for i in hi_supports:
             self._conf_scores[i] = 3
-
+        print("step 1 finished")
         m_l_supports, to_keeps = self._get_support_rxns([i
                                                          for i, c in self._conf_scores.items() if 0 <= c < 3],
                                                         keep_if_support=keep_if_support,
                                                         penalize_medium_score=False)
         for i in to_keeps:
             self._conf_scores[i] = 3
-        low_confs = [i for i, c in self._conf_scores.items() if i < 0]
+        low_confs = [i for i, c in self._conf_scores.items() if c < 0]
         for vid in low_confs:
             v = self._model.variables[vid]
             v.ub = max(0.0, v.lb)
 
         self._model.objective = Zero
 
-        #TODO
         for v in self._model.variables:
             if 0 < self._conf_scores[v.name] < 3:
                 self._model.objective.set_linear_coefficients({v: 1})
                 sol = self._model.solver.optimize()
                 if sol == "optimal" and self._model.objective.value > self._sf:
-                    self._conf_scores[v.name] = 3
+                    sol = self._model.solver.primal_values
+                    to_change = [vi for vi in sol if sol[vi] > self._sf and 0 < self._conf_scores[vi] < 3]
+                    for vi in to_change:
+                        self._conf_scores[vi] = 3
             self._model.objective.set_linear_coefficients({v: 0})
+        print("step 2 finished")
 
         for vid, conf in self._conf_scores.items():
             if 0 < conf < 3:
@@ -138,6 +145,7 @@ class CORDABuilder:
         hi_supports = self._get_support_rxns([i for i, c in self._conf_scores.items() if c >= 3],
                                              penalize_medium_score=False,
                                              support_redundancies=False)
+        print("step 3 finished")
         for i in hi_supports:
             self._conf_scores[i] = 3
 
@@ -234,8 +242,12 @@ def apply_CORDA(model,
             conf_scores[r.id] = 3
 
     if protected_rxns is not None:
+        rxn_id_in_model = [r.id for r in model.reactions]
         for r in protected_rxns:
-            conf_scores[r] = 3
+            if r in rxn_id_in_model:
+                conf_scores[r] = 3
+            else:
+                warnings.warn(f"{r} is not in the model")
 
     var_conf_scores = {r: conf for r, conf in conf_scores.items()}
     var_conf_scores.update({model.reactions.get_by_id(r).reverse_id: conf for r, conf in conf_scores.items()})
@@ -261,5 +273,5 @@ def apply_CORDA(model,
                                  "upper_bound": upper_bound,
                                  "threshold": threshold,
                                  "support_flux_value": support_flux_value})
-    result.add_result(model=result_model, conf_scores=conf_scores)
+    result.add_result(model=result_model, conf_scores=conf_scores, threshold_analysis=th_result)
     return result
