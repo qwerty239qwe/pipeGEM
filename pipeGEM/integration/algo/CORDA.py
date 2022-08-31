@@ -93,7 +93,8 @@ class CORDABuilder:
                     n_sups.loc[set(eval_vars) & support_vars, "n"] += 1
 
                 if len(new_sups) == 0:
-                    self._n_redundancies[var_id] = i+1 if support_redundancies else self._n_redundancies[var_id]
+                    if support_redundancies:
+                        self._n_redundancies[var_id] = i+1
                     break
                 for v in new_sups:
                     if self._model.variables[v] in cur_penalty:

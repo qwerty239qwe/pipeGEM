@@ -177,10 +177,14 @@ class Model(GEMComposite):
         path = Path(file_name)
         save_model(self._model, str(path))
 
-
-class ReducedModel(Model):
-    def __init__(self,
-                 name_tag=None,
-                 model=None
-                 ):
-        super().__init__(name_tag=name_tag, model=model)
+    def separate_merged_rxns(self):
+        to_be_restored, to_be_pruned = [], []
+        for r in self._model.reactions:
+            if hasattr(r, "merged_rxns"):
+                to_be_restored.extend(r.merged_rxns)
+                to_be_pruned.append(r)
+        if len(to_be_restored) == len(to_be_pruned) == 0:
+            print("No merged rxns found in this model")
+            return
+        self._model.add_reactions(to_be_restored)
+        self._model.remove_reactions(to_be_pruned, remove_orphans=True)

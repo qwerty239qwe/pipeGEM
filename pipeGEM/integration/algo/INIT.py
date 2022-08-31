@@ -62,14 +62,70 @@ def build_INIT_problem(model, ):
 
 
 class ftINIT_builder:
-    def __init__(self, model):
+    def __init__(self,
+                 model,
+                 spontaneous_rxn_ids=None,
+                 to_ignore_rxn_ids=None,
+                 prev_usage="essential",
+                 mipgap=0.003,
+                 timelimit=5000):
         self.model = model
         self.force_on_lim, self.prod_weight = 0.1, 0.5
+        self._mipgap = mipgap
+        self._timelimit = timelimit
+        self._prev_usage = prev_usage
+        self._external_comp = 'e'
+        if self._prev_usage not in ["essential", "exclude"]:
+            raise ValueError("Invalid prev_usage")
+        self._spontaneous_rxn_ids = spontaneous_rxn_ids if spontaneous_rxn_ids is not None else []
+        self._to_ignore_rxn_ids = to_ignore_rxn_ids if to_ignore_rxn_ids is not None else []
+        self._ignore_rxn_ids = self._get_ignored_rxn_ids()
+
+    def _get_ignored_rxn_ids(self) -> dict:
+        rxn_id_dic = {}
+        rxn_id_dic["spontaneous_rxn_ids"] = self._spontaneous_rxn_ids
+        rxn_id_dic["custom_ignored_rxn_ids"] = self._to_ignore_rxn_ids
+        rxn_id_dic["exchanges"] = [r.id for r in self.model.exchanges]
+        rxn_id_dic["import"] = []
+        rxn_id_dic["transport"] = []
+        rxn_id_dic["advanced_transport"] = []
+        rxn_id_dic["external"] = []
+        rxn_id_dic["without_GPR"] = []
+        for r in self.model.reactions:
+            coefs = [v for _, v in r.metabolites.values()]
+            if len(r.metabolites) == 2 and (coefs[0] == -coefs[1]):
+                comps = [m.compartment for m, v in r.metabolites.items()]
+                met_ids = [m.id[:-1] for m, v in r.metabolites.items()]
+                if not (len(set(met_ids)) == 1): # should be all the same
+                    continue
+                if any([c == self._external_comp for c in comps]):
+                    rxn_id_dic["import"].append(r.id)
+                else:
+                    rxn_id_dic["transport"].append(r.id)
+            elif r.gene_reaction_rule == '' and len(r.metabolites) > 2 and (len(r.metabolites) % 2 == 0) and sum(coefs) == 0:
+                comps = [m.compartment for m, v in r.metabolites.items()]
+                met_ids = [m.id[:-1] for m, v in r.metabolites.items()]
+                if len(set(met_ids)) != (len(met_ids) // 2):
+                    continue
+                failed = False
+                for one_met_id in set(met_ids):
+                    matched_index = [i for i, x in enumerate(met_ids) if x == one_met_id]
+                    if len(matched_index) > 2 or set([comps[i] for i in matched_index]) or sum([coefs[i] for i in matched_index]) != 0:
+                        failed = True
+                if failed:
+                    continue
+                rxn_id_dic["advanced_transport"].append(r.id)
+            elif r.gene_reaction_rule == '' and len(r.metabolites) > 1 and all([m.compartment == self._external_comp for m in r.metabolites]):
+                rxn_id_dic["external"].append(r.id)
+            elif r.gene_reaction_rule == '':
+                rxn_id_dic["without_GPR"].append(r.id)
+        return rxn_id_dic
 
     def categorize_rxns(self,
                         model,
                         rxn_score_dict,
                         essential_rxns,
+                        ignored_rxns,
                         mets) -> dict:
         result_dict = {}
         result_dict["rev_rxns"] = [r.id for r in model.reactions if r.reversibility]
@@ -82,7 +138,8 @@ class ftINIT_builder:
         result_dict["met_rxns"] = list(
             set([r.id for m in mets for r in self.get_met_prod_rxns(model, m)]) & set(result_dict["irrev_rxns"]))
         result_dict["pos_rxns"] = set(
-            [r for r, c in rxn_score_dict.items() if (c > 0 or (c == 0 and r in result_dict["met_rxns"]))]) - set(
+            [r for r, c in rxn_score_dict.items() if (c > 0 or ((c == 0 or (r in ignored_rxns))
+                                                                and r in result_dict["met_rxns"]))]) - set(
             essential_rxns)
         result_dict["neg_rxns"] = set([r for r, c in rxn_score_dict.items() if c < 0]) - set(essential_rxns)
         result_dict["pos_rev_rxns"] = list(set(result_dict["pos_rxns"]) & set(result_dict["rev_rxns"]))
@@ -191,6 +248,15 @@ class ftINIT_builder:
             constrs[met] = coefs
         return constrs
 
+    @staticmethod
+    def match_varname(var:str, prefixes):
+        if isinstance(prefixes, list):
+            for i in prefixes:
+                if var.startswith(i):
+                    return True
+        return var.startswith(prefixes)
+
+
     def _init_constraints_details(self, var_dict, rxn_groups, mets, met_prod_rxns):
         pi_var_coefs = self._const_detail_helper(var_dict, coefs={"rxn_f_{r}": 1,
                                                                   "rxn_r_{r}": -1,
@@ -296,11 +362,13 @@ class ftINIT_builder:
     def build_problem(self,
                       rxn_score_dict,
                       essential_rxns,
+                      ignored_rxns,
                       mets
                       ):
         rxn_groups = self.categorize_rxns(self.model,
                                           rxn_score_dict=rxn_score_dict,
                                           essential_rxns=essential_rxns,
+                                          ignored_rxns=ignored_rxns,
                                           mets=mets)
         var_dict = {}
         var_add_details = self._init_var_details(rxn_groups=rxn_groups, mets=mets,
@@ -333,4 +401,50 @@ class ftINIT_builder:
             elif "met_1_" == name[:6]:
                 obj_dict[var] = self.prod_weight
 
+        self.model.objective = obj_dict
+        self.model.solver.problem.setParam('MIPGap', self._mipgap)
+        self.model.solver.problem.setParam('Timelimit', self._timelimit)
 
+    def get_result(self,
+                   rxn_score_dict,
+                   essential_rxns,
+                   mets
+                   ):
+        rev_rxns = [r.id for r in self.model.reactions if r.reversibility]
+        ignored_rxns, reversed_rxns = [], []
+        self.build_problem(rxn_score_dict, essential_rxns, ignored_rxns, mets)
+        _ = self.model.solver.optimize()
+        sol = self.model.solver.primal_values
+        forward_fluxes = {varname: flux for varname, flux in sol.items() if not self.match_varname(varname,
+                                                                                                   ["rxn_f_"])}
+        reverse_fluxes = {varname: flux for varname, flux in sol.items() if not self.match_varname(varname,
+                                                                                                   ["rxn_r_"])}
+        fluxes = {varname[6:]: f - reverse_fluxes[varname[6:]] for varname, f in forward_fluxes.items()}
+
+        rxns_turned_on = [varname[8:] for varname, flux in sol.items() if self.match_varname(varname,
+                                                                                             ["nY_pi_1_",
+                                                                                              "nY_pr_1_",
+                                                                                              "nY_ni_1_",
+                                                                                              "nY_nr_1_"]) and
+                          flux >= 0.5]
+        if self._prev_usage == "exclude":
+            ignored_rxns += rxns_turned_on
+        elif self._prev_usage == "essential":
+            neg_flux = [r_id for r_id, f in fluxes.items() if f < 0]
+            to_reverse = list(set(rxns_turned_on) & set(neg_flux) & set(rev_rxns))
+            for r in to_reverse:
+                rxn = self.model.reactions.get_by_id(r)
+                rxn.subtract_metabolites({m: 2*c for m, c in rxn.metabolites.items()})
+                rxn.upper_bound = -rxn.lower_bound
+                rxn.lower_bound = 0
+            essential_rxns += to_reverse
+        # check if the rxns
+
+
+
+def apply_ftINIT(model,
+                 data):
+    model # simplify model
+    rxn_score = data # transform to
+
+    builder = ftINIT_builder(model=model)

@@ -38,29 +38,26 @@ class RxnMapper:
     def _inner_grr_helper(self, grr_list) -> list:
         inner_grr_scores = []
         for g in grr_list.split('and'):
-            if g == "":
-                inner_grr_scores.append(-1)
-
-            elif (g[:g.index(".")] if "." in g else g) in self.genes:
-                inner_grr_scores.append(self.gene_data[g[:g.index(".")] if "." in g else g])
+            if g == "" or not (g[:g.index(".")] if "." in g else g) in self.genes:
+                inner_grr_scores.append(self.missing_value)
             else:
-                inner_grr_scores.append(np.inf)
+                inner_grr_scores.append(self.gene_data[g[:g.index(".")] if "." in g else g])
         return inner_grr_scores
 
-    @staticmethod
-    def _outer_grr_helper(inner_grr_scores) -> float:
+    def _outer_grr_helper(self, inner_grr_scores, operation="nanmin") -> float:
         if len(inner_grr_scores) == 0:
-            return -1.
-        if len(inner_grr_scores) == 1 and inner_grr_scores[0] == np.inf:
-            return -np.inf
-        elif all([i == np.inf for i in inner_grr_scores]):
-            return -np.inf
-        return min(inner_grr_scores)
+            return self.missing_value
+        if all([not np.isfinite(i) for i in inner_grr_scores]):
+            return self.missing_value
+        return getattr(np, operation)(inner_grr_scores)
 
     def _map_to_rxns(self,
                      model,
                      absent_value=0,
-                     threshold=0.):
+                     threshold=0.,
+                     and_operation="nanmin",
+                     or_operation="nanmax",
+                     plus_operation="nansum"):
         """
         :return: dict {rxn_id : score}
         """
@@ -72,12 +69,18 @@ class RxnMapper:
             if len(grr) == 0:
                 rxn_score[rxn_id] = self.missing_value
                 continue
-            outer_grr_list = []
-            for gl in grr.split("or"):
-                inner_grr_scores = self._inner_grr_helper(gl)
-                outer_grr_list.append(self._outer_grr_helper(inner_grr_scores))
-            rxn_score[rxn_id] = max(outer_grr_list)
-            rxn_score[rxn_id] = rxn_score[rxn_id] if rxn_score[rxn_id] != -np.inf else self.missing_value
+            plus_grr_list = []
+            for grr_i in grr.split("plus"):
+                outer_grr_list = []
+                for gl in grr_i.split("or"):
+                    inner_grr_scores = self._inner_grr_helper(gl)
+                    outer_grr_list.append(self._outer_grr_helper(inner_grr_scores, and_operation))
+                plus_grr_list.append(self._outer_grr_helper(outer_grr_list, or_operation))
+            if all([not np.isfinite(i) for i in plus_grr_list]):
+                rxn_score[rxn_id] = self.missing_value
+            else:
+                rxn_score[rxn_id] = getattr(np, plus_operation)(plus_grr_list)
+            rxn_score[rxn_id] = rxn_score[rxn_id] if np.isfinite(rxn_score[rxn_id]) else self.missing_value
 
         for k, v in rxn_score.items():
             if v <= threshold:
