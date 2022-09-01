@@ -209,7 +209,7 @@ class PercentileThreshold(RankBased):
         super().__init__()
 
     def find_threshold(self,
-                       data,
+                       data,  # 1d array
                        p,
                        **kwargs):
         assert 0 <= p <= 100
@@ -224,6 +224,27 @@ class PercentileThreshold(RankBased):
         exp_th = np.percentile(arr, q=p)
         result.add_result(data=arr, exp_th=exp_th)
         return result
+
+
+class LocalThreshold(RankBased):
+    def __init__(self):
+        super().__init__()
+
+    def find_threshold(self,
+                       data,  # 2d array
+                       p,
+                       **kwargs):
+        assert 0 <= p <= 100
+        if isinstance(data, pd.DataFrame):
+            arr = data.values
+            genes = data.index
+        else:
+            arr = data
+            genes = kwargs.get("genes")
+        arr[~np.isfinite(arr)] = np.nan
+        exp_ths = np.percentile(arr, q=p, axis=1)
+
+
 
 
 threshold_finders = ThresholdFinders()

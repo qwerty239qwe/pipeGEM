@@ -6,6 +6,7 @@ from itertools import chain
 
 import pandas as pd
 import cobra
+from cobra.util import linear_reaction_coefficients
 import numpy as np
 
 from pipeGEM.core._base import GEMComposite
@@ -37,8 +38,10 @@ class Model(GEMComposite):
         self._model = model if model is not None else cobra.Model(name=name_tag)
         self._gene_data: Union[Dict[str, GeneData]] = {}
         self._medium_data = {}
-        self._analysis = {}
         self._tasks = {}
+        self._merged_rxn_lu_table = {}
+        self._original_objs = {}
+        self._empty_merged_rxns = []
 
     def __repr__(self):
         return f"pipeGEM Model {self._name_tag}"
@@ -77,6 +80,24 @@ class Model(GEMComposite):
     @property
     def gene_data(self):
         return self._gene_data
+
+    def copy(self,
+             copy_gene_data=False,
+             copy_medium_data=False,
+             copy_tasks=False,
+             copy_merging_info=True):
+        new = self.__class__(f"cp_{self.name_tag}", self._model.copy())
+        if copy_gene_data:
+            new._gene_data = self._gene_data.copy()
+        if copy_medium_data:
+            new._medium_data = self._medium_data.copy()
+        if copy_tasks:
+            new._tasks = self._tasks.copy()
+        if copy_merging_info:
+            new._merged_rxn_lu_table = self._merged_rxn_lu_table.copy()
+            new._original_objs = self._original_objs.copy()
+
+        return new
 
     def add_medium_data(self, name, data: Union[MediumData, pd.DataFrame], data_kwargs=None, **kwargs):
         if isinstance(data, pd.DataFrame):
@@ -179,12 +200,28 @@ class Model(GEMComposite):
 
     def separate_merged_rxns(self):
         to_be_restored, to_be_pruned = [], []
-        for r in self._model.reactions:
+        for r in self._model.reactions + self._empty_merged_rxns:
             if hasattr(r, "merged_rxns"):
-                to_be_restored.extend(r.merged_rxns)
+                to_be_restored.extend(list(r.merged_rxns.keys()))
                 to_be_pruned.append(r)
         if len(to_be_restored) == len(to_be_pruned) == 0:
             print("No merged rxns found in this model")
             return
         self._model.add_reactions(to_be_restored)
+        self._model.objective = self._original_objs
         self._model.remove_reactions(to_be_pruned, remove_orphans=True)
+
+    def update_merged_rxn(self, merged_rxn):
+        if len(self._original_objs) == 0:
+            self._original_objs = linear_reaction_coefficients(self._model)
+
+        if len(merged_rxn.metabolites) == 0:
+            self._empty_merged_rxns.append(merged_rxn)
+
+        for r, c in merged_rxn.merged_rxns.items():
+            self._merged_rxn_lu_table[r.id] = merged_rxn
+            if r in self._original_objs:
+                merged_rxn.objective_coefficient = self._original_objs[r] / c
+
+    def get_merged_rxn(self, rxn_id):
+        return self._merged_rxn_lu_table[rxn_id]

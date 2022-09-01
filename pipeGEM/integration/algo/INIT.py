@@ -1,6 +1,7 @@
 import cobra
 import numpy as np
 from optlang.symbolics import Zero
+from collections import namedtuple
 
 
 def add_fake_mets_for_core_mets(model, met_ids, added_comp="c"):
@@ -61,22 +62,37 @@ def build_INIT_problem(model, ):
 # ================== ^ old algo ^ ==================
 
 
+ftINIT_step = namedtuple("ftINIT_step", ["pos_rev_off", "met_secretion", "prev_usage",
+                                         "ignored_rxn_types", "ignored_mets",
+                                         "MILP_params", "abs_mip_gap"])
+
+
 class ftINIT_builder:
+    _rt = np.array(["exchanges", "import", "transport", "advanced_transport",
+                    "spontaneous_rxn_ids", "external", "custom_ignored_rxn_ids", "without_GPR"])
+    _method = {"1+1": [ftINIT_step(pos_rev_off=False, met_secretion=False, prev_usage="ignore",
+                                   ignored_rxn_types=_rt[:7], ignored_mets=[],
+                                   MILP_params={"mipgap": 4e-4, "timelimit": 150}, abs_mip_gap=10),
+                       ftINIT_step(pos_rev_off=False, met_secretion=False, prev_usage="ignore",
+                                   ignored_rxn_types=_rt[[0, 4]], ignored_mets=[],
+                                   MILP_params={"mipgap": 0.003, "timelimit": 5000}, abs_mip_gap=10)
+                       ]}
+
     def __init__(self,
                  model,
                  spontaneous_rxn_ids=None,
                  to_ignore_rxn_ids=None,
-                 prev_usage="essential",
+                 method="1+1",
                  mipgap=0.003,
                  timelimit=5000):
         self.model = model
         self.force_on_lim, self.prod_weight = 0.1, 0.5
         self._mipgap = mipgap
         self._timelimit = timelimit
-        self._prev_usage = prev_usage
+        self._method = method
         self._external_comp = 'e'
-        if self._prev_usage not in ["essential", "exclude"]:
-            raise ValueError("Invalid prev_usage")
+        if self._method not in ["1+1", "2+1", "2+0"]:
+            raise ValueError("Invalid method")
         self._spontaneous_rxn_ids = spontaneous_rxn_ids if spontaneous_rxn_ids is not None else []
         self._to_ignore_rxn_ids = to_ignore_rxn_ids if to_ignore_rxn_ids is not None else []
         self._ignore_rxn_ids = self._get_ignored_rxn_ids()
@@ -438,6 +454,8 @@ class ftINIT_builder:
                 rxn.upper_bound = -rxn.lower_bound
                 rxn.lower_bound = 0
             essential_rxns += to_reverse
+        elif self._prev_usage == "ignore":
+            pass
         # check if the rxns
 
 

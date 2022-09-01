@@ -75,3 +75,8 @@ class PercentileThresholdAnalysis(BaseAnalysis):
                   exp_th=self._exp_th,
                   *args,
                   **kwargs)
+
+
+class LocalThresholdAnalysis(BaseAnalysis):
+    def __init__(self, log):
+        super().__init__(log=log)
