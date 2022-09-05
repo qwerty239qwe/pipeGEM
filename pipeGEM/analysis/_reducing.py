@@ -3,7 +3,7 @@ import itertools
 
 
 class MergedReaction(cobra.Reaction):
-    def __init__(self, id, name=None, lower_bound=0, upper_bound=1000):
+    def __init__(self, id=None, name=None, lower_bound=0, upper_bound=1000):
         super().__init__(id=id, name=name, lower_bound=lower_bound, upper_bound=upper_bound)
         self._merged_rxns = {}
         self.s_ratio = 0

@@ -30,7 +30,7 @@ class RxnMapper:
                  missing_value=np.nan):
         self.genes = data.genes
         self.gene_data = data.gene_data
-        self.missing_value = missing_value
+        self.missing_value = missing_value  # if the gene is not shown in the given data
         self.rxn_scores = self._map_to_rxns(model,
                                             threshold=threshold,
                                             absent_value=absent_value)
@@ -122,12 +122,12 @@ class GeneData(BaseData):
         data_transform = (lambda x: x) if data_transform is None else data_transform
 
         if isinstance(data, pd.Series):
-            data = data.copy().apply(lambda x: discrete_transform[x]) if discrete_transform is not None else data.copy()
+            data = data.copy().apply(lambda x: discrete_transform(x)) if discrete_transform is not None else data.copy()
             self.gene_data = {str(gene_id) if convert_to_str else gene_id:
                               data_transform(exp) if exp > expression_threshold else absent_expression
                               for gene_id, exp in zip(data.index, data)}
         elif isinstance(data, dict):
-            data = {k: discrete_transform[v] if discrete_transform is not None else v for k, v in data.items()}
+            data = {k: discrete_transform(v) if discrete_transform is not None else v for k, v in data.items()}
             self.gene_data = {str(gene_id) if convert_to_str else gene_id:
                               data_transform(exp) if exp > expression_threshold else absent_expression
                               for gene_id, exp in data.items()}
@@ -158,8 +158,10 @@ class GeneData(BaseData):
     def _parse_discrete_transform(discrete_transform):
         if isinstance(discrete_transform, str):
             if discrete_transform in dis_trans:
-                return dis_trans[discrete_transform]
-        if isinstance(discrete_transform, dict) or discrete_transform is None:
+                return lambda x: dis_trans[discrete_transform][x]
+        if isinstance(discrete_transform, dict):
+            return lambda x: discrete_transform[x]
+        if callable(discrete_transform) or discrete_transform is None:
             return discrete_transform
         raise ValueError("Discrete transform is not a valid value, choose a dict or a str as input")
 

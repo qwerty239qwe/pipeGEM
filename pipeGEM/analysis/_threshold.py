@@ -7,7 +7,7 @@ from scipy.stats import gaussian_kde
 from scipy.optimize import curve_fit
 import numpy as np
 from pipeGEM.utils import ObjectFactory
-from pipeGEM.analysis import rFastCormicThresholdAnalysis, PercentileThresholdAnalysis, timing
+from pipeGEM.analysis import rFastCormicThresholdAnalysis, PercentileThresholdAnalysis, LocalThresholdAnalysis, timing
 
 
 class ThresholdFinders(ObjectFactory):
@@ -149,8 +149,8 @@ class DistributionBased(ThresholdFinder):
                                              mean_diff_tol=mean_diff_tol, verbosity=True)
                     p = init_val_displayed
                     covar = None
-        except RuntimeError:
-            warnings.warn("Fail to optimize")
+        except RuntimeError as e:
+            warnings.warn(f"Fail to optimize: {e}")
         A1, mu1, wid1, A2, mu2, wid2 = p
         print("fitted Amps: ", A1, A2)
         print("fitted means: ", mu1, mu2)
@@ -242,9 +242,10 @@ class LocalThreshold(RankBased):
             arr = data
             genes = kwargs.get("genes")
         arr[~np.isfinite(arr)] = np.nan
-        exp_ths = np.percentile(arr, q=p, axis=1)
-
-
+        exp_ths = pd.DataFrame({"exp_th": np.nanpercentile(arr, q=p, axis=1)}, index=genes)
+        result = LocalThresholdAnalysis(log={"p": p})
+        result.add_result(exp_ths)
+        return result
 
 
 threshold_finders = ThresholdFinders()

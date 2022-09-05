@@ -65,6 +65,10 @@ def add_scale_rxn_for_met(mod, met_id, mod_rxns, c=0.1, scale_f=1e-4):
                                  met: -1})
         met_id = original_met_id + met_postfix
 
+    if scale_times == 0:
+        print("The reaction is unchanged")
+        return
+
     for r in mod_rxns:
         rxn = mod.reactions.get_by_id(r)
         rxn.subtract_metabolites({original_met: rxn.metabolites[original_met],

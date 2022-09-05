@@ -43,6 +43,12 @@ class Model(GEMComposite):
         self._original_objs = {}
         self._empty_merged_rxns = []
 
+    def __enter__(self):
+        self._model.__enter__()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._model.__exit__(exc_type, exc_val, exc_tb)
+
     def __repr__(self):
         return f"pipeGEM Model {self._name_tag}"
 
