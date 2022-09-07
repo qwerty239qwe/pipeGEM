@@ -16,7 +16,7 @@ def parse_predefined_threshold(predefined_threshold,
                                use_heuristic_th=False):
     if predefined_threshold is None:
         th_finder = rFastCormicsThreshold()
-        th_result = th_finder.find_threshold(gene_data, use_first_guess=use_heuristic_th)
+        th_result = th_finder.find_threshold(gene_data, return_heuristic=use_heuristic_th)
         non_exp_th = th_result.non_exp_th
         exp_th = th_result.exp_th
     else:

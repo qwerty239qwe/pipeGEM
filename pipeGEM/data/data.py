@@ -92,33 +92,31 @@ class GeneData(BaseData):
     def __init__(self,
                  data,
                  convert_to_str: bool = True,
-                 expression_threshold = 1e-4,
-                 absent_expression = 0,
+                 expression_threshold: float = 1e-4,
+                 absent_expression: float = 0,
                  data_transform = None,
-                 discrete_transform = None):
+                 discrete_transform = None,
+                 ordered_thresholds: list = None):
         """
         A GeneData object stores gene data using a dict. It can also calculate rxn scores for a given model.
 
         Parameters
         ----------
         data
-        convert_to_str
-        expression_threshold
+        convert_to_str: bool
+        expression_threshold: float
+        absent_expression: float
         data_transform
         discrete_transform
-
+        ordered_thresholds: list
+            Ascending thresholds indicating how the gene level will be transformed discretely
 
         Examples
         ----------
-        data = GeneData(df)
-        data.align(model)
-        data.rxn_scores
-        model.data["data1"] = data
-        model.list_data
         """
         super().__init__("genes")
         self.convert_to_str = convert_to_str
-        discrete_transform = self._parse_discrete_transform(discrete_transform)
+        discrete_transform = self._parse_discrete_transform(discrete_transform, ordered_thresholds)
         data_transform = (lambda x: x) if data_transform is None else data_transform
 
         if isinstance(data, pd.Series):
@@ -134,6 +132,7 @@ class GeneData(BaseData):
         else:
             raise ValueError("Expression data should be a dict or a pandas series")
         self.genes = list(self.gene_data.keys())
+        self._digitize_data(ordered_thresholds)
         self.rxn_mapper = None
 
     def __getitem__(self, item):
@@ -154,8 +153,16 @@ class GeneData(BaseData):
             raise AttributeError("The rxn mapper is not initialized. Please use .align(model) to do that first.")
         return self.rxn_mapper.rxn_scores
 
+    def _digitize_data(self, ordered_thresholds):
+        if ordered_thresholds is not None:
+            n_bins = len(ordered_thresholds)
+            ranges = np.array([i for i in range(-((n_bins - 1) // 2), n_bins // 2 + 1)])
+            data = np.array(list(self.gene_data.values()))
+            disc_data = ranges[np.digitize(data, ordered_thresholds)]
+            self.gene_data = dict(zip(self.gene_data.keys(), disc_data))
+
     @staticmethod
-    def _parse_discrete_transform(discrete_transform):
+    def _parse_discrete_transform(discrete_transform, ordered_thresholds):
         if isinstance(discrete_transform, str):
             if discrete_transform in dis_trans:
                 return lambda x: dis_trans[discrete_transform][x]

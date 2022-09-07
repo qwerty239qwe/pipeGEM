@@ -24,7 +24,7 @@ def apply_GIMME(model: cobra.Model,
                 keep_context: bool = False
                 ):
     """
-    GLF implementation
+    GIMME implementation
 
     Parameters
     ----------

@@ -45,7 +45,7 @@ class DistributionBased(ThresholdFinder):
     def _cal_canyons_p(x1, y1, x2, y2, c=0.5):
         return c * 2 ** (-abs(x1 - x2)) + (1 - c) * 1.5 ** (((y1 / y2) if y1 > y2 else (y2 / y1)) - 1) / 50
 
-    def get_init_for_bimodal(self, x, y, min_h_ratio=1.5, max_w_ratio=2, n_top=100):
+    def get_init_for_bimodal(self, x, y, max_x, min_x, min_h_ratio=1.5, max_w_ratio=2, n_top=100):
         assert len(x) == len(y)
 
         dx = x[1] - x[0]
@@ -81,10 +81,11 @@ class DistributionBased(ThresholdFinder):
                 is_invalid_h = min_h_ratio * y1 < peak and min_h_ratio * y2 < peak
                 is_invalid_w = ((min(x1, x2) - xmin) / (xmax - max(x1, x2)) > max_w_ratio) or \
                                ((min(x1, x2) - xmin) / (xmax - max(x1, x2)) < 1 / max_w_ratio)
-                if i >= j or is_invalid_h or is_invalid_w:
+                if i >= j or is_invalid_h or is_invalid_w or x1 > max_x or x2 > max_x or x1 < min_x or x2 < min_x:
                     continue
                 p_arr[i, j] = self._cal_canyons_p(x1=x1, y1=y1, x2=x2, y2=y2)
         arg_min = np.where(p_arr == np.min(p_arr))
+        print("p_score of init values:", np.min(p_arr))
         return candidates[arg_min[0][0]], candidates[arg_min[1][0]]
 
     @staticmethod
@@ -109,54 +110,71 @@ class DistributionBased(ThresholdFinder):
         dtx = abs(x - c)
         return y[np.argsort(dtx)[0]]
 
-    def _bimodal_fit(self, x, y, amp_ratio_tol=4, var_ratio_tol=6, mean_diff_tol=3, return_best_p=True):
-        c1, c2 = self.get_init_for_bimodal(x, y)
+    def _bimodal_fit(self, x, y, max_x, min_x,
+                     amp_ratio_tol=4, var_ratio_tol=6, mean_diff_tol=3,
+                     return_heuristic=False, k=1):
+        c1, c2 = self.get_init_for_bimodal(x, y, max_x=max_x, min_x=min_x)
         c1, c2 = min(c1, c2), max(c1, c2)
         print("original guess: ", c1, c2)
         init_vals = (1, c1, 1, 1, c2, 1)
         init_val_displayed = (self._get_y_by_nearest_x(x, y, c1), c1, 1, self._get_y_by_nearest_x(x, y, c2), c2, 1)
-        grid = [(2 + 10 * i, 2 + 10 * j) for i in range(0, 10) for j in range(0, 10)]
+        grid = [(2 + 20 * i, 2 + 20 * j) for i in range(0, 5) for j in range(0, 5)]
         covar = None
+        pscore_arr = np.ones(shape=(k,)) * np.inf
+        params_arr = np.empty(shape=(k, 6))
+        params_arr[:] = np.nan
+
         p = init_val_displayed
         try:
             found_best = False
-            best_pscore = np.inf
-            best_p = None
+            # best_pscore = np.inf
+            # best_p = None
             it = 0
-            while (not found_best) and it < len(grid):
+            while it < len(grid):
                 tried_vals = [grid[it][0], init_vals[1], init_vals[2],
                               grid[it][1], init_vals[4], init_vals[5]]
+                x_var = (max_x - min_x) / 6
                 p, covar = curve_fit(self.bimodal_dist, xdata=x, ydata=y,
-                                     p0=tried_vals, bounds=((0, -np.inf, 0, 0, -np.inf, 0), np.inf))
-                found_best = self._check_fitted_param(p,
-                                                      amp_ratio_tol=amp_ratio_tol,
-                                                      var_ratio_tol=var_ratio_tol,
-                                                      mean_diff_tol=mean_diff_tol)
-                pscore = self._cal_canyons_p(x1=p[1], x2=p[4], y1=p[0], y2=p[3])
-                if best_pscore > pscore:
-                    best_p = p
+                                     p0=tried_vals, bounds=((0, max(min_x, init_vals[1] - x_var), 0,
+                                                             0, max(min_x, init_vals[4] - x_var), 0),
+                                                            (np.inf, min(max_x, init_vals[1] + x_var), np.inf,
+                                                             np.inf, min(max_x, init_vals[4] + x_var), np.inf)))
+                pscore = np.inf
+                if (min_x < p[1] < max_x) and (min_x < p[4] < max_x):  # valid x (in acceptable range)
+                    found_best = self._check_fitted_param(p,
+                                                          amp_ratio_tol=amp_ratio_tol,
+                                                          var_ratio_tol=var_ratio_tol,
+                                                          mean_diff_tol=mean_diff_tol)
+                    pscore = self._cal_canyons_p(x1=p[1], x2=p[4], y1=p[0], y2=p[3])
+                    print("pscore:", pscore)
+                insert_index = np.searchsorted(pscore_arr, pscore)
+                if insert_index < k:
+                    pscore_arr = np.insert(pscore_arr, insert_index, pscore)[:k]
+                    params_arr = np.insert(params_arr, insert_index, np.array(p), axis=0)[:k, :]
                 it += 1
+
             if not found_best:
-                if return_best_p:
-                    warnings.warn("Fail to find proper parameters, use the best one")
-                    p = (i for i in best_p)
+                if not return_heuristic:
+                    warnings.warn(f"Fail to find proper parameters, return the best {k} params")
                 else:
                     warnings.warn("Fail to find proper parameters, use initial values")
-                    print("problematic p: ", best_p)
+                    print("problematic parameter array: ", params_arr)
                     self._check_fitted_param(p,
                                              amp_ratio_tol=amp_ratio_tol,
                                              var_ratio_tol=var_ratio_tol,
                                              mean_diff_tol=mean_diff_tol, verbosity=True)
-                    p = init_val_displayed
+                    params_arr[:] = init_val_displayed
                     covar = None
         except RuntimeError as e:
             warnings.warn(f"Fail to optimize: {e}")
-        A1, mu1, wid1, A2, mu2, wid2 = p
-        print("fitted Amps: ", A1, A2)
-        print("fitted means: ", mu1, mu2)
-        if mu1 < mu2:
-            return (A2, mu2, wid2,), (A1, mu1, wid1,), covar
-        return (A1, mu1, wid1,), (A2, mu2, wid2,), covar
+
+        # move the larger means to the first 3 columns
+        params_arr[params_arr[:, 1] < params_arr[:, 4], :] = params_arr[params_arr[:, 1] < params_arr[:, 4], :][:, [3, 4, 5, 0, 1, 2]]
+        A1, A2 = params_arr[0, 0], params_arr[0, 3]
+        mu1, mu2 = params_arr[0, 1], params_arr[0, 4]
+        print("best fitted Amps: ", A1, A2)
+        print("best fitted means: ", mu1, mu2)
+        return params_arr
 
 
 class rFastCormicsThreshold(DistributionBased):
@@ -168,7 +186,11 @@ class rFastCormicsThreshold(DistributionBased):
     def find_threshold(self,
                        data: Union[np.ndarray, pd.Series, dict],
                        cut_off: float = -np.inf,
-                       use_first_guess: bool = False):
+                       return_heuristic: bool = False,
+                       hard_x_lims: tuple = (0.05, 0.95),
+                       k_best: int = 3):
+        assert hard_x_lims[0] < hard_x_lims[1]
+
         if isinstance(data, pd.Series):
             arr = data.values
         elif isinstance(data, dict):
@@ -177,20 +199,26 @@ class rFastCormicsThreshold(DistributionBased):
             arr = data
 
         arr = arr[arr > cut_off]
+        min_x, max_x = np.percentile(arr, hard_x_lims[0] * 100), np.percentile(arr, hard_x_lims[1] * 100)
         kde_f = gaussian_kde(arr)
         x = np.linspace(arr.min(), arr.max(), 10000)
         y = kde_f(x)
-        if use_first_guess:
-            c1, c2 = self.get_init_for_bimodal(x, y)
+        if return_heuristic:
+            if k_best > 1:
+                print("Only return a group of params because the return_heuristic is set to True")
+            c1, c2 = self.get_init_for_bimodal(x, y, max_x=max_x, min_x=min_x)
             c1, c2 = min(c1, c2), max(c1, c2)
-            best_vals_right, best_vals_left = (1, c2, 1), (1, c1, 1)
+            params_arr = np.array([[1, c2, 1, 1, c1, 1]])
         else:
-            best_vals_right, best_vals_left, _ = self._bimodal_fit(x, y)
+            params_arr = self._bimodal_fit(x, y, max_x=max_x, min_x=min_x, k=k_best)
 
-        result = rFastCormicThresholdAnalysis(log={"use_first_guess": use_first_guess, "cut_off": cut_off})
-        right_c = None if use_first_guess else self.gaussian_dist(x, *tuple(best_vals_right))
-        left_c = None if use_first_guess else self.gaussian_dist(x, *tuple(best_vals_left))
-        result.add_result(exp_th=best_vals_right[1], nonexp_th=best_vals_left[1],
+        result = rFastCormicThresholdAnalysis(log={"use_first_guess": return_heuristic,
+                                                   "cut_off": cut_off,
+                                                   'hard_x_lims': hard_x_lims})
+        print(params_arr.shape)
+        right_c = None if return_heuristic else np.array([self.gaussian_dist(x, *tuple(params_arr[k, 0:3])) for k in range(k_best)])
+        left_c = None if return_heuristic else np.array([self.gaussian_dist(x, *tuple(params_arr[k, 3:6])) for k in range(k_best)])
+        result.add_result(exp_th=params_arr[:, 1], nonexp_th=params_arr[:, 4],
                           right_curve=right_c, left_curve=left_c, x=x, y=y)
 
         return result
