@@ -261,6 +261,10 @@ class LocalThreshold(RankBased):
     def find_threshold(self,
                        data,  # 2d array
                        p,
+                       global_on_p=90,
+                       global_off_p=10,
+                       global_on_th=None,
+                       global_off_th=None,
                        **kwargs):
         assert 0 <= p <= 100
         if isinstance(data, pd.DataFrame):
@@ -271,6 +275,14 @@ class LocalThreshold(RankBased):
             genes = kwargs.get("genes")
         arr[~np.isfinite(arr)] = np.nan
         exp_ths = pd.DataFrame({"exp_th": np.nanpercentile(arr, q=p, axis=1)}, index=genes)
+
+        if global_on_p is not None or global_on_th is not None:
+            glob_on_th = np.nanpercentile(arr, q=global_on_p) if global_on_th is None else global_on_th
+            exp_ths.loc[exp_ths.index[np.nanmin(arr, axis=1) > glob_on_th], :] = glob_on_th
+        if global_off_p is not None or global_off_th is not None:
+            glob_off_th = np.nanpercentile(arr, q=global_off_p) if global_off_th is None else global_off_th
+            exp_ths.loc[exp_ths.index[np.nanmax(arr, axis=1) < glob_off_th], :] = glob_off_th
+
         result = LocalThresholdAnalysis(log={"p": p})
         result.add_result(exp_ths)
         return result
@@ -279,3 +291,4 @@ class LocalThreshold(RankBased):
 threshold_finders = ThresholdFinders()
 threshold_finders.register("rFASTCORMICS", rFastCormicsThreshold)
 threshold_finders.register("percentile", PercentileThreshold)
+threshold_finders.register("local", LocalThreshold)

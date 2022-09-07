@@ -27,13 +27,20 @@ class RxnMapper:
                  model,
                  threshold=0,
                  absent_value=0,
-                 missing_value=np.nan):
+                 missing_value=np.nan,
+                 and_operation="nanmin",
+                 or_operation="nanmax",
+                 plus_operation="nansum"  # for reduced reactions
+                 ):
         self.genes = data.genes
         self.gene_data = data.gene_data
         self.missing_value = missing_value  # if the gene is not shown in the given data
         self.rxn_scores = self._map_to_rxns(model,
                                             threshold=threshold,
-                                            absent_value=absent_value)
+                                            absent_value=absent_value,
+                                            and_operation=and_operation,
+                                            or_operation=or_operation,
+                                            plus_operation=plus_operation)
 
     def _inner_grr_helper(self, grr_list) -> list:
         inner_grr_scores = []
@@ -191,9 +198,30 @@ class GeneData(BaseData):
 
         raise ValueError("The method is not supported")
 
+    def apply(self, func):
+        return {k: func(v) for k, v in self.rxn_mapper.rxn_scores.items()}
+
     def get_threshold(self, name, **kwargs):
         tf = threshold_finders.create(name)
         return tf.find_threshold(self.gene_data, **kwargs)
+
+    def assign_local_threshold(self, local_threshold_result, method="binary", **kwargs):
+        assert method in ["binary", "ratio", "diff", "rdiff"]
+        gene_exp_ths = local_threshold_result.exp_ths
+        data_and_ths = pd.concat([gene_exp_ths, pd.DataFrame({"data": self.gene_data})], axis=1)
+        if method == "binary":
+            self.gene_data = (data_and_ths["data"] > data_and_ths["exp_th"]).astype(int).to_dict()
+        elif method == "ratio":
+            self.gene_data = (data_and_ths["data"] / data_and_ths["exp_th"]).to_dict()
+        elif method == "diff":
+            self.gene_data = (data_and_ths["exp_th"] - data_and_ths["data"]).to_dict()
+        elif method == "rdiff":
+            self.gene_data = (data_and_ths["data"] - data_and_ths["exp_th"]).to_dict()
+
+
+def find_local_threshold(data_df, **kwargs):
+    tf = threshold_finders.create("local")
+    return tf.find_threshold(data_df, **kwargs)
 
 
 class ThermalData(BaseData):

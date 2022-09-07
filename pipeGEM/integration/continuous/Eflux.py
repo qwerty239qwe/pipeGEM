@@ -5,11 +5,9 @@ import numpy as np
 
 from pipeGEM.utils import select_rxns_from_model
 from pipeGEM.utils.transform import exp_x
-from pipeGEM.integration.continuous import register
 from pipeGEM.analysis import EFluxAnalysis
 
 
-@register
 def apply_EFlux(model: cobra.Model,
                 rxn_expr_score: Dict[str, float],
                 max_ub: float = 1000,

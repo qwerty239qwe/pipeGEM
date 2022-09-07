@@ -24,7 +24,7 @@ def apply_RIPTiDe_pruning(model,
         raise ValueError("max_gw cannot be zero")
     if np.isnan(max_gw):
         raise ValueError("max_gw cannot be NaN")
-    min_gw = min([i for i in rxn_expr_score.values() if not np.isnan(i)])
+    min_gw = min([i for i in rxn_expr_score.values() if np.isfinite(i)])
     obj_dict = {r_id: (max_gw + min_gw - r_exp) / max_gw
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)}
     obj_dict.update({r.id: min_gw / max_gw

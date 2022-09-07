@@ -1,13 +1,3 @@
-import warnings
-from pathlib import Path
-
-from scipy.stats import gaussian_kde
-from scipy.optimize import curve_fit
-import numpy as np
-import matplotlib.pyplot as plt
-import cobra
-
-from pipeGEM.integration.mapping import Expression
 from pipeGEM.analysis import rFastCormicsThreshold, rFastCormicThresholdAnalysis
 
 
