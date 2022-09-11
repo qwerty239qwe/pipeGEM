@@ -205,18 +205,19 @@ class GeneData(BaseData):
         tf = threshold_finders.create(name)
         return tf.find_threshold(self.gene_data, **kwargs)
 
-    def assign_local_threshold(self, local_threshold_result, method="binary", **kwargs):
+    def assign_local_threshold(self, local_threshold_result, method="binary", group=None, **kwargs):
         assert method in ["binary", "ratio", "diff", "rdiff"]
-        gene_exp_ths = local_threshold_result.exp_ths
+        group = group if group is not None else 'exp_th'
+        gene_exp_ths = local_threshold_result.exp_ths[group]
         data_and_ths = pd.concat([gene_exp_ths, pd.DataFrame({"data": self.gene_data})], axis=1)
         if method == "binary":
-            self.gene_data = (data_and_ths["data"] > data_and_ths["exp_th"]).astype(int).to_dict()
+            self.gene_data = (data_and_ths["data"] > data_and_ths[group]).astype(int).to_dict()
         elif method == "ratio":
-            self.gene_data = (data_and_ths["data"] / data_and_ths["exp_th"]).to_dict()
+            self.gene_data = (data_and_ths["data"] / data_and_ths[group]).to_dict()
         elif method == "diff":
-            self.gene_data = (data_and_ths["exp_th"] - data_and_ths["data"]).to_dict()
+            self.gene_data = (data_and_ths[group] - data_and_ths["data"]).to_dict()
         elif method == "rdiff":
-            self.gene_data = (data_and_ths["data"] - data_and_ths["exp_th"]).to_dict()
+            self.gene_data = (data_and_ths["data"] - data_and_ths[group]).to_dict()
 
 
 def find_local_threshold(data_df, **kwargs):

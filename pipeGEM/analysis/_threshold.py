@@ -265,23 +265,64 @@ class LocalThreshold(RankBased):
                        global_off_p=10,
                        global_on_th=None,
                        global_off_th=None,
+                       groups=None,
                        **kwargs):
+        """
+
+        Parameters
+        ----------
+        data
+        p
+        global_on_p
+        global_off_p
+        global_on_th
+        global_off_th
+        groups: dict or pd.Series
+        kwargs
+
+        Returns
+        -------
+        local_threshold_analysis: LocalThresholdAnalysis
+            The result object contains an expression threshold dataframe.
+            The dataframe will be N_gene x N_group(if the groups arg is specified) containing the expression thresholds
+
+        """
         assert 0 <= p <= 100
         if isinstance(data, pd.DataFrame):
             arr = data.values
             genes = data.index
+            samples = data.columns
         else:
             arr = data
             genes = kwargs.get("genes")
+            samples = kwargs.get("samples")
+        if isinstance(groups, dict):
+            if all([isinstance(v, list) for v in groups.values()]):
+                groups = pd.Series({vi: k for k, v in groups.items() for vi in v})
+            else:
+                groups = pd.Series(groups)
+        elif groups is None:
+            groups = pd.Series(["exp_th" for _ in range(len(samples))], index=samples)
+        group_list = groups.unique()
+
         arr[~np.isfinite(arr)] = np.nan
-        exp_ths = pd.DataFrame({"exp_th": np.nanpercentile(arr, q=p, axis=1)}, index=genes)
+        exp_ths = pd.DataFrame({grp: np.nanpercentile(arr[:, samples.isin(groups[groups == grp].index)], q=p, axis=1)
+                                for grp in group_list}, index=genes)
 
         if global_on_p is not None or global_on_th is not None:
-            glob_on_th = np.nanpercentile(arr, q=global_on_p) if global_on_th is None else global_on_th
-            exp_ths.loc[exp_ths.index[np.nanmin(arr, axis=1) > glob_on_th], :] = glob_on_th
+            for grp in group_list:
+                glob_on_th_grp = np.nanpercentile(arr[:, samples.isin(groups[groups == grp].index)], q=global_on_p) \
+                    if global_on_th is None else global_on_th
+                glob_on_th_grp = glob_on_th_grp[grp] if isinstance(glob_on_th_grp, dict) else glob_on_th_grp
+                exp_ths.loc[exp_ths.index[np.nanmin(arr[:, samples.isin(groups[groups == grp].index)],
+                                                    axis=1) > glob_on_th_grp], grp] = glob_on_th_grp
         if global_off_p is not None or global_off_th is not None:
-            glob_off_th = np.nanpercentile(arr, q=global_off_p) if global_off_th is None else global_off_th
-            exp_ths.loc[exp_ths.index[np.nanmax(arr, axis=1) < glob_off_th], :] = glob_off_th
+            for grp in group_list:
+                glob_off_th_grp = np.nanpercentile(arr[:, samples.isin(groups[groups == grp].index)], q=global_off_p) \
+                    if global_off_th is None else global_off_th
+                glob_off_th_grp = glob_off_th_grp[grp] if isinstance(glob_off_th_grp, dict) else glob_off_th_grp
+                exp_ths.loc[exp_ths.index[np.nanmax(arr[:, samples.isin(groups[groups == grp].index)],
+                                                    axis=1) < glob_off_th_grp], grp] = glob_off_th_grp
 
         result = LocalThresholdAnalysis(log={"p": p})
         result.add_result(exp_ths)
