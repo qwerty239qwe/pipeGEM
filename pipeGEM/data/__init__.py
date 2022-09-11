@@ -1,1 +1,1 @@
-from .data import GeneData, MediumData
+from .data import GeneData, MediumData, find_local_threshold

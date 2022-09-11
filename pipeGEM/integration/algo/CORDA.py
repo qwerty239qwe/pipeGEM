@@ -66,6 +66,9 @@ class CORDABuilder:
             n_sups = pd.DataFrame({"n": np.zeros(shape=(len(eval_vars),))}, index=eval_vars)
 
         for vi, var_id in enumerate(var_ids):
+            if n_iters == 1 and var_id in all_support_vars:
+                continue
+
             self._model.objective = Zero
             var = self._model.variables[var_id]
             if var.ub < self._threshold:
@@ -109,10 +112,14 @@ class CORDABuilder:
 
     def build(self,
               keep_if_support=5):
+        n_cores = len([i for i, c in self._conf_scores.items() if c >= 3])
         hi_supports = self._get_support_rxns([i for i, c in self._conf_scores.items() if c >= 3])
+        print(f"{n_cores - len([i for i, c in self._conf_scores.items() if c >= 3])} were removed from the core variables")
+        n_cores = len([i for i, c in self._conf_scores.items() if c >= 3])
         for i in hi_supports:
             self._conf_scores[i] = 3
-        print("step 1 finished")
+        print(f"step 1 finished, {len([i for i, c in self._conf_scores.items() if c >= 3]) - n_cores} were added to the core variables")
+        n_cores = len([i for i, c in self._conf_scores.items() if c >= 3])
         m_l_supports, to_keeps = self._get_support_rxns([i
                                                          for i, c in self._conf_scores.items() if 0 <= c < 3],
                                                         keep_if_support=keep_if_support,
@@ -136,8 +143,9 @@ class CORDABuilder:
                     for vi in to_change:
                         self._conf_scores[vi] = 3
             self._model.objective.set_linear_coefficients({v: 0})
-        print("step 2 finished")
-
+        print(f"step 2 finished, {len([i for i, c in self._conf_scores.items() if c >= 3]) - n_cores} added to core variables")
+        n_cores = len([i for i, c in self._conf_scores.items() if c >= 3])
+        # do we need this?
         for vid, conf in self._conf_scores.items():
             if 0 < conf < 3:
                 self._model.variables[vid].ub = 0.0
@@ -146,7 +154,7 @@ class CORDABuilder:
         hi_supports = self._get_support_rxns([i for i, c in self._conf_scores.items() if c >= 3],
                                              penalize_medium_score=False,
                                              support_redundancies=False)
-        print("step 3 finished")
+        print(f"step 3 finished, {len([i for i, c in self._conf_scores.items() if c >= 3]) - n_cores} added to core variables")
         for i in hi_supports:
             self._conf_scores[i] = 3
 

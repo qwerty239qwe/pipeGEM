@@ -18,10 +18,6 @@ def apply_RIPTiDe_pruning(model,
     if protected_rxns is None:
         protected_rxns = []
     max_gw = max_gw or max([i for i in rxn_expr_score.values() if not np.isnan(i)])
-    if max_gw < max(rxn_expr_score.values()):
-        raise ValueError("max_gw must be greater than or equal to the max rxn score")
-    if max_gw == 0:
-        raise ValueError("max_gw cannot be zero")
     if np.isnan(max_gw):
         raise ValueError("max_gw cannot be NaN")
     min_gw = min([i for i in rxn_expr_score.values() if np.isfinite(i)])
