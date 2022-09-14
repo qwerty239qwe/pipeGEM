@@ -11,7 +11,7 @@ from pipeGEM.analysis import EFluxAnalysis
 def apply_EFlux(model: cobra.Model,
                 rxn_expr_score: Dict[str, float],
                 max_ub: float = 1000,
-                min_lb: float = .03,
+                min_lb: float = .01,
                 ignore: Union[str, List[str], None] = None,
                 transform: Callable = exp_x):
     """

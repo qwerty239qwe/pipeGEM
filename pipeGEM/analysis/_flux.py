@@ -283,5 +283,23 @@ def modified_pfba(model,
     return solution
 
 
+def add_norm_constraint(model,
+                        ignored_reactions=None,
+                        coef_dict=None,
+                        ub=1,
+                        name="norm_constraint_for_reactions"):
+    import gurobipy
+    if coef_dict is None:
+        coef_dict = {r.id: 1 for r in model.reactions}
+    terms = []
+    for r in model.reactions:
+        if r.id not in ignored_reactions:
+            terms.append(coef_dict[r.id] * r.forward_variable * r.forward_variable)
+            terms.append(coef_dict[r.id] * r.reverse_variable * r.reverse_variable)
+    lhs = gurobipy.quicksum(terms)
+    model.problem.addQConstr(lhs, gurobipy.GRB.LESS_EQUAL, ub, name=name)
+    model.problem.params.NonConvex = 2
+
+
 def max_abs_flux(model, ):
     pass
