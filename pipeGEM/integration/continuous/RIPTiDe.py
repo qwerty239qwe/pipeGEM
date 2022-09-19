@@ -44,6 +44,7 @@ def apply_RIPTiDe_sampling(model,
                            solver = "gurobi",
                            sampling_method: str = "gapsplit",
                            sampling_n: int = 500,
+                           keep_context: bool = False,
                            **kwargs
                            ):
     max_gw = max_gw or max(rxn_expr_score.values())
@@ -53,16 +54,21 @@ def apply_RIPTiDe_sampling(model,
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)}
     obj_dict.update({r.id: 1
                      for r in model.reactions if r.id not in obj_dict})  # same as the smallest weight
-    add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac, direction="max")
-    fix_objective_as_constraint(model=model, fraction=obj_frac)
+
     sampling_result = None
     if do_sampling:
-        sampling_analyzer = flux_analyzers["sampling"](model, solver, log={"n": sampling_n,
-                                                                           "method": sampling_method,
-                                                                           **kwargs})
-        sampling_result = sampling_analyzer.analyze({"n": sampling_n,
-                                                     "method": sampling_method,
-                                                     **kwargs})
+        with model:
+            add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac, direction="max")
+            fix_objective_as_constraint(model=model, fraction=obj_frac)
+            sampling_analyzer = flux_analyzers["sampling"](model, solver, log={"n": sampling_n,
+                                                                               "method": sampling_method,
+                                                                               **kwargs})
+            sampling_result = sampling_analyzer.analyze(n=sampling_n,
+                                                        method=sampling_method,
+                                                        **kwargs)
+    if keep_context:
+        add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac, direction="max")
+        fix_objective_as_constraint(model=model, fraction=obj_frac)
     analysis_result = RIPTiDeSamplingAnalysis(log = {"max_gw": max_gw, "obj_frac": obj_frac,
                                                      "do_sampling": do_sampling, "solver": solver,
                                                      "sampling_method": sampling_method})

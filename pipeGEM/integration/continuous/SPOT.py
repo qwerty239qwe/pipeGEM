@@ -30,12 +30,18 @@ def apply_SPOT(model: cobra.Model,
     -------
     None
     """
-    obj_dict = {r_id: r_exp
+    protected_rxns = [] if protected_rxns is None else protected_rxns
+    obj_dict = {model.reactions.get_by_id(r_id).forward_variable: r_exp
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp) and
                 r_id not in protected_rxns}
+    obj_dict.update({model.reactions.get_by_id(r_id).reverse_variable: r_exp
+                    for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp) and
+                    r_id not in protected_rxns})
     with model:
         add_norm_constraint(model)
-        add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=0, direction="max")
+        model.objective.set_linear_coefficients({v: 0 for v in model.variables})
+        model.objective.set_linear_coefficients({k: v for k, v in obj_dict.items()})
+        #add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=0, direction="max")
         sol = model.optimize("maximize")
 
     flux_df = sol.to_frame()

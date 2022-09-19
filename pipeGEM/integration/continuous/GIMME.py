@@ -16,6 +16,7 @@ def apply_GIMME(model: cobra.Model,
                 obj_frac: float = 0.8,
                 remove_zero_fluxes: bool = False,
                 flux_threshold: float = 1e-6,
+                max_inconsistency_score = 1e3,
                 return_fluxes: bool = True,
                 keep_context: bool = False
                 ):
@@ -37,6 +38,7 @@ def apply_GIMME(model: cobra.Model,
     None
     """
     obj_dict = {r_id: (high_exp - r_exp)
+                if high_exp - r_exp < max_inconsistency_score else max_inconsistency_score  # this is for preventing using -np.inf values
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp) and
                 r_id not in protected_rxns and
                 r_exp < high_exp}

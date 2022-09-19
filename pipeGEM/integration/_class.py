@@ -1,5 +1,6 @@
 from pipeGEM.integration.continuous.GIMME import apply_GIMME
 from pipeGEM.integration.continuous.Eflux import apply_EFlux
+from pipeGEM.integration.continuous.SPOT import apply_SPOT
 from pipeGEM.integration.algo.rFASTCORMICS import apply_rFASTCORMICS
 from pipeGEM.integration.continuous.RIPTiDe import apply_RIPTiDe_pruning, apply_RIPTiDe_sampling
 from pipeGEM.integration.algo.CORDA import apply_CORDA
@@ -48,6 +49,14 @@ class EFlux(RemovableGeneDataIntegrator):
 
     def integrate(self, data, **kwargs):
         return apply_EFlux(model=self._model, rxn_expr_score=data.rxn_scores, **kwargs)
+
+
+class SPOT(RemovableGeneDataIntegrator):
+    def __init__(self, model):
+        super().__init__(model)
+
+    def integrate(self, data, **kwargs):
+        return apply_SPOT(model=self._model, rxn_expr_score=data.rxn_scores, **kwargs)
 
 
 class RIPTiDePruning(GeneDataIntegrator):
@@ -100,6 +109,7 @@ class CORDA(GeneDataIntegrator):
 integrator_factory = Integrators()
 integrator_factory.register("GIMME", GIMME)
 integrator_factory.register("EFlux", EFlux)
+integrator_factory.register("SPOT", SPOT)
 integrator_factory.register("RIPTiDePruning", RIPTiDePruning)
 integrator_factory.register("RIPTiDeSampling", RIPTiDeSampling)
 integrator_factory.register("RIPTiDe", RIPTiDe)

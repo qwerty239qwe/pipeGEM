@@ -102,6 +102,8 @@ class SamplingAnalyzer(FluxAnalyzer):
                 kwargs["gurobi_direct"] = (self.solver_name == "gurobi")
                 kwargs.pop("method")
                 return gapsplit(self.model, n=n, **kwargs)
+            else:
+                method = kwargs.pop("method")
 
             return sampling.sample(self.model, n=n, **kwargs)
 
@@ -292,13 +294,17 @@ def add_norm_constraint(model,
     if coef_dict is None:
         coef_dict = {r.id: 1 for r in model.reactions}
     terms = []
+    ignored_reactions = ignored_reactions if ignored_reactions is not None else []
     for r in model.reactions:
         if r.id not in ignored_reactions:
-            terms.append(coef_dict[r.id] * r.forward_variable * r.forward_variable)
-            terms.append(coef_dict[r.id] * r.reverse_variable * r.reverse_variable)
+            f_var = model.solver.problem.getVarByName(r.forward_variable.name)
+            r_var = model.solver.problem.getVarByName(r.reverse_variable.name)
+            terms.append(coef_dict[r.id] * f_var * f_var)
+            terms.append(coef_dict[r.id] * r_var * r_var)
     lhs = gurobipy.quicksum(terms)
-    model.problem.addQConstr(lhs, gurobipy.GRB.LESS_EQUAL, ub, name=name)
-    model.problem.params.NonConvex = 2
+    model.solver.problem.addQConstr(lhs, gurobipy.GRB.LESS_EQUAL, ub, name=name)
+    model.solver.problem.params.NonConvex = 2
+    model.solver.update()
 
 
 def max_abs_flux(model, ):
