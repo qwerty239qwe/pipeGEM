@@ -232,7 +232,8 @@ def add_mod_pfba(
         model.objective = objective
     if model.solver.objective.name == "_pfba_objective":
         raise ValueError("The model already has a pFBA objective.")
-    fix_objective_as_constraint(model, fraction=fraction_of_optimum)
+    if fraction_of_optimum != 0:
+        fix_objective_as_constraint(model, fraction=fraction_of_optimum)
     reactions = model.reactions if reactions is None else reactions
     if weights is None:
         reaction_var_dict = {rxn.forward_variable: 1 for rxn in reactions}
@@ -247,9 +248,10 @@ def add_mod_pfba(
         reaction_var_dict = {model.reactions.get_by_id(k).forward_variable: v for k, v in weights.items()}
         reaction_var_dict.update({model.reactions.get_by_id(k).reverse_variable: v for k, v in weights.items()})
 
-    model.objective = model.problem.Objective(
-        Zero, direction=direction, sloppy=True, name="_pfba_objective"
-    )
+    # model.objective = model.problem.Objective(
+    #     Zero, direction=direction, sloppy=True, name="_pfba_objective"
+    # )
+    model.objective.set_linear_coefficients({v: 0 for v in model.variables})
     model.objective.set_linear_coefficients({k: v for k, v in reaction_var_dict.items()})
 
 
@@ -288,22 +290,35 @@ def modified_pfba(model,
 def add_norm_constraint(model,
                         ignored_reactions=None,
                         coef_dict=None,
+                        degree=1,
                         ub=1,
                         name="norm_constraint_for_reactions"):
     import gurobipy
     if coef_dict is None:
         coef_dict = {r.id: 1 for r in model.reactions}
-    terms = []
+    terms = [] if degree != 1 else {}
     ignored_reactions = ignored_reactions if ignored_reactions is not None else []
     for r in model.reactions:
         if r.id not in ignored_reactions:
-            f_var = model.solver.problem.getVarByName(r.forward_variable.name)
-            r_var = model.solver.problem.getVarByName(r.reverse_variable.name)
-            terms.append(coef_dict[r.id] * f_var * f_var)
-            terms.append(coef_dict[r.id] * r_var * r_var)
-    lhs = gurobipy.quicksum(terms)
-    model.solver.problem.addQConstr(lhs, gurobipy.GRB.LESS_EQUAL, ub, name=name)
-    model.solver.problem.params.NonConvex = 2
+            if degree == 2:
+                f_var = model.solver.problem.getVarByName(r.forward_variable.name)
+                r_var = model.solver.problem.getVarByName(r.reverse_variable.name)
+                terms.append(coef_dict[r.id] * f_var * f_var)
+                terms.append(coef_dict[r.id] * r_var * r_var)
+            elif degree == 1:
+                terms.update({r.forward_variable: coef_dict[r.id],
+                              r.reverse_variable: coef_dict[r.id]})
+
+    if degree == 2:
+        lhs = gurobipy.quicksum(terms)
+        model.solver.problem.addQConstr(lhs, gurobipy.GRB.LESS_EQUAL, ub ** degree, name=name)
+    elif degree == 1:
+        norm1_cons = model.problem.Constraint(Zero,
+                                              name=name, lb=0, ub=ub)
+        model.add_cons_vars([norm1_cons])
+        model.solver.update()
+        norm1_cons.set_linear_coefficients(terms)
+    # model.solver.problem.params.NonConvex = 2  # every norm is a convex function
     model.solver.update()
 
 

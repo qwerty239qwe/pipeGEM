@@ -13,6 +13,7 @@ def apply_RIPTiDe_pruning(model,
                           obj_frac: float = 0.8,
                           threshold: float = 1e-6,
                           protected_rxns = None,
+                          max_inconsistency_score = 1e3,
                           **kwargs
                           ):
     if protected_rxns is None:
@@ -21,10 +22,10 @@ def apply_RIPTiDe_pruning(model,
     if np.isnan(max_gw):
         raise ValueError("max_gw cannot be NaN")
     min_gw = min([i for i in rxn_expr_score.values() if np.isfinite(i)])
-    obj_dict = {r_id: (max_gw + min_gw - r_exp) / max_gw
-                for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)}
-    obj_dict.update({r.id: min_gw / max_gw
-                     for r in model.reactions if r.id not in obj_dict})  # same as the smallest weight
+    obj_dict = {r_id: (max_gw + min_gw - r_exp) / max_gw if (max_gw + min_gw - r_exp) < max_inconsistency_score else 1
+                for r_id, r_exp in rxn_expr_score.items() if not (np.isnan(r_exp) or r_id in protected_rxns)}
+
+    assert all([0 <= v <= 1 for _, v in obj_dict.items()])
     sol_df = modified_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac).to_frame()
     rxn_to_remove = list(set(sol_df[abs(sol_df["fluxes"]) < threshold].index.to_list()) - set(protected_rxns))
     output_model = model.copy()

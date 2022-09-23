@@ -6,9 +6,10 @@ from cobra.util import fix_objective_as_constraint
 import numpy as np
 import pandas as pd
 
-from pipeGEM.analysis import add_mod_pfba, GIMMEAnalysis
+from pipeGEM.analysis import add_mod_pfba, GIMMEAnalysis, timing
 
 
+@timing
 def apply_GIMME(model: cobra.Model,
                 rxn_expr_score: Dict[str, float],
                 high_exp: float,

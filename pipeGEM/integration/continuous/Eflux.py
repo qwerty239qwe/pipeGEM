@@ -1,6 +1,7 @@
 from typing import Dict, List, Callable, Union
 
 import cobra
+from cobra.flux_analysis.parsimonious import pfba
 import numpy as np
 
 from pipeGEM.utils import select_rxns_from_model
@@ -13,6 +14,7 @@ def apply_EFlux(model: cobra.Model,
                 max_ub: float = 1000,
                 min_lb: float = .01,
                 ignore: Union[str, List[str], None] = None,
+                return_fluxes: bool = True,
                 transform: Callable = exp_x):
     """
     Parameters
@@ -62,7 +64,9 @@ def apply_EFlux(model: cobra.Model,
             if not np.isnan(trans_rxn_exp_dict[r.id]) and (trans_rxn_exp_dict[r.id] < r.upper_bound):
                 r.upper_bound = trans_rxn_exp_dict[r.id]
         r_bounds_dict[r.id] = r.bounds
+    sol = pfba(model)
+    flux_df = sol.to_frame()
 
     result = EFluxAnalysis(log={"name": model.name, "max_ub": max_ub, "min_lb": min_lb, "ignored_rxns": ignore})
-    result.add_result(rxn_bounds=r_bounds_dict, rxn_scores=rxn_expr_score)
+    result.add_result(rxn_bounds=r_bounds_dict, rxn_scores=rxn_expr_score, fluxes=flux_df if return_fluxes else None)
     return result

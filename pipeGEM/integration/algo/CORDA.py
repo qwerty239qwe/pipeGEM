@@ -23,8 +23,9 @@ class CORDABuilder:
                  penalty_factor=100,
                  penalty_increase_factor=1.1,
                  upper_bound=1e6,
-                 support_flux_value=1,
-                 threshold=1e-6):
+                 support_flux_value=1e-6,
+                 threshold=1e-6,
+                 skip_last_step=True):
         self._model = model
         self._conf_scores = conf_scores
         self._n = n_iters if np.isfinite(n_iters) else len(model.reactions)
@@ -40,6 +41,7 @@ class CORDABuilder:
         for r in model.reactions:
             r.upper_bound = self._upper_bound if r.upper_bound > threshold else r.upper_bound
             r.lower_bound = -self._upper_bound if -r.lower_bound > threshold else r.lower_bound
+        self._skip_last_step = skip_last_step
 
     @property
     def model(self):
@@ -56,7 +58,7 @@ class CORDABuilder:
                           support_redundancies=True):
         penalty_dic = {var_id: (1 if penalize_medium_score else 0)
                        if self._conf_scores[var_id] >= 0 else self._pf
-                       for var_id in var_ids if self._conf_scores[var_id] <= 2}
+                       for var_id in var_ids if self._conf_scores[var_id] < 3}
 
         n_iters = self._n if support_redundancies else 1
         all_support_vars = set()
@@ -82,14 +84,15 @@ class CORDABuilder:
             all_support_vars_for_v = set()
             for i in range(n_iters):
                 self._model.objective.set_linear_coefficients(cur_penalty)
+                self._model.objective.direction = "min"
                 sol = self._model.solver.optimize()
                 if sol != "optimal":
                     self._infeasible_rxns.append(var_id)
                     self._conf_scores[var_id] = -1
                     break
                 sol = self._model.solver.primal_values
-                support_vars = set([v for v in sol if sol[v] > self._threshold
-                                    and self._conf_scores[v] <= 2 and v != var_id])
+                support_vars = set([v for v in sol if abs(sol[v]) >= self._threshold
+                                    and self._conf_scores[v] < 3 and v != var_id])
                 new_sups = support_vars - all_support_vars_for_v
                 all_support_vars_for_v |= support_vars
                 if keep_if_support is not None:
@@ -146,22 +149,23 @@ class CORDABuilder:
         print(f"step 2 finished, {len([i for i, c in self._conf_scores.items() if c >= 3]) - n_cores} added to core variables")
         n_cores = len([i for i, c in self._conf_scores.items() if c >= 3])
         # do we need this?
-        for vid, conf in self._conf_scores.items():
-            if 0 < conf < 3:
-                self._model.variables[vid].ub = 0.0
-            elif conf == 0:
-                self._conf_scores[vid] = -1
-        hi_supports = self._get_support_rxns([i for i, c in self._conf_scores.items() if c >= 3],
-                                             penalize_medium_score=False,
-                                             support_redundancies=False)
-        print(f"step 3 finished, {len([i for i, c in self._conf_scores.items() if c >= 3]) - n_cores} added to core variables")
-        for i in hi_supports:
-            self._conf_scores[i] = 3
+        if not self._skip_last_step:
+            for vid, conf in self._conf_scores.items():
+                if 0 < conf < 3:
+                    self._model.variables[vid].ub = 0.0
+                elif conf == 0:
+                    self._conf_scores[vid] = -1
+            hi_supports = self._get_support_rxns([i for i, c in self._conf_scores.items() if c >= 3],
+                                                 penalize_medium_score=False,
+                                                 support_redundancies=False)
+            print(f"step 3 finished, {len([i for i, c in self._conf_scores.items() if c >= 3]) - n_cores} added to core variables")
+            for i in hi_supports:
+                self._conf_scores[i] = 3
 
         to_remove = []
         for rxn in self._model.reactions:
             conf = max(self._conf_scores[rxn.id], self._conf_scores[rxn.reverse_id])
-            if conf == 3 and rxn not in self._mocks:
+            if conf >= 3 and rxn not in self._mocks:
                 rxn.bounds = self._bounds[rxn.id]
             else:
                 to_remove.append(rxn)
@@ -216,6 +220,7 @@ class LinearDiscreteStrategy(DiscreteStrategy):
 
 discrete_strategies = {"linear": LinearDiscreteStrategy}
 
+
 @timing
 def apply_CORDA(model,
                 data,
@@ -230,7 +235,8 @@ def apply_CORDA(model,
                 met_prod = None,
                 upper_bound=1e6,
                 threshold=1e-6,
-                support_flux_value=1,
+                support_flux_value=1e-6,
+                skip_last_step=True,
                 ) -> CORDA_Analysis:
     mocks = []
     threshold_dic = parse_predefined_threshold(predefined_threshold,
@@ -246,9 +252,12 @@ def apply_CORDA(model,
                                                 met_prod,
                                                 conf_scores,
                                                 upper_bound)
+    obj_coefs = {}
     for r in model.reactions:
         if r.objective_coefficient != 0:
             conf_scores[r.id] = 3
+            obj_coefs[r.forward_variable] = r.objective_coefficient
+            obj_coefs[r.reverse_variable] = -r.objective_coefficient
 
     if protected_rxns is not None:
         rxn_id_in_model = [r.id for r in model.reactions]
@@ -270,9 +279,12 @@ def apply_CORDA(model,
                                  penalty_increase_factor=penalty_increase_factor,
                                  upper_bound=upper_bound,
                                  support_flux_value=support_flux_value,
-                                 threshold=threshold
+                                 threshold=threshold,
+                                 skip_last_step=skip_last_step
                                  )
     result_model = corda_builder.build(keep_if_support=keep_if_support)
+    result_model.objective.set_linear_coefficients(obj_coefs)
+    result_model.objective.direction = "max"
     conf_scores = corda_builder.conf_scores
     result = CORDA_Analysis(log={"n_iters": n_iters,
                                  "penalty_factor": penalty_factor,
@@ -282,5 +294,6 @@ def apply_CORDA(model,
                                  "upper_bound": upper_bound,
                                  "threshold": threshold,
                                  "support_flux_value": support_flux_value})
+
     result.add_result(model=result_model, conf_scores=conf_scores, threshold_analysis=th_result)
     return result

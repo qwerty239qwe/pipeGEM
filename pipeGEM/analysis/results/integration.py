@@ -6,14 +6,20 @@ class EFluxAnalysis(BaseAnalysis):
         super().__init__(log)
         self._rxn_bounds = None
         self._rxn_scores = None
+        self._fluxes = None
 
     @property
     def rxn_bounds(self):
         return self._rxn_bounds
 
-    def add_result(self, rxn_bounds, rxn_scores):
+    @property
+    def flux_result(self):
+        return self._fluxes
+
+    def add_result(self, rxn_bounds, rxn_scores, fluxes=None):
         self._rxn_bounds = rxn_bounds
         self._rxn_scores = rxn_scores
+        self._fluxes = fluxes
 
 
 class GIMMEAnalysis(BaseAnalysis):

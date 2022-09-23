@@ -37,12 +37,17 @@ def apply_SPOT(model: cobra.Model,
     obj_dict.update({model.reactions.get_by_id(r_id).reverse_variable: r_exp
                     for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp) and
                     r_id not in protected_rxns})
+
     with model:
-        add_norm_constraint(model)
+        fix_objective_as_constraint(model, fraction=0.1)
+        add_norm_constraint(model, ub=10000)
+
         model.objective.set_linear_coefficients({v: 0 for v in model.variables})
         model.objective.set_linear_coefficients({k: v for k, v in obj_dict.items()})
-        #add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=0, direction="max")
+
+        # add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=0)
         sol = model.optimize("maximize")
+        print(sol.objective_value)
 
     flux_df = sol.to_frame()
     new_model = None
