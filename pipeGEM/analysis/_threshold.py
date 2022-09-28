@@ -146,7 +146,7 @@ class DistributionBased(ThresholdFinder):
                                                           var_ratio_tol=var_ratio_tol,
                                                           mean_diff_tol=mean_diff_tol)
                     pscore = self._cal_canyons_p(x1=p[1], x2=p[4], y1=p[0], y2=p[3])
-                    print("pscore:", pscore)
+                    # print("pscore:", pscore)
                 insert_index = np.searchsorted(pscore_arr, pscore)
                 if insert_index < k:
                     pscore_arr = np.insert(pscore_arr, insert_index, pscore)[:k]
@@ -174,7 +174,7 @@ class DistributionBased(ThresholdFinder):
         mu1, mu2 = params_arr[0, 1], params_arr[0, 4]
         print("best fitted Amps: ", A1, A2)
         print("best fitted means: ", mu1, mu2)
-        return params_arr
+        return params_arr, c1, c2
 
 
 class rFastCormicsThreshold(DistributionBased):
@@ -210,16 +210,15 @@ class rFastCormicsThreshold(DistributionBased):
             c1, c2 = min(c1, c2), max(c1, c2)
             params_arr = np.array([[1, c2, 1, 1, c1, 1]])
         else:
-            params_arr = self._bimodal_fit(x, y, max_x=max_x, min_x=min_x, k=k_best)
+            params_arr, c1, c2 = self._bimodal_fit(x, y, max_x=max_x, min_x=min_x, k=k_best)
 
         result = rFastCormicThresholdAnalysis(log={"use_first_guess": return_heuristic,
                                                    "cut_off": cut_off,
                                                    'hard_x_lims': hard_x_lims})
-        print(params_arr.shape)
         right_c = None if return_heuristic else np.array([self.gaussian_dist(x, *tuple(params_arr[k, 0:3])) for k in range(k_best)])
         left_c = None if return_heuristic else np.array([self.gaussian_dist(x, *tuple(params_arr[k, 3:6])) for k in range(k_best)])
         result.add_result(exp_th=params_arr[:, 1], nonexp_th=params_arr[:, 4],
-                          right_curve=right_c, left_curve=left_c, x=x, y=y)
+                          right_curve=right_c, left_curve=left_c, x=x, y=y, init_exp=c2, init_nonexp=c1)
 
         return result
 

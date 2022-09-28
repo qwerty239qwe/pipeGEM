@@ -12,6 +12,8 @@ class rFastCormicThresholdAnalysis(BaseAnalysis):
         self._nonexp_th_arr = None
         self._right_curve_arr = None
         self._left_curve_arr = None
+        self._init_exp = None
+        self._init_nonexp = None
 
     def save(self, file_path, index=0):
         result_dic = {"exp_th": self._exp_th_arr[index],
@@ -20,12 +22,14 @@ class rFastCormicThresholdAnalysis(BaseAnalysis):
         with open(file_path, "w") as f:
             json.dump(result_dic, f)
 
-    def add_result(self, x, y, exp_th, nonexp_th, right_curve, left_curve):
+    def add_result(self, x, y, exp_th, nonexp_th, right_curve, left_curve, init_exp, init_nonexp):
         self._data = (x, y)
         self._exp_th_arr = exp_th
         self._nonexp_th_arr = nonexp_th
         self._right_curve_arr = right_curve
         self._left_curve_arr = left_curve
+        self._init_exp = init_exp
+        self._init_nonexp = init_nonexp
 
     @property
     def exp_th(self):
@@ -34,6 +38,10 @@ class rFastCormicThresholdAnalysis(BaseAnalysis):
     @property
     def non_exp_th(self):
         return self._nonexp_th_arr[0]
+
+    @property
+    def init_threshold(self):
+        return self._init_exp, self._init_nonexp
 
     def get_other_exp_th(self, k):
         return self._exp_th_arr[k]

@@ -248,10 +248,10 @@ def add_mod_pfba(
         reaction_var_dict = {model.reactions.get_by_id(k).forward_variable: v for k, v in weights.items()}
         reaction_var_dict.update({model.reactions.get_by_id(k).reverse_variable: v for k, v in weights.items()})
 
-    # model.objective = model.problem.Objective(
-    #     Zero, direction=direction, sloppy=True, name="_pfba_objective"
-    # )
-    model.objective.set_linear_coefficients({v: 0 for v in model.variables})
+    model.objective = model.problem.Objective(
+        Zero, direction=direction, sloppy=True, name="_pfba_objective"
+    )
+    #model.objective.set_linear_coefficients({v: 0 for v in model.variables})
     model.objective.set_linear_coefficients({k: v for k, v in reaction_var_dict.items()})
 
 

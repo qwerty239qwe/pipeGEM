@@ -333,7 +333,7 @@ class TaskHandler:
         if true_status == 'optimal':
             try:
                 result = analyzer.analyze(**(method_kws if method_kws is not None else {}))
-                result = self._get_test_result(result.df, dummy_rxns, fail_threshold)
+                result = self._get_test_result(result.result, dummy_rxns, fail_threshold)
             except Infeasible:
                 true_status = "infeasible"
                 result = {}

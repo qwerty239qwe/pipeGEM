@@ -38,16 +38,20 @@ def apply_GIMME(model: cobra.Model,
     -------
     None
     """
+    ori_obj = [r.id for r in model.reactions if r.objective_coefficient != 0]
     obj_dict = {r_id: (high_exp - r_exp)
                 if high_exp - r_exp < max_inconsistency_score else max_inconsistency_score  # this is for preventing using -np.inf values
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp) and
-                r_id not in protected_rxns and
+                r_id not in protected_rxns and r_id not in ori_obj and
                 r_exp < high_exp}
+
     with model:
         add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac)
         sol = model.optimize("minimize")
 
     flux_df = sol.to_frame()
+    print("original obj's optimized value: ", flux_df.loc[ori_obj, "fluxes"])
+
     new_model = None
     if remove_zero_fluxes:
         new_model = model.copy()
