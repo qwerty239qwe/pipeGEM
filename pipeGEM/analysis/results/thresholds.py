@@ -97,6 +97,9 @@ class LocalThresholdAnalysis(BaseAnalysis):
         super().__init__(log=log)
         self._exp_ths = None
 
+    def save(self, file_path):
+        pass
+
     def add_result(self, exp_ths):
         self._exp_ths = exp_ths
 

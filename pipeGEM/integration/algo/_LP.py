@@ -160,6 +160,7 @@ def LP7(J,
         model.objective.set_linear_coefficients({v: -1 for v in vars})
         model.solver.update()
         sol = model.optimize(objective_sense="minimize", raise_error=True)
+    sol.to_frame().to_csv(f"./LP7_{len(J)}.csv")
     if use_abs:
         fm = sol.to_frame()["fluxes"].abs()
     else:
@@ -171,12 +172,12 @@ def LP7(J,
     return fm[fm > rxn_scale_eps[fm.index]].index.to_list()
 
 
-def LP9(K,
-        P,
-        NonP,
+def LP9(K: np.ndarray,
+        P: np.ndarray,
+        NonP: np.ndarray,
         model: cobra.Model,
         epsilon,
-        min_v,
+        min_v_ser,
         scaling_factor = 1,
         rxn_scale_eps=None) -> list:
     """
@@ -199,8 +200,8 @@ def LP9(K,
     -------
         The result rxn ids list
     """
-    assert min_v > 0
-    assert len(set(P) & set(K)) == 0
+    assert (min_v_ser > 0).all()
+    assert len(np.intersect1d(P, K)) == 0
     with model:
         prob = model.problem
         vars = []
@@ -231,8 +232,8 @@ def LP9(K,
         model.solver.update()
         for r in model.reactions:
             if r.id in K:
-                r.upper_bound = max(r.upper_bound, min_v) * scaling_factor
-                r.lower_bound = min_v * scaling_factor
+                r.upper_bound = max(r.upper_bound, min_v_ser[r.id]) * scaling_factor
+                r.lower_bound = min_v_ser[r.id] * scaling_factor
             else:
                 r.lower_bound *= scaling_factor
             r.upper_bound *= scaling_factor
@@ -247,8 +248,9 @@ def LP9(K,
             print("infeasible result: K = ", K)
             return []
         fm = sol.to_frame()["fluxes"].abs()
+        pd.DataFrame({"abs_fluxes": fm, "min_v": min_v_ser}).to_csv(f"./LP10_{len(K)}.csv")
     if rxn_scale_eps is None:
-        return fm[fm > 0.99 * min_v].index.to_list()  # supp
+        return fm[fm > 0.99 * min(epsilon, min_v_ser.min())].index.to_list()  # supp
     return fm[fm > rxn_scale_eps[fm.index]].index.to_list()
 
 

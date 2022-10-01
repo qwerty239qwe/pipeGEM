@@ -18,12 +18,12 @@ def find_sparse_mode(J, P, nonP, model, singleJ, epsilon):
         # print(f"find_sparse_mode of single reaction: {singleJ}")
     supps, v = LP7(J if singleJ is None else singleJ,
                    model, epsilon, use_abs=False, return_min_v=True)
-    K = np.intersect1d(list(J), supps)  # J might not be an irrv set
-    if singleJ is not None and len(singleJ & set(K)) == 0:
+    K = np.intersect1d(J if singleJ is None else singleJ, supps)  # J might not be an irrv set
+    if singleJ is not None and len(np.intersect1d(singleJ, K)) == 0:
         warn(f"Singleton {singleJ} flux cannot be generated in LP7")
     if K.shape[0] == 0:
         return []
-    return LP9(K, P, nonP, model, epsilon, min_v=v[list(K)].min())
+    return LP9(K, P, nonP, model, epsilon, min_v_ser=v[list(K)])
 
 
 def fastcc(model,
@@ -37,42 +37,42 @@ def fastcc(model,
     print(f"Epsilon used: {epsilon}")
     if return_model:
         consistent_model = model.copy()
-    all_rxns = get_rxn_set(model)
-    irr_rxns = get_rxn_set(model, "irreversible")
-    no_expressed = get_rxn_set(model, "not_expressed")
-    backward_rxns = get_rxn_set(model, "backward")
-    J = irr_rxns - no_expressed
+    all_rxns = get_rxn_set(model, dtype=np.array)
+    irr_rxns = get_rxn_set(model, "irreversible", dtype=np.array)
+    no_expressed = get_rxn_set(model, "not_expressed", dtype=np.array)
+    backward_rxns = get_rxn_set(model, "backward", dtype=np.array)
+    J = np.setdiff1d(irr_rxns, no_expressed)
     with model:
         if len(backward_rxns) > 0:
             print(f"Found and flipped {len(backward_rxns)} reactions")
             flip_direction(model, backward_rxns)
 
-        A = set(LP7(J, model, epsilon, use_abs=True))  # rxns to keeps
+        A = np.array(LP7(J, model, epsilon, use_abs=True))  # rxns to keeps
         # print("A: ", len(A))
-        J = all_rxns - A - J - no_expressed  # rev rxns to check
+        J = np.setdiff1d(all_rxns, np.union1d(np.union1d(A, J), no_expressed))  # rev rxns to check
         # print("J: ", len(J))
         singleton, flipped = False, False
         with tqdm(total=len(J)) as pbar:
             while len(J) != 0:
                 if singleton:
-                    Ji = {next(iter(J))}
-                    new_supps = set(LP3(Ji, model, epsilon)) if is_convex else set(non_convex_LP3(Ji, model, epsilon))
+                    Ji = np.array([J[0]])
+                    new_supps = np.array(LP3(Ji, model, epsilon)) if is_convex else np.array(non_convex_LP3(Ji, model, epsilon))
                 else:
                     Ji = J.copy()
-                    new_supps = set(LP7(Ji, model, epsilon)) if is_convex else set(non_convex_LP7(Ji, model, epsilon))
-                A |= new_supps
+                    new_supps = np.array(LP7(Ji, model, epsilon)) if is_convex else np.array(non_convex_LP7(Ji, model, epsilon))
+                A = np.union1d(A, new_supps)
                 before_n = len(J)
-                J -= A
+                J = np.setdiff1d(J, A)
                 after_n = len(J)
                 pbar.update(before_n - after_n)
                 if before_n != after_n:
                     flipped = False
                 else :  # no change in number of rxn_to_keeps
-                    Jirev = Ji - irr_rxns
+                    Jirev = np.setdiff1d(Ji, irr_rxns)
                     if flipped or len(Jirev) == 0:
                         flipped = False
                         if singleton:
-                            J -= Ji
+                            J = np.setdiff1d(J, Ji)
                             # print("[Removed] ", Ji, "is flux inconsistent.")
                             pbar.update(1)
                         else:
@@ -80,7 +80,7 @@ def fastcc(model,
                     else:
                         flip_direction(model, Jirev)
                         flipped = True
-    rxns_to_remove = list(all_rxns - A)
+    rxns_to_remove = np.setdiff1d(all_rxns, A)
     output = {}
     if return_model:
         consistent_model.remove_reactions(rxns_to_remove, remove_orphans=True)
@@ -102,78 +102,78 @@ def fastCore(C: Union[List[str], Set[str]],
              return_model: bool,
              return_rxn_ids: bool,
              return_removed_rxn_ids: bool,
-             raise_err: bool = False,
+             raise_err: bool = True,
              scale_by_coef: bool = True):
     if return_model:
         output_model = model.copy()
-    if not isinstance(C, set):
-        C = set(C)
-    if not isinstance(nonP, set):
-        nonP = set(nonP)
-    all_rxns = get_rxn_set(model)
-    irr_rxns = get_rxn_set(model, "irreversible")
-    backward_rxns = get_rxn_set(model, "backward")
+    if not isinstance(C, np.ndarray):
+        C = np.array(list(C))
+    if not isinstance(nonP, np.ndarray):
+        nonP = np.array(list(nonP))
+    all_rxns = get_rxn_set(model, dtype=np.array)
+    irr_rxns = get_rxn_set(model, "irreversible", dtype=np.array)
+    backward_rxns = get_rxn_set(model, "backward", dtype=np.array)
 
     with model:
         if len(backward_rxns) > 0:
             flip_direction(model, backward_rxns)
 
         flipped, singleton = False, False
-        J = C & irr_rxns
-        P = all_rxns - C - nonP
+        J = np.intersect1d(C, irr_rxns)
+        P = np.setdiff1d(np.setdiff1d(all_rxns, C), nonP)
         singleJ = None
-        A = set(find_sparse_mode(J, P, nonP, model, singleJ, epsilon))
-        invalid_part = J - A
+        A = np.array(find_sparse_mode(J, P, nonP, model, singleJ, epsilon))
+        A.sort()
+        invalid_part = np.setdiff1d(J, A)
         track_irrev = False
         if len(invalid_part) != 0:
-            track_irrev = True
+            # track_irrev = True
             warn(f"Inconsistent irreversible core reactions (They should be included in A): Total: {invalid_part}")
-        J = C - A  # reactions to be added to the model
+        J = np.array(np.setdiff1d(C, A))  # reactions we want to add to the model
         with tqdm(total=len(J)) as pbar:
             n_j = len(J)
-
             while len(J) > 0:
-                P = P - A
-                supp = set(find_sparse_mode(J, P, nonP, model, singleJ, epsilon))
-                A |= supp
-                if len(J & A) > 0:
-                    J -= A
+                P = np.setdiff1d(P, A)
+                supp = np.array(find_sparse_mode(J, P, nonP, model, singleJ, epsilon))
+                A = np.union1d(A, supp)
+                if len(np.intersect1d(J, A)) > 0:
+                    J = np.setdiff1d(J, A)
                     pbar.update(n_j - len(J))
                     n_j = len(J)
                     flipped, singleton = False, False
                     singleJ = None
 
                     if track_irrev:
-                        print(f"Irrev in J: {len(J & irr_rxns)}, J: {len(J)}")
+                        print(f"Irrev in J: {len(np.intersect1d(J, irr_rxns))}, J: {len(J)}")
                 else:
-                    if singleton and len(J - irr_rxns) != 0:
+                    if singleton and len(np.setdiff1d(J, irr_rxns)) != 0:
                         if singleJ is None:
-                            Jrev = {next(iter(J - irr_rxns))}
-                            singleJ = Jrev
+                            Jrev = np.setdiff1d(J, irr_rxns)[0]
+                            singleJ = np.array([Jrev])
                             flipped = False
                     else:
-                        Jrev = J - irr_rxns
+                        Jrev = np.setdiff1d(J, irr_rxns)
                     if len(Jrev) == 0 or flipped:  # If no reversible J or the model is flipped
                         if singleton:
                             if raise_err:
-                                raise ValueError(f"Error: Global network is not consistent. Last rxn: {J} |J| = {len(J)}")
+                                raise ValueError(f"Error: Global network is not consistent. \nLast rxn: {J}\n |J| = {len(J)}")
                             else:
-                                to_remove = {next(iter(J))}
-                                warn(f"Error: Global network is not consistent. Removed core rxn: {to_remove}")
-                                J -= to_remove
+                                to_remove = singleJ
+                                warn(f"Error: Global network is not consistent. Removing core rxn: {to_remove}")
+                                J = np.setdiff1d(J, to_remove)
                                 n_j = len(J)
                                 pbar.update(1)
                                 flipped, singleton = False, False
                                 singleJ = None
                         else:
                             flipped, singleton = False, True
-                            if singleJ is None and len(J - irr_rxns) != 0:
-                                Jrev = {next(iter(J - irr_rxns))}
+                            if singleJ is None and len(np.setdiff1d(J, irr_rxns)) != 0:
+                                Jrev = np.array([np.setdiff1d(J, irr_rxns)[0]])
                                 singleJ = Jrev
                     else:
                         flip_direction(model, Jrev)
                         flipped = True
-    rxns_to_remove = list(all_rxns - A)
+    rxns_to_remove = np.setdiff1d(all_rxns, A)
     output = {}
     if return_model:
         output_model.remove_reactions(rxns_to_remove, remove_orphans=True)

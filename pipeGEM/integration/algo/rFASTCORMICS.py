@@ -45,6 +45,10 @@ def apply_rFASTCORMICS(model,
                                              "use_heuristic_th": use_heuristic_th,
                                              "method": method,
                                              "threshold": threshold})
+    old_exchange_bounds = {r.id: r.bounds for r in model.exchanges}
+    for r in model.exchanges:
+        r.lower_bound = min(r.lower_bound, -1000) if r.lower_bound < 0 else r.lower_bound
+        r.upper_bound = max(r.upper_bound, 1000) if r.upper_bound > 0 else r.upper_bound
     if method == "onestep":
         pr_result = fastcore.fastCore(C=core_rxns,
                                       nonP=unpenalized_rxns,
@@ -53,6 +57,10 @@ def apply_rFASTCORMICS(model,
                                       return_model=True,
                                       return_rxn_ids=True,
                                       return_removed_rxn_ids=True)
+        for r in pr_result["model"].exchanges:
+            if r.id in old_exchange_bounds:
+                r.bounds = old_exchange_bounds[r.id]
+
         pr_result_obj.add_result(fastcore_result=pr_result,
                                  core_rxns=core_rxns,
                                  noncore_rxns=non_core_rxns,
