@@ -12,7 +12,8 @@ from pipeGEM.analysis import EFluxAnalysis
 def apply_EFlux(model: cobra.Model,
                 rxn_expr_score: Dict[str, float],
                 max_ub: float = 1000,
-                min_lb: float = .01,
+                min_lb: float = 1e-6,
+                min_score = -1e3,
                 ignore: Union[str, List[str], None] = None,
                 return_fluxes: bool = True,
                 transform: Callable = exp_x):
@@ -45,7 +46,7 @@ def apply_EFlux(model: cobra.Model,
         print(f"Ignoring {ignore_rxn_ids}")
     else:
         ignore_rxn_ids = []
-    exps = [v for _, v in rxn_expr_score.items() if not np.isnan(v)]
+    exps = [v if v > min_score else min_score for _, v in rxn_expr_score.items() if not np.isnan(v)]
     max_exp = max(exps) if len(exps) != 0 else max_ub
     min_exp = min(exps) if len(exps) != 0 else min_lb
     print(f"Max expression: {max_exp} | Min expression: {min_exp}")
@@ -53,9 +54,12 @@ def apply_EFlux(model: cobra.Model,
     exchanges = model.exchanges
     trans_min_exp = transform(min_exp)
     denominator = transform(max_exp) - trans_min_exp
+    capped_scores = {k: v if v > min_score else min_score if not np.isnan(v) else v for k, v in rxn_expr_score.items()}
     trans_rxn_exp_dict = {k: min_lb + ((max_ub - min_lb) * (transform(v) - trans_min_exp) / denominator)
                           if not np.isnan(v) else v
-                          for k, v in rxn_expr_score.items()}
+                          for k, v in capped_scores.items()}
+    print(denominator, trans_min_exp)
+    assert all([v >= 0 for v in trans_rxn_exp_dict.values() if not np.isnan(v)]), trans_rxn_exp_dict
     r_bounds_dict = {}
     for r in model.reactions:
         if r not in exchanges and r.id not in ignore_rxn_ids:

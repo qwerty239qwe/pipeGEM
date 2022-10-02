@@ -117,6 +117,7 @@ def LP7(J,
         epsilon: float,
         use_abs=True,
         rxn_scale_eps=None,
+        tol_coef=1e-2,
         return_min_v=False) -> list:
     """
     LP7 tries to maximize the number of feasible fluxes in J whose value is at least epsilon (Nikos Vlassis, et al. 2013)
@@ -130,7 +131,10 @@ def LP7(J,
     epsilon
         Threshold of non-zero fluxes
     use_abs
-        the returned reactions are selected by its absolute value or not
+        If True, the returned reactions are selected by its absolute value
+    tol_coef
+
+
     Returns
     -------
         a list of rxn IDs, the rxns can produce feasible fluxes.
@@ -142,7 +146,10 @@ def LP7(J,
         constr_coefs = {}
         for j in J:
             rxn = model.reactions.get_by_id(j)
-            var = prob.Variable(f"LP7_z_{rxn.id}", lb=0, ub=epsilon)  # 0 <= zi <= eps
+
+            # we make the lb negative because some reactions need to be negative to produce valid fluxes sometimes
+            var = prob.Variable(f"LP7_z_{rxn.id}", lb=-np.inf, ub=epsilon)  # -inf <= zi <= eps
+
             c_name = f"const_LP7_{rxn.id}"
             const = prob.Constraint(Zero,
                                     name=c_name, ub=0)  # vi >= zi
@@ -157,9 +164,9 @@ def LP7(J,
             model.constraints[con].set_linear_coefficients(coefs)
 
         model.objective = prob.Objective(Zero, sloppy=True)
-        model.objective.set_linear_coefficients({v: -1 for v in vars})
+        model.objective.set_linear_coefficients({v: 1 for v in vars})
         model.solver.update()
-        sol = model.optimize(objective_sense="minimize", raise_error=True)
+        sol = model.optimize(objective_sense="maximize", raise_error=True)
     sol.to_frame().to_csv(f"./LP7_{len(J)}.csv")
     if use_abs:
         fm = sol.to_frame()["fluxes"].abs()
@@ -167,8 +174,8 @@ def LP7(J,
         fm = sol.to_frame()["fluxes"]
     if rxn_scale_eps is None:
         if return_min_v:
-            return fm[fm > 0.99*epsilon].index.to_list(), fm
-        return fm[fm > 0.99*epsilon].index.to_list()
+            return fm[fm > tol_coef*epsilon].index.to_list(), fm
+        return fm[fm > tol_coef*epsilon].index.to_list()
     return fm[fm > rxn_scale_eps[fm.index]].index.to_list()
 
 
@@ -179,6 +186,7 @@ def LP9(K: np.ndarray,
         epsilon,
         min_v_ser,
         scaling_factor = 1,
+        tol_coef=1e-2,
         rxn_scale_eps=None) -> list:
     """
     LP9 minimizes the L1 norm of fluxes in the penalty set P, subject to a minimum flux constraint on the set K.
@@ -250,7 +258,7 @@ def LP9(K: np.ndarray,
         fm = sol.to_frame()["fluxes"].abs()
         pd.DataFrame({"abs_fluxes": fm, "min_v": min_v_ser}).to_csv(f"./LP10_{len(K)}.csv")
     if rxn_scale_eps is None:
-        return fm[fm > 0.99 * min(epsilon, min_v_ser.min())].index.to_list()  # supp
+        return fm[fm > tol_coef * min(epsilon, min_v_ser.min())].index.to_list()  # supp
     return fm[fm > rxn_scale_eps[fm.index]].index.to_list()
 
 
