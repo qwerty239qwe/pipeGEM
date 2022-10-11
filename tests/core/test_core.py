@@ -35,11 +35,8 @@ def test_group_info(ecoli_core):
 def test_group_get_flux(ecoli_core):
     m1 = ecoli_core
     g2 = Group({"ecoli_g1": {"e11": m1, "e12": m1}, "ecoli_g2": {"e21": m1, "e22": m1}, "a": m1}, name_tag="G2")
-    print(g2.get_flux(method="FBA", constr="default", aggregate="mean"))
-    print(g2.get_flux(method="FBA", constr="default", aggregate="sum"))
-    g2.do_analysis(method="sampling", constr="default", n=10)
-    print(g2.get_flux(method="sampling", constr="default", aggregate="sum"))
-    print(g2.get_info(features=["get_flux"], method="FBA", constr="default"))
+    fba_result = g2.do_flux_analysis(method="FBA")
+    sampling_result = g2.do_flux_analysis(method="sampling", n=10)
 
 
 def test_group_operations(ecoli_core):

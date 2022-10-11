@@ -59,7 +59,7 @@ def apply_rFASTCORMICS(model,
                                       return_removed_rxn_ids=True)
         for r in pr_result["model"].exchanges:
             if r.id in old_exchange_bounds:
-                r.bounds = old_exchange_bounds[r.id]
+                pr_result["model"].reactions.get_by_id(r.id).bounds = old_exchange_bounds[r.id]
 
         pr_result_obj.add_result(fastcore_result=pr_result,
                                  core_rxns=core_rxns,

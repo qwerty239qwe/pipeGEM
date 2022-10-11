@@ -15,3 +15,4 @@ tqdm~=4.60.0
 optlang~=1.4.4
 networkx
 zeep
+pint
