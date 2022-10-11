@@ -23,7 +23,7 @@ class CORDABuilder:
                  penalty_factor=100,
                  penalty_increase_factor=1.1,
                  upper_bound=1e6,
-                 support_flux_value=1e-6,
+                 support_flux_value=1,
                  threshold=1e-6,
                  skip_last_step=True):
         self._model = model
@@ -235,7 +235,7 @@ def apply_CORDA(model,
                 met_prod = None,
                 upper_bound=1e6,
                 threshold=1e-6,
-                support_flux_value=1e-6,
+                support_flux_value=1,
                 skip_last_step=True,
                 ) -> CORDA_Analysis:
     mocks = []
@@ -246,6 +246,7 @@ def apply_CORDA(model,
     transformer = discrete_strategies[discrete_strategy_name](exp_th, non_exp_th, data.rxn_scores)
     conf_scores = transformer.transform()
     model = model.copy()
+    old_exchange_bounds = {r.id: r.bounds for r in model.exchanges}
     # check
     if met_prod is not None:
         mocks, conf_scores = _add_prod_met_rxns(model,
@@ -285,6 +286,10 @@ def apply_CORDA(model,
     result_model = corda_builder.build(keep_if_support=keep_if_support)
     result_model.objective.set_linear_coefficients(obj_coefs)
     result_model.objective.direction = "max"
+    for r in result_model.exchanges:
+        if r.id in old_exchange_bounds:
+            result_model.reactions.get_by_id(r.id).bounds = old_exchange_bounds[r.id]
+
     conf_scores = corda_builder.conf_scores
     result = CORDA_Analysis(log={"n_iters": n_iters,
                                  "penalty_factor": penalty_factor,

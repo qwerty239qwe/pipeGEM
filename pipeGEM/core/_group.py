@@ -72,16 +72,16 @@ class Group(GEMComposite):
 
     def __setitem__(self, key, value):
         if isinstance(value, dict):
-            self._group.append(Group(group=value, name_tag=key))
+            np.append(self._group, [Group(group=value, name_tag=key)])
         elif isinstance(value, list):
             if all([isinstance(g, GEMComposite) for g in value]):
-                self._group.extend(value)
+                np.append(self._group, value)
             else:
                 ValueError("Input list must only contain Group or Model objects")
         elif isinstance(value, cobra.Model):
-            self._group.append(Model.from_cobra_model(model=value, name=key))
+            np.append(self._group, [Model(model=value, name_tag=key)])
         elif isinstance(value, Model):
-            self._group.append(value)
+            np.append(self._group, [value])
         else:
             raise TypeError("Inputted value should be a dict, list, Model, or a cobra.model")
 
@@ -253,7 +253,7 @@ class Group(GEMComposite):
             sel_models = self._ravel_group(selected)
             return self.__class__(sel_models, "selected_group")
 
-        return selected
+        return self.__class__(selected, "selected_group")
 
     @staticmethod
     def _check_rxn_id(comp: GEMComposite, index, subsystems):

@@ -74,6 +74,10 @@ class Model(GEMComposite):
         return [m.id for m in self.metabolites]
 
     @property
+    def cobra_model(self):
+        return self._model
+
+    @property
     def subsystems(self):
         subs = {}
         for r in self.reactions:
