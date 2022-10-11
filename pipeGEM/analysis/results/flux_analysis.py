@@ -41,7 +41,7 @@ class FluxAnalysis(BaseAnalysis):
                 one_df = a.result.reset_index().rename(columns={"index": "Reaction"})
                 one_df["name"] = a.log["name"]
                 dfs.append(one_df)
-            new._df = pd.concat(dfs, axis=0).reset_index(inplace=True, drop=True)
+            new._df = pd.concat(dfs, axis=0).reset_index(drop=True)
             new._df["name"] = pd.Categorical(new._df["name"])
         else:
             dfs = []

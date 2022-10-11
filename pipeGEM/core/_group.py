@@ -212,7 +212,7 @@ class Group(GEMComposite):
             selected = [self]
         elif isinstance(tag, str):
             selected = [g for g in self._group if g.name_tag == tag]
-        elif isinstance(tag, list):
+        elif isinstance(tag, list) or isinstance(tag, np.ndarray):
             selected = [g for g in self._group if g.name_tag in tag]
         else:
             raise ValueError
@@ -246,6 +246,8 @@ class Group(GEMComposite):
         """
         if index is None:
             selected = [self]
+        elif isinstance(index, int):
+            selected = [self._group[index]]
         elif isinstance(index, int) or isinstance(index, list) or isinstance(index, np.ndarray):
             selected = self._group[index]
         else:
@@ -276,7 +278,7 @@ class Group(GEMComposite):
                 raise ValueError("The input list should be a list of pipeGEM.Model")
             group_lis = [c for c in group_dict]
             max_g = max([g.tree_level for g in group_lis] + [1])
-        else:
+        elif isinstance(group_dict, dict):
             for name, comp in group_dict.items():
                 if isinstance(comp, dict):
                     g = Group(group=comp, name_tag=name)
@@ -291,6 +293,8 @@ class Group(GEMComposite):
                 elif isinstance(comp, pipeGEM.Model):
                     group_lis.append(comp)
                     max_g = max([g.tree_level for g in group_lis] + [1])
+        else:
+            raise ValueError("Group doesn't support object type: ", type(group_dict))
         self._lvl = max_g + 1
         return np.array(group_lis)
 
