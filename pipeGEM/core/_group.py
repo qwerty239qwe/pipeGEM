@@ -69,19 +69,20 @@ class Group(GEMComposite):
         for g in self._group:
             if g.name_tag == item:
                 return g
+        raise KeyError(item, " is not in the group")
 
     def __setitem__(self, key, value):
         if isinstance(value, dict):
-            np.append(self._group, [Group(group=value, name_tag=key)])
+            self._group = np.append(self._group, [Group(group=value, name_tag=key)])
         elif isinstance(value, list):
             if all([isinstance(g, GEMComposite) for g in value]):
-                np.append(self._group, value)
+                self._group = np.append(self._group, value)
             else:
                 ValueError("Input list must only contain Group or Model objects")
         elif isinstance(value, cobra.Model):
-            np.append(self._group, [Model(model=value, name_tag=key)])
+            self._group = np.append(self._group, [Model(model=value, name_tag=key)])
         elif isinstance(value, Model):
-            np.append(self._group, [value])
+            self._group = np.append(self._group, [value])
         else:
             raise TypeError("Inputted value should be a dict, list, Model, or a cobra.model")
 
@@ -270,7 +271,7 @@ class Group(GEMComposite):
     def _form_group(self, group_dict) -> np.ndarray:
         group_lis = []
         max_g = 0
-        if isinstance(group_dict, list):
+        if isinstance(group_dict, list) or isinstance(group_dict, np.ndarray):
             if not all([isinstance(c, pipeGEM.Model) for c in group_dict]):
                 raise ValueError("The input list should be a list of pipeGEM.Model")
             group_lis = [c for c in group_dict]
