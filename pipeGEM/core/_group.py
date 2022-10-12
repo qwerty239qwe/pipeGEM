@@ -38,7 +38,7 @@ class Group(GEMComposite):
             The name of this object
         """
         super().__init__(name_tag=name_tag)
-        self._group: np.ndarray = self._form_group(group)
+        self._group: list = self._form_group(group)
 
     def __repr__(self):
         return self.__str__()
@@ -65,6 +65,12 @@ class Group(GEMComposite):
             yield self._group[index]
             index += 1
 
+    def __contains__(self, item):
+        for g in self._group:
+            if g.name_tag == item:
+                return True
+        return item in self._group
+
     def __getitem__(self, item):
         for g in self._group:
             if g.name_tag == item:
@@ -72,19 +78,28 @@ class Group(GEMComposite):
         raise KeyError(item, " is not in the group")
 
     def __setitem__(self, key, value):
+
         if isinstance(value, dict):
-            self._group = np.append(self._group, [self.__class__(group=value, name_tag=key)])
+            self._group.append(self.__class__(group=value, name_tag=key))
         elif isinstance(value, list):
             if all([isinstance(g, GEMComposite) for g in value]):
-                self._group = np.append(self._group, value)
+                self._group.append(self.__class__(group=value, name_tag=key))
             else:
                 ValueError("Input list must only contain Group or Model objects")
         elif isinstance(value, cobra.Model):
-            self._group = np.append(self._group, [Model(model=value, name_tag=key)])
+            self._group.append(Model(model=value, name_tag=key))
         elif isinstance(value, GEMComposite):
-            self._group = np.append(self._group, [value])
+            value._name_tag = key
+            self._group.append(value)
         else:
             raise TypeError("Inputted value should be a dict, list, Model, or a cobra.model")
+
+    def index(self, item, raise_err=True):
+        for i, g in enumerate(self._group):
+            if g.name_tag == item:
+                return i
+        if raise_err:
+            raise KeyError(item, " is not in this group")
 
     @property
     def reaction_ids(self) -> List[str]:
@@ -220,6 +235,9 @@ class Group(GEMComposite):
             sel_models = self._ravel_group(selected)
             return self.__class__(sel_models, "selected_group")
 
+        if len(selected) == 1:
+            return selected[0]
+
         return self.__class__(selected, "selected_group")
 
     def iget(self,
@@ -244,19 +262,25 @@ class Group(GEMComposite):
         selected_objects: list
             A list of selected objects
         """
+        name = "selected_group"
+
         if index is None:
             selected = [self]
+            name = self.name_tag
         elif isinstance(index, int):
             selected = [self._group[index]]
-        elif isinstance(index, int) or isinstance(index, list) or isinstance(index, np.ndarray):
-            selected = self._group[index]
+            name = self._group[index].name_tag
+        elif isinstance(index, list) or isinstance(index, np.ndarray):
+            selected = [self._group[i] for i in index]
         else:
             raise ValueError
         if ravel:
             sel_models = self._ravel_group(selected)
-            return self.__class__(sel_models, "selected_group")
+            return self.__class__(sel_models, name)
 
-        return self.__class__(selected, "selected_group")
+        if len(selected) == 1:
+            return selected[0]
+        return self.__class__(selected, name)
 
     @staticmethod
     def _check_rxn_id(comp: GEMComposite, index, subsystems):
@@ -270,12 +294,13 @@ class Group(GEMComposite):
                 all += comp.subsystems[s]
             return all
 
-    def _form_group(self, group_dict) -> np.ndarray:
+    def _form_group(self, group_dict) -> list:
         group_lis = []
         max_g = 0
         if isinstance(group_dict, list) or isinstance(group_dict, np.ndarray):
-            if not all([isinstance(c, pipeGEM.Model) or isinstance(c, self.__class__) for c in group_dict]):
-                raise ValueError("The input list should be a list of pipeGEM.Model")
+            if not all([isinstance(c, GEMComposite) for c in group_dict]):
+                raise ValueError("The input list should be a list of pipeGEM.Model, the list contains types: ",
+                                 set([type(c) for c in group_dict]))
             group_lis = [c for c in group_dict]
             max_g = max([g.tree_level for g in group_lis] + [1])
         elif isinstance(group_dict, dict):
@@ -296,26 +321,23 @@ class Group(GEMComposite):
         else:
             raise ValueError("Group doesn't support object type: ", type(group_dict))
         self._lvl = max_g + 1
-        return np.array(group_lis)
+        return group_lis
 
-    def _traverse_util(self, comp: GEMComposite, suffix_row, max_lvl, features, **f_kws) -> List:
-        assert max_lvl >= len(suffix_row), f"{suffix_row}, {max_lvl}"
+    def _traverse_util(self, comp: GEMComposite, data, suffix_row, row_idx, features, **f_kws) -> int:
         if comp.is_leaf:
-            return suffix_row + \
-                   ["-" for _ in range(max_lvl - len(suffix_row))] + \
-                   [getattr(comp, f)
-                    if isinstance(getattr(type(comp), f), property)
-                    else getattr(comp, f)(**f_kws)
-                    for f in features]
-        res = []
+            inserted = suffix_row + [comp.name_tag] + \
+                       ["-" for _ in range(data.shape[1] - len(suffix_row) - 1 - len(features))] + \
+                       [getattr(comp, f)
+                        if isinstance(getattr(type(comp), f), property)
+                        else getattr(comp, f)(**f_kws)
+                        for f in features]
+            data[row_idx, :] = inserted
+
+            return row_idx + 1
         assert is_iter(comp)
         for c in comp:
-            r = self._traverse_util(c, suffix_row + [c.name_tag], max_lvl, features, **f_kws)
-            if isinstance(r[0], list):
-                res.extend(r)
-            else:
-                res.append(r)
-        return res
+            row_idx = self._traverse_util(c, data, suffix_row + [comp.name_tag], row_idx, features, **f_kws)
+        return row_idx
 
     def _traverse_get_model(self, comp: GEMComposite) -> Union[List[GEMComposite], GEMComposite]:
         if comp.is_leaf:
@@ -336,12 +358,12 @@ class Group(GEMComposite):
         else:
             comps = self.iget(index)
 
-        data = []
-        for c in comps:
-            max_lvl = max([c.tree_level for c in comps])
-            data += self._traverse_util(c, [], max_lvl=max_lvl, features=features if features is not None else [],
-                                        **kwargs)
-
+        data = np.empty(shape=(comps.size + (len(features) if features is not None else 0), self.tree_level), dtype="<U30")
+        # max_lvl = max([c.tree_level for c in comps])
+        row_idx = self._traverse_util(comps, data=data, suffix_row=[],
+                                      row_idx=0, features=features if features is not None else [],
+                                      **kwargs)
+        assert row_idx == data.shape[0]
         return data
 
     def get_info(self,
@@ -371,10 +393,11 @@ class Group(GEMComposite):
 
         """
         data = self._traverse(tag, index, features, **kwargs)
+        print(data)
         features = features if features is not None else []
         col_names = [f"group_{i}" for i in range(len(data[0]) -
                                                  len(features))] + features
-        return pd.DataFrame(data=np.array(data), columns=col_names).infer_objects()
+        return pd.DataFrame(data=data, columns=col_names).infer_objects()
 
     def _find_by_nametag(self,
                          info_df: pd.DataFrame,

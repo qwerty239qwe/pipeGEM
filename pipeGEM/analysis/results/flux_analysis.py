@@ -38,7 +38,8 @@ class FluxAnalysis(BaseAnalysis):
         if method == "concat":
             dfs = []
             for a in analyses:
-                one_df = a.result.reset_index().rename(columns={"index": "Reaction"})
+                one_df = a.result.reset_index().rename(columns={"index": "Reaction"}) \
+                    if "Reaction" not in a.result.columns else a.result
                 one_df["name"] = a.log["name"]
                 dfs.append(one_df)
             new._df = pd.concat(dfs, axis=0).reset_index(drop=True)

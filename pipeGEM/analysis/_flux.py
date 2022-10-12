@@ -103,7 +103,7 @@ class SamplingAnalyzer(FluxAnalyzer):
                 kwargs.pop("method")
                 return gapsplit(self.model, n=n, **kwargs)
             else:
-                method = kwargs.pop("method")
+                method = kwargs.pop("method") if "method" in kwargs else None
 
             return sampling.sample(self.model, n=n, **kwargs)
 

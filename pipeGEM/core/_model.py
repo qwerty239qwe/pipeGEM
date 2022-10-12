@@ -25,7 +25,7 @@ class Model(GEMComposite):
                  name_tag: str = None,
                  model = None):
         """
-        Main model used to store cobra.Model and its name, omics data, and analyzer
+        Main model used to store cobra.Model, tasks and omics data
 
         Parameters
         ----------
