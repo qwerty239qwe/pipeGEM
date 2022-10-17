@@ -19,6 +19,11 @@ def timing(f):
 class BaseAnalysis:
     def __init__(self, log):
         self._log = log  # analysis record (parameter, model, and data name)
+        self._result = None
+
+    @property
+    def result(self):
+        return self._result
 
     def add_running_time(self, t):
         self._log["running_time"] = t

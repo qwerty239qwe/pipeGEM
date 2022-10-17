@@ -49,6 +49,8 @@ def test_group_get_flux(ecoli_core):
     g2 = Group({"ecoli_g1": {"e11": m1, "e12": m1}, "ecoli_g2": {"e21": m1, "e22": m1}, "a": m1}, name_tag="G2")
     fba_result = g2.do_flux_analysis(method="FBA", solver="glpk")
     sampling_result = g2.do_flux_analysis(method="sampling", solver="glpk", n=10)
+    assert isinstance(fba_result.result, pd.DataFrame)
+    assert isinstance(sampling_result.result, pd.DataFrame)
 
 
 def test_group_operations(ecoli_core):
@@ -60,3 +62,10 @@ def test_group_operations(ecoli_core):
     assert len(g["ecoli_g3"])==2
     for gi in g:
         print(gi.name_tag)
+
+
+# TODO: test_add_data_model
+# TODO: test_add_data_group
+# TODO: test_add_tasks
+# TODO: test_get_data
+# TODO: test_

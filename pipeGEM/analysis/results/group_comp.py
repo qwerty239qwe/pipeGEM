@@ -29,7 +29,6 @@ class ComponentComparisonAnalysis(ComparisonAnalysis):
 class FluxCorrAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
-        self._result = None
 
     def add_result(self, result):
         self._result = result

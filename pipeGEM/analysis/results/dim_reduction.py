@@ -5,7 +5,6 @@ from pipeGEM.plotting import DimReductionPlotter
 class PCA_Analysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
-        self._result = None
 
     def add_result(self, result):
         self._result = result
@@ -26,7 +25,6 @@ class PCA_Analysis(BaseAnalysis):
 class EmbeddingAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
-        self._result = None
 
     def add_result(self, result):
         self._result = result

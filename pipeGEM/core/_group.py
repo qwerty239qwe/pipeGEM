@@ -1,4 +1,4 @@
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Optional
 from functools import reduce
 import itertools
 
@@ -10,12 +10,10 @@ from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, man
 import pipeGEM
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
+from pipeGEM.data import GeneData
 from pipeGEM.plotting.categorical import plot_model_components
 from pipeGEM.plotting.heatmap import plot_heatmap, plot_clustermap
-from pipeGEM.plotting import plot_fba, plot_fva, plot_sampling
-from pipeGEM.plotting.scatter import plot_PCA, plot_embedding
 from pipeGEM.utils import is_iter, calc_jaccard_index
-from pipeGEM.analysis import flux_analyzers
 
 
 class Group(GEMComposite):
@@ -169,6 +167,17 @@ class Group(GEMComposite):
             subs[g] = set(rxns)
         return subs
 
+    @property
+    def gene_data(self):
+        models = self.tget(None, ravel=True)
+        gene_data = {m.name_tag: m.gene_data for m in models}
+        return GeneData.aggregate(gene_data, prop="data")
+
+    def get_RAS(self, data_name, method="mean"):
+        models = self.tget(None, ravel=True)
+        gene_data = {m.name_tag: m.gene_data for m in models}
+        return GeneData.aggregate(gene_data, prop="data")
+
     def _get_group_model(self, group_strategy):
         if group_strategy == "top":
             return {g.name_tag: self._ravel_group(g) if not g.is_leaf else [g.name_tag] for g in self._group}
@@ -186,18 +195,22 @@ class Group(GEMComposite):
                                               log={"name": self.name_tag,
                                                    "group": self._get_group_model(group_strategy)})
 
-    def _ravel_group(self, comp_list):
+    def _ravel_group(self, comp_list, get_obj="object"):
         sel_models = []
         for i in comp_list:
             if i.is_leaf:
-                sel_models.append(i)
+                if get_obj == "object":
+                    sel_models.append(i)
+                else:
+                    sel_models.append(getattr(i, get_obj))
             else:
-                sel_models.extend(self._traverse_get_model(i))
+                sel_models.extend(self._traverse_get_model(i, get_obj=get_obj))
         return sel_models
 
     def tget(self,
-             tag: Union[str, list],
+             tag: Optional[Union[str, list]] = None,
              ravel: bool = False,
+             name: str = "selected_group"
              ):
         """
         Use name_tag to find groups or models in this group
@@ -215,13 +228,13 @@ class Group(GEMComposite):
 
         Examples
         ----------
-        g = Group({'G1': {'model_1': model_1, 'model_2': model_2}})
-        g.tget(['G1'])
+        g = Group({'G1': {'model_1': model_1, 'model_2': model_2}, 'G2': {'model_3': model_3}})
+        g1 = g.tget(['G1'])
 
         Returns
         -------
-        selected_objects: list of Groups or Models
-            A list of selected objects
+        selected_group: Group
+            A Group containing the selected objects
         """
         if tag is None:
             selected = [self]
@@ -233,16 +246,16 @@ class Group(GEMComposite):
             raise ValueError
         if ravel:
             sel_models = self._ravel_group(selected)
-            return self.__class__(sel_models, "selected_group")
+            return self.__class__(sel_models, name)
 
         if len(selected) == 1:
             return selected[0]
-
-        return self.__class__(selected, "selected_group")
+        return self.__class__(selected, name)
 
     def iget(self,
              index,
-             ravel: bool = False):
+             ravel: bool = False,
+             name: str = "selected_group"):
         """
         Use index to find groups or models in this group
 
@@ -256,14 +269,14 @@ class Group(GEMComposite):
 
         ravel: bool
             Return a group with only models
+        name: str
+            Name of returned Group
 
         Returns
         -------
-        selected_objects: list
-            A list of selected objects
+        selected_group: Group
+            A Group containing the selected objects
         """
-        name = "selected_group"
-
         if index is None:
             selected = [self]
             name = self.name_tag
@@ -339,13 +352,16 @@ class Group(GEMComposite):
             row_idx = self._traverse_util(c, data, suffix_row + [comp.name_tag], row_idx, features, **f_kws)
         return row_idx
 
-    def _traverse_get_model(self, comp: GEMComposite) -> Union[List[GEMComposite], GEMComposite]:
+    def _traverse_get_model(self, comp: GEMComposite, get_obj="object") -> Union[List[GEMComposite], GEMComposite]:
         if comp.is_leaf:
-            return comp
+            if get_obj == "object":
+                return comp
+            else:
+                return getattr(comp, get_obj)
         res = []
         assert is_iter(comp)
         for c in comp:
-            r = self._traverse_get_model(c)
+            r = self._traverse_get_model(c, get_obj=get_obj)
             if isinstance(r, list):
                 res.extend(r)
             else:
@@ -393,25 +409,38 @@ class Group(GEMComposite):
 
         """
         data = self._traverse(tag, index, features, **kwargs)
-        print(data)
         features = features if features is not None else []
         col_names = [f"group_{i}" for i in range(len(data[0]) -
                                                  len(features))] + features
         return pd.DataFrame(data=data, columns=col_names).infer_objects()
 
-    def _find_by_nametag(self,
-                         info_df: pd.DataFrame,
-                         name_tag: str,
-                         keep: str = "first",
-                         ) -> Union[pd.Series, pd.DataFrame]:
-        assert keep in ["first", "last", "all"]
-        queries = [f"{c}=='{name_tag}'" for c in info_df.columns]
-        res = info_df.query(" or ".join(queries))
-        if keep == "first":
-            res = res.iloc[:, 0]
-        elif keep == "last":
-            res = res.iloc[:, -1]
-        return res
+    @staticmethod
+    def _compare_components(models,
+                            components="all"):
+        label_index = {model.name_tag: ind for ind, model in enumerate(models)}
+        jaccard_index = {f'{A.name_tag}_to_{B.name_tag}': calc_jaccard_index(A, B, components)
+                         for A, B in itertools.combinations(models, 2)}
+        jaccard_index.update({f'{A.name_tag}_to_{A.name_tag}': 1 for A in models})
+        model_names = [A.name_tag for A in models]
+        result = np.array([[jaccard_index[f'{sorted([A, B], key=lambda x: label_index[x])[0]}'
+                                          f'_to_'
+                                          f'{sorted([A, B], key=lambda x: label_index[x])[1]}']
+                          for A in model_names]
+                          for B in model_names])
+        result = pd.DataFrame(result, index=model_names, columns=model_names)
+
+    def compare(self,
+                tags,
+                compare_models: bool = True,
+                to_compare: str = "components",
+                **kwargs
+                ):
+        models: List[GEMComposite] = self.tget(tags, compare_models)
+        if to_compare == "components":
+            self._compare_components(models=models, **kwargs)
+
+
+
 
     def _get_by_tags(self, tags, get_model_level) -> List[GEMComposite]:
         if tags == "all":
@@ -574,30 +603,6 @@ class Group(GEMComposite):
                         **kwargs
                         )
 
-    @staticmethod
-    def _compare_components(models,
-                            components="all"):
-        label_index = {model.name_tag: ind for ind, model in enumerate(models)}
-        jaccard_index = {f'{A.name_tag}_to_{B.name_tag}': calc_jaccard_index(A, B, components)
-                         for A, B in itertools.combinations(models, 2)}
-        jaccard_index.update({f'{A.name_tag}_to_{A.name_tag}': 1 for A in models})
-        model_names = [A.name_tag for A in models]
-        result = np.array([[jaccard_index[f'{sorted([A, B], key=lambda x: label_index[x])[0]}'
-                                          f'_to_'
-                                          f'{sorted([A, B], key=lambda x: label_index[x])[1]}']
-                          for A in model_names]
-                          for B in model_names])
-        result = pd.DataFrame(result, index=model_names, columns=model_names)
-
-    def compare(self,
-                tags,
-                compare_models: bool = True,
-                to_compare: str = "components",
-                **kwargs
-                ):
-        models: List[GEMComposite] = self.tget(tags, compare_models)
-        if to_compare == "components":
-            self._compare_components(models=models, **kwargs)
 
 
     def plot_model_heatmap(self,

@@ -7,6 +7,7 @@ from pint import UnitRegistry
 
 from ._base import BaseData
 from pipeGEM.analysis import threshold_finders
+from pipeGEM.analysis import DataAggregation
 
 HPA_scores = {'High': 20,
               'Medium': 15,
@@ -218,6 +219,19 @@ class GeneData(BaseData):
             self.gene_data = (data_and_ths[group] - data_and_ths["data"]).to_dict()
         elif method == "rdiff":
             self.gene_data = (data_and_ths["data"] - data_and_ths[group]).to_dict()
+
+    @classmethod
+    def aggregate(cls, data, method="concat", prop="data", absent_expression=0) -> DataAggregation:
+        assert prop in ["data", "score"], "prop should be either data or score"
+
+        obj_prop = {"data": "gene_data", "score": "rxn_scores"}
+        mg_d = pd.concat([pd.DataFrame({name+":"+d_name: getattr(gene_data, obj_prop[prop])})
+                          for name, d in data.items() for d_name, gene_data in d.items()], axis=1).fillna(absent_expression)
+        if method != "concat":
+            mg_d = getattr(mg_d, method)(axis=1).to_frame()
+        result = DataAggregation(log={"method": method, "prop": prop, "absent_expression": absent_expression})
+        result.add_result(mg_d)
+        return result
 
 
 def find_local_threshold(data_df, **kwargs):

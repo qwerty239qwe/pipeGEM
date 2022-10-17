@@ -52,6 +52,9 @@ class Model(GEMComposite):
     def __repr__(self):
         return f"pipeGEM Model {self._name_tag}"
 
+    def __str__(self):
+        return self.__repr__()
+
     def __getattr__(self, item):
         if item not in self.__dict__:
             return getattr(self._model, item)
