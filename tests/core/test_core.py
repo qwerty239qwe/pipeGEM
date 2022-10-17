@@ -50,7 +50,7 @@ def test_group_get_flux(ecoli_core):
     fba_result = g2.do_flux_analysis(method="FBA", solver="glpk")
     sampling_result = g2.do_flux_analysis(method="sampling", solver="glpk", n=10)
     assert isinstance(fba_result.result, pd.DataFrame)
-    assert isinstance(sampling_result.result, pd.DataFrame)
+    assert isinstance(sampling_result.result, dict)
 
 
 def test_group_operations(ecoli_core):
@@ -64,8 +64,4 @@ def test_group_operations(ecoli_core):
         print(gi.name_tag)
 
 
-# TODO: test_add_data_model
-# TODO: test_add_data_group
 # TODO: test_add_tasks
-# TODO: test_get_data
-# TODO: test_
