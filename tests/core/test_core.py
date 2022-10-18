@@ -44,6 +44,14 @@ def test_group_info(ecoli_core):
     assert isinstance(g2.get_info(), pd.DataFrame), g2.get_info()
 
 
+def test_group_get_info_2(ecoli_core):
+    m1 = ecoli_core
+    g2 = Group({"ecoli_g1": {"g11": {"m111": m1, "m112": m1}, "m12": m1},
+                "ecoli_g2": {"m21": m1, "m22": m1},
+                "m3": m1}, name_tag="G2")
+    print(g2.get_info(features=["n_rxns", "n_mets", "n_genes"]))
+
+
 def test_group_get_flux(ecoli_core):
     m1 = ecoli_core
     g2 = Group({"ecoli_g1": {"e11": m1, "e12": m1}, "ecoli_g2": {"e21": m1, "e22": m1}, "a": m1}, name_tag="G2")
@@ -63,5 +71,29 @@ def test_group_operations(ecoli_core):
     for gi in g:
         print(gi.name_tag)
 
+
+def test_compare_sim(ecoli_core):
+    m1 = ecoli_core
+    g = Group(group={"ecoli_g1": {"e11": m1, "e12": m1, "e13": m1},
+                     "ecoli_g2": {"e21": m1, "e22": m1}, "a": m1},
+              name_tag="G2")
+    sim_comp = g.compare(tags=None, compare_models=True, use="jaccard")
+    sim_comp.plot(dpi=150)
+
+
+def test_compare_num(ecoli_core):
+    m1 = ecoli_core
+    g = Group(group={"ecoli_g1": {"e11": m1, "e12": m1, "e13": m1},
+                     "ecoli_g2": {"e21": m1, "e22": m1}, "a": m1},
+              name_tag="G2")
+    num_comp = g.compare(tags=None, compare_models=True, use="num")
+    print(num_comp.result)
+    print(num_comp.name_order)
+    num_comp.plot(dpi=150)
+
+    num_comp = g.compare(tags=None, compare_models=False, use="num")
+    print(num_comp.result)
+    print(num_comp.name_order)
+    num_comp.plot(dpi=150, group="model", name_order=[gi.name_tag for gi in g])
 
 # TODO: test_add_tasks

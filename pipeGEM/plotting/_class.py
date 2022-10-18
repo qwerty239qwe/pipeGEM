@@ -8,6 +8,7 @@ from ._flux import plot_fba, plot_fva, plot_sampling
 from .curve import plot_rFastCormic_thresholds, plot_percentile_thresholds
 from .heatmap import plot_heatmap
 from .scatter import plot_PCA, plot_embedding
+from .categorical import plot_model_components
 
 
 class BasePlotter:
@@ -153,6 +154,20 @@ class PercentileThresholdPlotter(BasePlotter):
 
         return plot_percentile_thresholds(data=data,
                                           exp_th=exp_th, *args, **kwargs)
+
+
+class ComponentNumberPlotter(BasePlotter):
+    def __init__(self, dpi=150, prefix="component_"):
+        super().__init__(dpi, prefix)
+
+    def plot_func(self,
+                  result,
+                  name_order,
+                  *args,
+                  **kwargs):
+        return plot_model_components(comp_df=result,
+                                     order=name_order,
+                                     **kwargs)
 
 
 class ComponentComparisonPlotter(BasePlotter):

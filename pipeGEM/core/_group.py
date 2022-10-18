@@ -10,6 +10,7 @@ from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, man
 import pipeGEM
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
+from pipeGEM.analysis import ComponentComparisonAnalysis, ComponentNumberAnalysis
 from pipeGEM.data import GeneData
 from pipeGEM.plotting.categorical import plot_model_components
 from pipeGEM.plotting.heatmap import plot_heatmap, plot_clustermap
@@ -238,6 +239,7 @@ class Group(GEMComposite):
         """
         if tag is None:
             selected = [self]
+            name = self.name_tag
         elif isinstance(tag, str):
             selected = [g for g in self._group if g.name_tag == tag]
         elif isinstance(tag, list) or isinstance(tag, np.ndarray):
@@ -343,8 +345,7 @@ class Group(GEMComposite):
             inserted = suffix_row + [comp.name_tag] + \
                        ["-" for _ in range(data.shape[1] - len(suffix_row) - 1 - len(features))] + \
                        [getattr(comp, f)
-                        if isinstance(getattr(type(comp), f), property)
-                        else getattr(comp, f)(**f_kws)
+                        if isinstance(getattr(type(comp), f), property) else getattr(comp, f)(**f_kws)
                         for f in features]
             data[row_idx, :] = inserted
 
@@ -376,7 +377,7 @@ class Group(GEMComposite):
         else:
             comps = self.iget(index)
 
-        data = np.empty(shape=(comps.size + (len(features) if features is not None else 0), self.tree_level), dtype="<U30")
+        data = np.empty(shape=(comps.size, self.tree_level + (len(features) if features is not None else 0)), dtype="O")
         # max_lvl = max([c.tree_level for c in comps])
         row_idx = self._traverse_util(comps, data=data, suffix_row=[],
                                       row_idx=0, features=features if features is not None else [],
@@ -424,47 +425,56 @@ class Group(GEMComposite):
                          for A, B in itertools.combinations(models, 2)}
         jaccard_index.update({f'{A.name_tag}_to_{A.name_tag}': 1 for A in models})
         model_names = [A.name_tag for A in models]
-        result = np.array([[jaccard_index[f'{sorted([A, B], key=lambda x: label_index[x])[0]}'
+        comp_arr = np.array([[jaccard_index[f'{sorted([A, B], key=lambda x: label_index[x])[0]}'
                                           f'_to_'
                                           f'{sorted([A, B], key=lambda x: label_index[x])[1]}']
                           for A in model_names]
                           for B in model_names])
-        result = pd.DataFrame(result, index=model_names, columns=model_names)
+        comp_arr = pd.DataFrame(comp_arr, index=model_names, columns=model_names)
+        result = ComponentComparisonAnalysis(log={"components": components})
+        result.add_result(comp_arr)
+        return result
+
+    @staticmethod
+    def _compare_component_num(models,
+                               components="all",
+                               name_order: Union[str, list]="default",
+                               present_lvl: int = 1):
+        components = ['genes', 'reactions', 'metabolites'] if components == "all" else components
+        c_to_f = {"genes": "n_genes", "reactions": "n_rxns", "metabolites": "n_mets"}
+        comp_df = models.get_info(features=[c_to_f[c] for c in components])
+        comp_df = comp_df.rename(columns={f"group_{present_lvl-1}": "group", f"group_{present_lvl}": "model"})
+        new_comp_df = pd.concat(
+            (pd.melt(comp_df, id_vars=["group", "model"], value_vars="n_rxns", var_name="component", value_name="number"),
+             pd.melt(comp_df, id_vars=["group", "model"], value_vars="n_mets", var_name="component", value_name="number"),
+             pd.melt(comp_df, id_vars=["group", "model"], value_vars="n_genes", var_name="component",
+                     value_name="number")),
+            ignore_index=True
+        )
+
+        new_comp_df["number"] = new_comp_df["number"].astype(dtype=int)
+        result = ComponentNumberAnalysis(log={"components": components, 'present_lvl': present_lvl})
+        result.add_result(new_comp_df, name_order=name_order
+                                                  if name_order != "default" else None)
+        return result
 
     def compare(self,
-                tags,
+                tags=None,
                 compare_models: bool = True,
-                to_compare: str = "components",
+                use: str = "jaccard",
                 **kwargs
                 ):
-        models: List[GEMComposite] = self.tget(tags, compare_models)
-        if to_compare == "components":
-            self._compare_components(models=models, **kwargs)
+        assert use in ["jaccard", "PCA", "num"]
+
+        models: Group = self.tget(tags, compare_models)
+        if use == "jaccard":
+            return self._compare_components(models=models, **kwargs)
+        elif use == "num":
+            return self._compare_component_num(models=models, name_order=[models.name_tag], **kwargs)
 
 
 
 
-    def _get_by_tags(self, tags, get_model_level) -> List[GEMComposite]:
-        if tags == "all":
-            result = self._group
-        elif isinstance(tags, str):
-            result = self.tget(tags)
-        elif isinstance(tags, list):
-            result = []
-            for t in tags:
-                result.extend(self.tget(t))
-        else:
-            raise TypeError("")
-
-        if get_model_level:
-            models = []
-            for r in result:
-                if r.is_leaf:
-                    models.append(r)
-                else:
-                    models.extend(self._traverse_get_model(r))
-            return models
-        return result
 
     def plot_components(self,
                         group_order = None,
@@ -506,44 +516,6 @@ class Group(GEMComposite):
         new_comp_df["number"] = new_comp_df["number"].astype(dtype=int)
         plot_model_components(new_comp_df, group_order, file_name=file_name)
         return new_comp_df
-
-    def _process_flux(self,
-                      method,
-                      constr,
-                      tags,
-                      get_model_level,
-                      aggregation_method,
-                      show_groups = False
-                      ) -> Dict[str, pd.DataFrame]:
-        # TODO: remove
-
-        if show_groups:
-            compos: List[GEMComposite] = self._get_by_tags(tags, False)
-        else:
-            compos: List[GEMComposite] = self._get_by_tags(tags, get_model_level)
-        # TODO: add more model info to fluxes result
-        # compo_info = self.get_info(tags=tags if tags is not "all" else None)
-        fluxes: Dict[str, Dict[str, pd.DataFrame]] = {}
-        for c in compos:
-            if c.is_leaf:
-                flux = c.get_flux(method=method,
-                                  constr=constr,
-                                  as_dict=True,
-                                  keep_rc=False)
-            else:
-                flux = c.get_flux(aggregate=aggregation_method if not show_groups else "concat",
-                                  as_dict=True,
-                                  method=method,
-                                  constr=constr,
-                                  keep_rc=False)
-            for k, f in flux.items():
-                if k not in fluxes:
-                    fluxes[k] = {}
-                processed = f.T
-                processed["model"] = processed.index
-                processed["group"] = c.name_tag
-                fluxes[k][c.name_tag] = processed
-        return {fname: pd.concat(list(fdfs.values()), axis=0).fillna(0) for fname, fdfs in fluxes.items() }
 
     def plot_flux_heatmap(self,
                           method,
@@ -604,65 +576,3 @@ class Group(GEMComposite):
                         file_name=file_name,
                         **kwargs
                         )
-
-
-
-    def plot_model_heatmap(self,
-                           tags: Union[str, List[str]] = "all",
-                           components: Union[str, List[str]] = 'all',
-                           get_model_level: bool = True,
-                           annotate: bool = True,
-                           file_name=None,
-                           prefix="model_jaccard_",
-                           dpi=300,
-                           **kwargs):
-        # TODO: remove it
-        """
-        Plot the similarity of models' components
-
-        Parameters
-        ----------
-        tags: str or list of str, default = 'all'
-            Tag used to get the analyzed models, if input 'all', then get all the groups in this object
-        components: str or a list of str
-            if components is a list, use the names in the list to calculate similarity score.
-            if 'all', use all of the components to calculate similarity score.
-            Choose a category / categories from ['reactions', 'metabolites', 'genes']
-        get_model_level: bool, default = True
-            Whether to use model level only or use group level
-        annotate: bool, default = True
-            If to add annotation (number) on the heatmap
-        file_name: str, optional, default = None
-            output file name, if None then no file will be saved
-        prefix: str, default = 'model_jaccard_'
-            The file name prefix
-        **kwargs
-
-        Returns
-        -------
-        None
-        """
-        models: List[GEMComposite] = self._get_by_tags(tags, get_model_level)
-        label_index = {model.name_tag: ind for ind, model in enumerate(models)}
-        jaccard_index = {f'{A.name_tag}_to_{B.name_tag}': calc_jaccard_index(A, B, components)
-                         for A, B in itertools.combinations(models, 2)}
-        jaccard_index.update({f'{A.name_tag}_to_{A.name_tag}': 1 for A in models})
-        model_names = [A.name_tag for A in models]
-        data = np.array([[jaccard_index[f'{sorted([A, B],key=lambda x: label_index[x])[0]}'
-                                        f'_to_'
-                                        f'{sorted([A, B], key=lambda x: label_index[x])[1]}']
-                         for A in model_names]
-                         for B in model_names])
-
-        plot_heatmap(data=pd.DataFrame(data, index=model_names, columns=model_names),
-                     xticklabels=True,
-                     yticklabels=True,
-                     scale=1,
-                     cbar_label='Jaccard Index',
-                     cmap='magma',
-                     annotate=annotate,
-                     file_name=file_name,
-                     prefix=prefix,
-                     dpi=dpi,
-                     **kwargs)
-
