@@ -331,6 +331,8 @@ class Group(GEMComposite):
                 elif isinstance(comp, pipeGEM.Model):
                     group_lis.append(comp)
                     max_g = max([g.tree_level for g in group_lis] + [1])
+        elif group_dict is None:
+            group_lis = []
         else:
             raise ValueError("Group doesn't support object type: ", type(group_dict))
         self._lvl = max_g + 1

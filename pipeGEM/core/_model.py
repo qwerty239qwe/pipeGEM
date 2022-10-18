@@ -29,8 +29,11 @@ class Model(GEMComposite):
 
         Parameters
         ----------
-        name: str
+        name: optional, str
             The name of this object, it will be used in a pg.Group object
+        model: optional, cobra.Model
+            A cobra model analyzed in this object
+
         """
         super(Model, self).__init__(name_tag=name_tag)
         if not isinstance(model, cobra.Model):
@@ -99,7 +102,25 @@ class Model(GEMComposite):
              copy_medium_data=False,
              copy_tasks=False,
              copy_merging_info=True):
-        new = self.__class__(f"cp_{self.name_tag}", self._model.copy())
+        """
+        Create a deep-copied object of this Model
+
+        Parameters
+        ----------
+        copy_gene_data: bool
+            Also copy the gene data in this Model
+        copy_medium_data: bool
+            Also copy the medium data in this Model
+        copy_tasks: bool
+            Also copy the tasks in this Model
+        copy_merging_info: bool
+            Also copy the merged reaction information
+        Returns
+        -------
+        copied_model: pipeGEM.Model
+
+        """
+        new = self.__class__(model=self._model.copy(), name_tag=f"copied_{self.name_tag}")
         if copy_gene_data:
             new._gene_data = self._gene_data.copy()
         if copy_medium_data:

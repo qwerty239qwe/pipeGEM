@@ -21,6 +21,9 @@ class BaseAnalysis:
         self._log = log  # analysis record (parameter, model, and data name)
         self._result = None
 
+    def __repr__(self):
+        return self.result
+
     @property
     def result(self):
         return self._result
