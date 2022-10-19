@@ -92,11 +92,11 @@ class FBA_Analysis(FluxAnalysis):
                       method="PCA",
                       **kwargs
                       ) -> Union[PCA_Analysis, EmbeddingAnalysis]:
-        if "group" not in self._df:
+        if "group" not in self._log:
             raise NotAggregatedError("This analysis result contains only 1 model's fluxes, "
                                      "please use Group.do_flux_analysis to get a proper result for dim reduction")
 
-        flux_df = self._df.pivot(columns="name", values="fluxes")
+        flux_df = self._df.pivot_table(index="Reaction", columns="name", values="fluxes", aggfunc="mean").fillna(0).T
         if method == "PCA":
             final_df, exp_var_df, component_df = prepare_PCA_dfs(flux_df.T,
                                                                  **kwargs)

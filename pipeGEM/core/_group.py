@@ -181,7 +181,7 @@ class Group(GEMComposite):
 
     def _get_group_model(self, group_strategy):
         if group_strategy == "top":
-            return {g.name_tag: self._ravel_group(g) if not g.is_leaf else [g.name_tag] for g in self._group}
+            return {g.name_tag: self._ravel_group(g, "name_tag") if not g.is_leaf else [g.name_tag] for g in self._group}
 
     def do_flux_analysis(self, method, aggregate_method="concat", solver="gurobi", group_strategy="top", **kwargs):
         results = []
@@ -378,7 +378,6 @@ class Group(GEMComposite):
             comps = self.iget(index)
 
         data = np.empty(shape=(comps.size, self.tree_level + (len(features) if features is not None else 0)), dtype="O")
-        # max_lvl = max([c.tree_level for c in comps])
         row_idx = self._traverse_util(comps, data=data, suffix_row=[],
                                       row_idx=0, features=features if features is not None else [],
                                       **kwargs)
@@ -474,48 +473,6 @@ class Group(GEMComposite):
 
 
 
-
-
-    def plot_components(self,
-                        group_order = None,
-                        file_name: str = None) -> pd.DataFrame:
-        """
-        Plot number of models' components and return the used df
-
-        Parameters
-        ----------
-        group_order: list of str
-            Order of groups to plot the model component
-        file_name: str
-            Saved figure's file name, no plot will be saved if no filename is assigned.
-
-        Examples
-        ----------
-        group = Group({"g1": ["model1", "model2"],
-                       "g2": ["model3", "model4"],
-                       "g3": ["model5", "model6"]})
-        group.plot_components(group_order = ["g1", "g2", "g3"],
-                              file_name = "model_components.png")
-        group.plot_components(group_order = ["model1", "model2", "model3", "model4"],
-                              file_name = "model_components.png")
-        Returns
-        -------
-        df: pd.DataFrame
-            The dataframe used to generate the plot
-        """
-        if group_order is None:
-            group_order = list([g.name_tag for g in self._group])
-        comp_df = self.get_info(features=["n_rxns", "n_mets", "n_genes"])
-        comp_df = comp_df.rename(columns={"group_0": "group", "group_1": "obj"})
-        new_comp_df = pd.concat(
-            (pd.melt(comp_df, id_vars=["group", "obj"], value_vars="n_rxns", var_name="component", value_name="number"),
-             pd.melt(comp_df, id_vars=["group", "obj"], value_vars="n_mets", var_name="component", value_name="number"),
-             pd.melt(comp_df, id_vars=["group", "obj"], value_vars="n_genes", var_name="component", value_name="number")),
-            ignore_index=True
-        )
-        new_comp_df["number"] = new_comp_df["number"].astype(dtype=int)
-        plot_model_components(new_comp_df, group_order, file_name=file_name)
-        return new_comp_df
 
     def plot_flux_heatmap(self,
                           method,

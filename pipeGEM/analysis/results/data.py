@@ -7,3 +7,6 @@ class DataAggregation(BaseAnalysis):
 
     def add_result(self, result):
         self._result = result
+
+    def corr(self):
+        pass

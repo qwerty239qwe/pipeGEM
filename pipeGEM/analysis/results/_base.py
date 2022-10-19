@@ -22,7 +22,10 @@ class BaseAnalysis:
         self._result = None
 
     def __repr__(self):
-        return self.result
+        return repr(self.result)
+
+    def __str__(self):
+        return str(self._log)
 
     @property
     def result(self):

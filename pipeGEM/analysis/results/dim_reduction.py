@@ -16,8 +16,8 @@ class PCA_Analysis(BaseAnalysis):
              **kwargs):
 
         pltr = DimReductionPlotter(dpi, prefix)
-        pltr.plot(data=self._result,
-                  group=self.log["group"],
+        pltr.plot(flux_df=self._result,
+                  groups=self.log["group"],
                   method=method,
                   **kwargs)
 
@@ -35,7 +35,7 @@ class EmbeddingAnalysis(BaseAnalysis):
              method="PCA",
              **kwargs):
         pltr = DimReductionPlotter(dpi, prefix)
-        pltr.plot(data=self._result,
-                  group=self.log["group"],
+        pltr.plot(flux_df=self._result,
+                  groups=self.log["group"],
                   method=method,
                   **kwargs)

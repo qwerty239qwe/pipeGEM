@@ -96,4 +96,5 @@ def test_compare_num(ecoli_core):
     print(num_comp.name_order)
     num_comp.plot(dpi=150, group="model", name_order=[gi.name_tag for gi in g])
 
+
 # TODO: test_add_tasks
