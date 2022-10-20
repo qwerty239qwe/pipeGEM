@@ -17,6 +17,10 @@ class FluxAnalysis(BaseAnalysis):
         self._sol = None
         self._df: Optional[pd.DataFrame] = None
 
+    def add_name(self, name):
+        self._df["name"] = name
+        self._df["name"] = pd.Categorical(self._df["name"])
+
     @classmethod
     def aggregate(cls, analyses, method, log, **kwargs):
         """
@@ -40,15 +44,12 @@ class FluxAnalysis(BaseAnalysis):
             for a in analyses:
                 one_df = a.result.reset_index().rename(columns={"index": "Reaction"}) \
                     if "Reaction" not in a.result.columns else a.result
-                one_df["name"] = a.log["name"]
                 dfs.append(one_df)
             new._df = pd.concat(dfs, axis=0).reset_index(drop=True)
-            new._df["name"] = pd.Categorical(new._df["name"])
         else:
             dfs = []
             for a in analyses:
                 one_df = a.result["fluxes"]
-                one_df.name = f"fluxes_{a.log['name']}"
                 dfs.append(one_df)
             new._df = pd.concat(dfs, axis=1)
             new._df = getattr(new._df, method)(axis=1).to_frame()

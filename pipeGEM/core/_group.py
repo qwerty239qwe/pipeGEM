@@ -191,6 +191,7 @@ class Group(GEMComposite):
                                             solver=solver, **kwargs)
             else:
                 result = c.do_flux_analysis(method=method, solver=solver, **kwargs)
+                result.add_name(c.name_tag)
             results.append(result)
         return results[0].__class__.aggregate(results, method=aggregate_method,
                                               log={"name": self.name_tag,
