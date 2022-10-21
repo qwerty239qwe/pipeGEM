@@ -44,6 +44,7 @@ def apply_RIPTiDe_sampling(model,
                            do_sampling: bool = False,
                            solver = "gurobi",
                            sampling_method: str = "gapsplit",
+                           protected_rxns = None,
                            sampling_n: int = 500,
                            keep_context: bool = False,
                            **kwargs
@@ -60,12 +61,12 @@ def apply_RIPTiDe_sampling(model,
     if do_sampling:
         with model:
             add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac, direction="max")
-            fix_objective_as_constraint(model=model, fraction=obj_frac)
             sampling_analyzer = flux_analyzers["sampling"](model, solver, log={"n": sampling_n,
                                                                                "method": sampling_method,
                                                                                **kwargs})
             sampling_result = sampling_analyzer.analyze(n=sampling_n,
                                                         method=sampling_method,
+                                                        obj_lb_ratio=obj_frac,
                                                         **kwargs)
     if keep_context:
         add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac, direction="max")

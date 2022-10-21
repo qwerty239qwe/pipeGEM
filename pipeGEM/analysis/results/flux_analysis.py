@@ -128,7 +128,6 @@ class FBA_Analysis(FluxAnalysis):
         if by == "reaction":
             flux_df = flux_df.T
         corr_result = flux_df.fillna(0).corr().fillna(0.)
-        print(corr_result)
         result = CorrelationAnalysis(log={"by": by})
         result.add_result(corr_result)
         return result

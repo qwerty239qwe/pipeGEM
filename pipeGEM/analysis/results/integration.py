@@ -1,3 +1,5 @@
+import pandas as pd
+
 from ._base import *
 
 
@@ -95,6 +97,16 @@ class RIPTiDeSamplingAnalysis(BaseAnalysis):
 
     def add_result(self, sampling_result):
         self._sampling_result = sampling_result
+
+    @property
+    def flux_result(self):
+        results = []
+        for i, result_df in self._sampling_result.result.items():
+            result_df = result_df.rename(columns={"flux": i})
+            result_df.index = result_df["rxn_id"]
+            result_df = result_df["flux"].to_frame().T
+            results.append(result_df)
+        return pd.concat(results, axis=0)
 
 
 class rFastCormicAnalysis(BaseAnalysis):
