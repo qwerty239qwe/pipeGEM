@@ -2,8 +2,9 @@ import pandas as pd
 
 from typing import Optional, Union
 from ._base import *
-from pipeGEM.plotting import FBAPlotter, FVAPlotter, SamplingPlotter, DimReductionPlotter
+from pipeGEM.plotting import FBAPlotter, FVAPlotter, SamplingPlotter
 from pipeGEM.analysis._dim_reduction import prepare_PCA_dfs, prepare_embedding_dfs
+from .corr import CorrelationAnalysis
 from .dim_reduction import PCA_Analysis, EmbeddingAnalysis
 
 
@@ -109,7 +110,7 @@ class FBA_Analysis(FluxAnalysis):
                                            reducer=method,
                                            **kwargs)
             result = EmbeddingAnalysis(log={**kwargs, **self.log})
-            result.add_result(emb_df)
+            result.add_result(emb_df, method=method)
             return result
 
     def hclust(self):
@@ -117,18 +118,20 @@ class FBA_Analysis(FluxAnalysis):
 
     def corr(self,
              by="name"):
-        if "group" not in self._df:
+        if "name" not in self._df:
             raise NotAggregatedError("This analysis result contains only 1 model's fluxes, "
                                      "please use Group.do_flux_analysis to get a proper result for dim reduction")
         if by not in ["name", "reaction"]:
             raise ValueError("argument 'by' should be either 'name' or 'reaction'")
 
-        flux_df = self._df.pivot(columns="name", values="fluxes")
+        flux_df = self._df.pivot_table(index="Reaction", columns="name", values="fluxes", aggfunc="mean")
         if by == "reaction":
             flux_df = flux_df.T
-        corr_result = flux_df.fillna(0).corr()
-
-
+        corr_result = flux_df.fillna(0).corr().fillna(0.)
+        print(corr_result)
+        result = CorrelationAnalysis(log={"by": by})
+        result.add_result(corr_result)
+        return result
 
 
 class FVA_Analysis(FluxAnalysis):

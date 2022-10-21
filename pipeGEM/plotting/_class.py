@@ -227,3 +227,25 @@ class HeatmapPlotter(BasePlotter):
                   *args,
                   **kwargs):
         plot_heatmap
+
+
+class CorrelationPlotter(BasePlotter):
+    def __init__(self, dpi=150, prefix="corr_"):
+        super().__init__(dpi, prefix)
+
+    def plot_func(self,
+                  result,
+                  xticklabels=True,
+                  yticklabels=True,
+                  scale=1,
+                  cbar_label='Jaccard Index',
+                  cmap='magma',
+                  *args,
+                  **kwargs):
+        return plot_heatmap(data=result,
+                            xticklabels=xticklabels,
+                            yticklabels=yticklabels,
+                            scale=scale,
+                            cbar_label=cbar_label,
+                            cmap=cmap,
+                            **kwargs)
