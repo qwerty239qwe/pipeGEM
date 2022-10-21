@@ -196,6 +196,10 @@ class SamplingAnalysis(FluxAnalysis):
     def result(self):
         return self._df_dic
 
+    def add_name(self, name):
+        for i in self._df_dic:
+            self._df_dic[i]["name"] = name
+
     def add_result(self, result):
         self._df_dic = result.melt(var_name="rxn_id", value_name="flux")
 

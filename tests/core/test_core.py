@@ -57,6 +57,7 @@ def test_group_get_flux(ecoli_core):
     g2 = Group({"ecoli_g1": {"e11": m1, "e12": m1}, "ecoli_g2": {"e21": m1, "e22": m1}, "a": m1}, name_tag="G2")
     fba_result = g2.do_flux_analysis(method="FBA", solver="glpk")
     sampling_result = g2.do_flux_analysis(method="sampling", solver="glpk", n=10)
+    print(sampling_result.result)
     assert isinstance(fba_result.result, pd.DataFrame)
     assert isinstance(sampling_result.result, dict)
 
