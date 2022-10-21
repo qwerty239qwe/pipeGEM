@@ -200,8 +200,12 @@ class SamplingAnalysis(FluxAnalysis):
         for i in self._df_dic:
             self._df_dic[i]["name"] = name
 
-    def add_result(self, result):
-        self._df_dic = result.melt(var_name="rxn_id", value_name="flux")
+    def add_result(self, result: pd.DataFrame):
+        for i in range(result.shape[0]):
+            one_sample = result.loc[i, :].to_frame()
+            one_sample = one_sample.reset_index()
+            one_sample.columns = ["rxn_id", "flux"]
+            self._df_dic[i] = one_sample
 
     def plot(self,
              dpi=150,
