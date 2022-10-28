@@ -120,7 +120,8 @@ class Model(GEMComposite):
         copied_model: pipeGEM.Model
 
         """
-        new = self.__class__(model=self._model.copy(), name_tag=f"copied_{self.name_tag}")
+        new = self.__class__(model=self._model.copy(),
+                             name_tag=f"copied_{self.name_tag}")
         if copy_gene_data:
             new._gene_data = self._gene_data.copy()
         if copy_medium_data:

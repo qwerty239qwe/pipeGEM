@@ -31,7 +31,7 @@ def apply_GIMME(model: cobra.Model,
     rxn_expr_score: Dict[str, float]
         A dict with rxn_ids as keys and expression values as values
     high_exp: float
-        Expression value higher than this value is treated as high_exp
+        Expression value higher than this value is defined as high expression
     obj_frac: float
 
     Returns
@@ -40,7 +40,7 @@ def apply_GIMME(model: cobra.Model,
     """
     ori_obj = [r.id for r in model.reactions if r.objective_coefficient != 0]
     obj_dict = {r_id: (high_exp - r_exp)
-                if high_exp - r_exp < max_inconsistency_score else max_inconsistency_score  # this is for preventing using -np.inf values
+                if high_exp - r_exp < max_inconsistency_score else max_inconsistency_score  # for preventing -np.inf values
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp) and
                 r_id not in protected_rxns and r_id not in ori_obj and
                 r_exp < high_exp}

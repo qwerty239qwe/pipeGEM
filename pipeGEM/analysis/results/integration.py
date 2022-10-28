@@ -104,7 +104,7 @@ class RIPTiDeSamplingAnalysis(BaseAnalysis):
         for i, result_df in self._sampling_result.result.items():
             result_df = result_df.rename(columns={"flux": i})
             result_df.index = result_df["rxn_id"]
-            result_df = result_df["flux"].to_frame().T
+            result_df = result_df[i].to_frame().T
             results.append(result_df)
         return pd.concat(results, axis=0)
 

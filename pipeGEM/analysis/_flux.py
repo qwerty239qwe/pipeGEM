@@ -6,6 +6,7 @@ from itertools import chain
 import pandas as pd
 import numpy as np
 import cobra
+from cobra.util import constraint_matrices, nullspace
 from cobra.core.solution import get_solution
 from cobra.flux_analysis.variability import flux_variability_analysis
 from cobra.flux_analysis.parsimonious import pfba
@@ -94,18 +95,15 @@ class SamplingAnalyzer(FluxAnalyzer):
                       obj_lb_ratio=0.75,
                       n=5000,
                       **kwargs):
-        obj_lb = self.model.slim_optimize() * obj_lb_ratio
-        with self.model:
-            biom = self.model.problem.Constraint(self.model.objective.expression, obj_lb)
-            self.model.solver.add(biom)
+
+        with self.model as model:
+            fix_objective_as_constraint(model, fraction=obj_lb_ratio)
             if kwargs.get("method") == "gapsplit":
                 kwargs["gurobi_direct"] = (self.solver_name == "gurobi")
                 kwargs.pop("method")
-                return gapsplit(self.model, n=n, **kwargs)
-            else:
-                method = kwargs.pop("method") if "method" in kwargs else None
+                return gapsplit(model, n=n, **kwargs)
 
-            return sampling.sample(self.model, n=n, **kwargs)
+            return sampling.sample(model, n=n, **kwargs)
 
 
 flux_analyzers = FluxAnalyzers()
