@@ -36,7 +36,7 @@ def apply_GIMME(model: cobra.Model,
 
     Returns
     -------
-    None
+    result: GIMMEAnalysis
     """
     ori_obj = [r.id for r in model.reactions if r.objective_coefficient != 0]
     obj_dict = {r_id: (high_exp - r_exp)

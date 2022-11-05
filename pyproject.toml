@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pipeGEM"
-version = "1.0.0"
+version = "0.0.1a1"
 description = "Processing and integrating data with genome-scale metabolic models (GEM)"
 readme = "README.md"
 authors = [{ name = "Yu-Te Lin", email = "qwerty239qwe@gmail.com" }]
@@ -40,3 +40,6 @@ dev = ["pip-tools", "pytest"]
 
 [project.urls]
 Homepage = "https://github.com/qwerty239qwe/pipeGEM"
+
+[project.scripts]
+realpython = "pipeGEM.__main__:main"
