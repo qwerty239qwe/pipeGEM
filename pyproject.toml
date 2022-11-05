@@ -1,0 +1,42 @@
+[build-system]
+requires      = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pipeGEM"
+version = "1.0.0"
+description = "Processing and integrating data with genome-scale metabolic models (GEM)"
+readme = "README.md"
+authors = [{ name = "Yu-Te Lin", email = "qwerty239qwe@gmail.com" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+keywords = ["metabolism", "metabolic-model", "computational-biology", "system-biology", "cobra"]
+dependencies = [
+    "cobra ~= 0.20.0",
+    "pandas ~= 1.2.0",
+    "numpy ~= 1.19.3",
+    "scipy ~= 1.6.0",
+    "matplotlib ~= 3.3.3",
+    "requests ~= 2.25.1",
+    "scikit-learn ~= 0.24.0",
+    "scikit-posthocs ~= 0.6.6",
+    "seaborn ~= 0.11.1",
+    "umap-learn ~= 0.5.1",
+    "biodbs ~= 0.0.1",
+    "tqdm ~= 4.60.0",
+    "optlang ~= 1.4.4",
+    "networkx",
+    "zeep",
+    "pint"
+]
+requires-python = ">=3.7"
+
+[project.optional-dependencies]
+dev = ["pip-tools", "pytest"]
+
+[project.urls]
+Homepage = "https://github.com/qwerty239qwe/pipeGEM"
