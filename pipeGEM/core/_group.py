@@ -1,4 +1,4 @@
-from typing import List, Union, Dict, Optional
+from typing import List, Union, Optional
 from functools import reduce
 import itertools
 
@@ -12,8 +12,7 @@ from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
 from pipeGEM.analysis import ComponentComparisonAnalysis, ComponentNumberAnalysis
 from pipeGEM.data import GeneData
-from pipeGEM.plotting.categorical import plot_model_components
-from pipeGEM.plotting.heatmap import plot_heatmap, plot_clustermap
+from pipeGEM.plotting import plot_clustermap
 from pipeGEM.utils import is_iter, calc_jaccard_index
 
 
