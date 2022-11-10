@@ -107,7 +107,7 @@ def prepare_embedding_dfs(feature_df,
     sample_names = feature_df.columns.to_list()
     x = StandardScaler().fit_transform(x.T) if standardize else x.values.T
     if reducer == Reducer("TSNE") and kwargs.get("perplexity") is None:
-        kwargs["perplexity"] = min(x.shape[0], 30)
+        kwargs["perplexity"] = min(x.shape[0]-1, 30)
     X_embedded = REDUCER_DICT[reducer](n_components=n_components, **kwargs).fit_transform(x)
     df = pd.DataFrame(X_embedded,
                       columns=["embedding {}".format(i) for i in range(1, n_components + 1)],
