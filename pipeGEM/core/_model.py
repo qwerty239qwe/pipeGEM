@@ -97,6 +97,10 @@ class Model(GEMComposite):
     def gene_data(self):
         return self._gene_data
 
+    @property
+    def aggregated_gene_data(self):
+        return GeneData.aggregate(self._gene_data, prop="data")
+
     def copy(self,
              copy_gene_data=False,
              copy_medium_data=False,
