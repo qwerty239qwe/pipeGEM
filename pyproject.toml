@@ -8,7 +8,6 @@ version = "0.0.1a1"
 description = "Processing and integrating data with genome-scale metabolic models (GEM)"
 readme = "README.md"
 authors = [{ name = "Yu-Te Lin", email = "qwerty239qwe@gmail.com" }]
-license = { file = "LICENSE" }
 classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python",
@@ -16,19 +15,19 @@ classifiers = [
 ]
 keywords = ["metabolism", "metabolic-model", "computational-biology", "system-biology", "cobra"]
 dependencies = [
-    "cobra ~= 0.20.0",
-    "pandas ~= 1.2.0",
-    "numpy ~= 1.19.3",
-    "scipy ~= 1.6.0",
-    "matplotlib ~= 3.3.3",
-    "requests ~= 2.25.1",
-    "scikit-learn ~= 0.24.0",
-    "scikit-posthocs ~= 0.6.6",
-    "seaborn ~= 0.11.1",
-    "umap-learn ~= 0.5.1",
-    "biodbs ~= 0.0.1",
-    "tqdm ~= 4.60.0",
-    "optlang ~= 1.4.4",
+    "cobra",
+    "pandas",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "requests",
+    "scikit-learn",
+    "scikit-posthocs",
+    "seaborn",
+    "umap-learn",
+    "biodbs",
+    "tqdm",
+    "optlang",
     "networkx",
     "zeep",
     "pint"

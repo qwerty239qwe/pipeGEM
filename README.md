@@ -1,10 +1,12 @@
 # PipeGEM v0.1.0-alpha1
-[![PyPI pyversions](https://img.shields.io/pypi/pyversions/biodbs.svg)](https://pypi.python.org/pypi/biodbs/)
-[![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
-![ci](https://github.com/qwerty239qwe/biodbs/actions/workflows/ci.yml/badge.svg)
+[![PyPI pyversions](https://img.shields.io/pypi/pyversions/biodbs.svg)](https://pypi.python.org/pypi/pipeGEM/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+![ci](https://github.com/qwerty239qwe/pipeGEM/actions/workflows/ci.yml/badge.svg)
 ___
-This is a package for visualizing and analyzing metabolic models. Also, it allows users to . 
-The analysis functions in the package are based on cobrapy: 
+This is a package for visualizing and analyzing multiple metabolic models. 
+It also allow users to integrate omic data, metabolic tasks, and medium data with GEMs. 
+
+The flux analysis functions in the package are based on cobrapy: 
 https://cobrapy.readthedocs.io/en/latest/
 ___
 ### How to get PipeGEM
