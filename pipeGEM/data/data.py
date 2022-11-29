@@ -161,7 +161,7 @@ class GeneData(BaseData):
     def rxn_scores(self) -> Dict[str, float]:
         if self.rxn_mapper is None:
             raise AttributeError("The rxn mapper is not initialized. Please do .align(model) first.")
-        return {k: self.data_transform(v) for k, v in self.rxn_mapper.rxn_scores}
+        return {k: self.data_transform(v) for k, v in self.rxn_mapper.rxn_scores.items()}
 
     def _digitize_data(self, ordered_thresholds):
         if ordered_thresholds is not None:
