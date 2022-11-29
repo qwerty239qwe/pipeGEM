@@ -110,8 +110,9 @@ class GeneData(BaseData):
 
         Parameters
         ----------
-        data
+        data: pd.Series or a dict
         convert_to_str: bool
+            Convert the gene names into strings
         expression_threshold: float
         absent_expression: float
         data_transform
@@ -125,17 +126,17 @@ class GeneData(BaseData):
         super().__init__("genes")
         self.convert_to_str = convert_to_str
         discrete_transform = self._parse_discrete_transform(discrete_transform, ordered_thresholds)
-        data_transform = (lambda x: x) if data_transform is None else data_transform
+        self.data_transform = (lambda x: x) if data_transform is None else data_transform
 
         if isinstance(data, pd.Series):
             data = data.copy().apply(lambda x: discrete_transform(x)) if discrete_transform is not None else data.copy()
             self.gene_data = {str(gene_id) if convert_to_str else gene_id:
-                              data_transform(exp) if exp > expression_threshold else absent_expression
+                              exp if exp > expression_threshold else absent_expression
                               for gene_id, exp in zip(data.index, data)}
         elif isinstance(data, dict):
             data = {k: discrete_transform(v) if discrete_transform is not None else v for k, v in data.items()}
             self.gene_data = {str(gene_id) if convert_to_str else gene_id:
-                              data_transform(exp) if exp > expression_threshold else absent_expression
+                              exp if exp > expression_threshold else absent_expression
                               for gene_id, exp in data.items()}
         else:
             raise ValueError("Expression data should be a dict or a pandas series")
@@ -152,14 +153,15 @@ class GeneData(BaseData):
     def transformed_rxn_scores(self, func):
         return {k: func(v) for k, v in self.rxn_scores.items()}
 
-    def transformed_data(self, func):
-        return {k: func(v) for k, v in self.gene_data.items()}
+    @property
+    def transformed_gene_data(self):
+        return {k: self.data_transform(v) for k, v in self.gene_data.items()}
 
     @property
     def rxn_scores(self) -> Dict[str, float]:
         if self.rxn_mapper is None:
-            raise AttributeError("The rxn mapper is not initialized. Please use .align(model) to do that first.")
-        return self.rxn_mapper.rxn_scores
+            raise AttributeError("The rxn mapper is not initialized. Please do .align(model) first.")
+        return {k: self.data_transform(v) for k, v in self.rxn_mapper.rxn_scores}
 
     def _digitize_data(self, ordered_thresholds):
         if ordered_thresholds is not None:
