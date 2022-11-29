@@ -20,7 +20,7 @@ def apply_RIPTiDe_pruning(model,
     if protected_rxns is None:
         protected_rxns = []
     rxn_expr_score = {k: v if -max_inconsistency_score < v < max_inconsistency_score else max_inconsistency_score
-                     if v > max_inconsistency_score else -max_inconsistency_score
+                      if v > max_inconsistency_score else -max_inconsistency_score
                       for k, v in rxn_expr_score.items() if not np.isnan(v)}
 
     max_gw = max_gw or max([i for i in rxn_expr_score.values() if not np.isnan(i)])
@@ -45,6 +45,7 @@ def apply_RIPTiDe_pruning(model,
 def apply_RIPTiDe_sampling(model,
                            rxn_expr_score: Dict[str, float],
                            max_gw: float = None,
+                           max_inconsistency_score = 1e3,
                            obj_frac: float = 0.8,
                            sampling_obj_frac: float = 0.05,
                            do_sampling: bool = False,
@@ -55,6 +56,9 @@ def apply_RIPTiDe_sampling(model,
                            keep_context: bool = False,
                            **kwargs
                            ):
+    rxn_expr_score = {k: v if -max_inconsistency_score < v < max_inconsistency_score else max_inconsistency_score
+                      if v > max_inconsistency_score else -max_inconsistency_score
+                      for k, v in rxn_expr_score.items() if not np.isnan(v)}
     max_gw = max_gw or np.nanmax(list(rxn_expr_score.values()))
     min_gw = np.nanmin(list(rxn_expr_score.values()))
     print(f"Max RAL: {max_gw}, Min RAL: {min_gw}")
