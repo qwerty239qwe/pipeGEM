@@ -19,6 +19,10 @@ def apply_RIPTiDe_pruning(model,
                           ):
     if protected_rxns is None:
         protected_rxns = []
+    rxn_expr_score = {k: v if -max_inconsistency_score < v < max_inconsistency_score else max_inconsistency_score
+                     if v > max_inconsistency_score else -max_inconsistency_score
+                      for k, v in rxn_expr_score.items() if not np.isnan(v)}
+
     max_gw = max_gw or max([i for i in rxn_expr_score.values() if not np.isnan(i)])
     if np.isnan(max_gw):
         raise ValueError("max_gw cannot be NaN")
