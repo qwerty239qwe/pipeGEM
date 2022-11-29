@@ -16,3 +16,4 @@ optlang
 networkx
 zeep
 pint
+openpyxl
