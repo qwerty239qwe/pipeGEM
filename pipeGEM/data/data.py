@@ -110,13 +110,18 @@ class GeneData(BaseData):
 
         Parameters
         ----------
-        data: pd.Series or a dict
+        data: pd.Series or dict
+            Data contains pairs of gene IDs and expression values.
         convert_to_str: bool
             Convert the gene names into strings
         expression_threshold: float
+            The absent_expression will be assigned to the expression values below this threshold
         absent_expression: float
-        data_transform
-        discrete_transform
+            The value assigned to the low-expressed genes
+        data_transform: callable
+            Transformation applied to the rxn_scores and the transformed_gene_data. e.g. np.log2
+        discrete_transform: str, dict, or callable
+            Discrete data transformation applied to the rxn_scores.
         ordered_thresholds: list
             Ascending thresholds indicating how the gene level will be transformed discretely
 
@@ -148,6 +153,38 @@ class GeneData(BaseData):
         return self.gene_data[item]
 
     def align(self, model, **kwargs):
+        """
+        Calculate rxn_scores using a metabolic model.
+
+        Parameters
+        ----------
+        model: pipeGEM.Model or cobra.Model
+            The model with the genes and reactions to be mapped onto
+        kwargs:
+            Keyword arguments used to create a RxnMapper object, including:
+            threshold: float or int, default = 0
+                The absent_value will be assigned to the expression values below this threshold
+            absent_value: float or int, default = 0
+                The value assigned to the low-expressed genes
+            missing_value: any, default = np.nan
+                The value assigned to the genes not included in the gene_data
+            and_operation: str, default = 'nanmin',
+                The operation name used to calculate the 'and' gene-reaction relationships.
+
+                Valid operations include:
+                nanmin: return minimum while ignoring all the nan values
+                nanmax: return maximum while ignoring all the nan values
+                nansum: return the expression sums while ignoring all the nan values
+                nanmean: calculate the expression means while ignoring all the nan values
+            or_operation: str, default = 'nanmax'
+                The operation name used to calculate the 'or' gene-reaction relationships.
+            plus_operation: str, default = 'nansum'
+                The operation name used to calculate the 'plus' gene-reaction relationships.
+
+        Returns
+        -------
+        None
+        """
         self.rxn_mapper = RxnMapper(self, model, **kwargs)
 
     def transformed_rxn_scores(self, func):
