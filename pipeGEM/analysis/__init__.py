@@ -6,3 +6,4 @@ from pipeGEM.analysis._threshold import *
 from pipeGEM.analysis._problem import *
 from pipeGEM.analysis._gapsplit import gapsplit
 from pipeGEM.analysis._reducing import *
+from pipeGEM.analysis._mapping import *

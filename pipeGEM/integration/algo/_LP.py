@@ -167,7 +167,6 @@ def LP7(J,
         model.objective.set_linear_coefficients({v: 1 for v in vars})
         model.solver.update()
         sol = model.optimize(objective_sense="maximize", raise_error=True)
-    sol.to_frame().to_csv(f"./LP7_{len(J)}.csv")
     if use_abs:
         fm = sol.to_frame()["fluxes"].abs()
     else:
@@ -256,7 +255,6 @@ def LP9(K: np.ndarray,
             print("infeasible result: K = ", K)
             return []
         fm = sol.to_frame()["fluxes"].abs()
-        pd.DataFrame({"abs_fluxes": fm, "min_v": min_v_ser}).to_csv(f"./LP10_{len(K)}.csv")
     if rxn_scale_eps is None:
         return fm[fm > tol_coef * min(epsilon, min_v_ser.min())].index.to_list()  # supp
     return fm[fm > rxn_scale_eps[fm.index]].index.to_list()

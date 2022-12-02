@@ -6,6 +6,7 @@ import pandas as pd
 from pint import UnitRegistry
 
 from ._base import BaseData
+from pipeGEM.analysis import RxnMapper
 from pipeGEM.analysis import threshold_finders
 from pipeGEM.analysis import DataAggregation
 
@@ -20,80 +21,6 @@ HPA_scores = {'High': 20,
               'Not detected': -8}
 
 dis_trans = {"HPA": HPA_scores}
-
-
-class RxnMapper:
-    def __init__(self,
-                 data,
-                 model,
-                 threshold=0,
-                 absent_value=0,
-                 missing_value=np.nan,
-                 and_operation="nanmin",
-                 or_operation="nanmax",
-                 plus_operation="nansum"  # for reduced reactions
-                 ):
-        self.genes = data.genes
-        self.gene_data = data.gene_data
-        self.missing_value = missing_value  # if the gene is not shown in the given data
-        self.rxn_scores = self._map_to_rxns(model,
-                                            threshold=threshold,
-                                            absent_value=absent_value,
-                                            and_operation=and_operation,
-                                            or_operation=or_operation,
-                                            plus_operation=plus_operation)
-
-    def _inner_grr_helper(self, grr_list) -> list:
-        inner_grr_scores = []
-        for g in grr_list.split('and'):
-            if g == "" or not (g[:g.index(".")] if "." in g else g) in self.genes:
-                inner_grr_scores.append(self.missing_value)
-            else:
-                inner_grr_scores.append(self.gene_data[g[:g.index(".")] if "." in g else g])
-        return inner_grr_scores
-
-    def _outer_grr_helper(self, inner_grr_scores, operation="nanmin") -> float:
-        if len(inner_grr_scores) == 0:
-            return self.missing_value
-        if all([not np.isfinite(i) for i in inner_grr_scores]):
-            return self.missing_value
-        return getattr(np, operation)(inner_grr_scores)
-
-    def _map_to_rxns(self,
-                     model,
-                     absent_value=0,
-                     threshold=0.,
-                     and_operation="nanmin",
-                     or_operation="nanmax",
-                     plus_operation="nansum"):
-        """
-        :return: dict {rxn_id : score}
-        """
-        grrs = {r.id: r.gene_reaction_rule.replace(' ', '').replace('(', '').replace(')', '')
-                for r in model.reactions}
-
-        rxn_score = {}
-        for rxn_id, grr in grrs.items():
-            if len(grr) == 0:
-                rxn_score[rxn_id] = self.missing_value
-                continue
-            plus_grr_list = []
-            for grr_i in grr.split("plus"):
-                outer_grr_list = []
-                for gl in grr_i.split("or"):
-                    inner_grr_scores = self._inner_grr_helper(gl)
-                    outer_grr_list.append(self._outer_grr_helper(inner_grr_scores, and_operation))
-                plus_grr_list.append(self._outer_grr_helper(outer_grr_list, or_operation))
-            if all([not np.isfinite(i) for i in plus_grr_list]):
-                rxn_score[rxn_id] = self.missing_value
-            else:
-                rxn_score[rxn_id] = getattr(np, plus_operation)(plus_grr_list)
-            rxn_score[rxn_id] = rxn_score[rxn_id] if np.isfinite(rxn_score[rxn_id]) else self.missing_value
-
-        for k, v in rxn_score.items():
-            if v <= threshold:
-                rxn_score[k] = absent_value
-        return rxn_score
 
 
 class GeneData(BaseData):
