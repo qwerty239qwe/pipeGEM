@@ -259,7 +259,7 @@ def list_models(databases=["metabolic atlas", "BiGG"],
     return mg_df
 
 
-def load_model(model_id):
+def load_remote_model(model_id):
     model_list = list_models()
     if model_id in model_list[model_list["database"]=="BiGG"]["id"].to_list():
         return cobra.io.load_model(model_id)

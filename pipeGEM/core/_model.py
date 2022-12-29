@@ -14,7 +14,7 @@ from pipeGEM.utils import save_model, check_rxn_scales
 from pipeGEM.data import GeneData, MediumData
 from pipeGEM.integration import integrator_factory
 from pipeGEM.integration.algo.fastcore import fastcc
-from pipeGEM.analysis import flux_analyzers, FastCCAnalysis, TaskAnalysis
+from pipeGEM.analysis import flux_analyzers, FastCCAnalysis, TaskAnalysis, ko_analyzers
 from pipeGEM.analysis.tasks import TaskHandler
 
 
@@ -222,6 +222,15 @@ class Model(GEMComposite):
 
     def do_flux_analysis(self, method, solver="gurobi", **kwargs):
         analyzer = flux_analyzers.create(method, model=self._model, solver=solver, log={"name": self.name_tag})
+        return analyzer.analyze(**kwargs)
+
+    def simulate_ko_genes(self, gene_ids, **kwargs):
+        dummy_data = GeneData({g.id: 1 if g.id not in gene_ids else 0 for g in self._model.genes})
+        dummy_data.align(model=self, **kwargs)
+        return dummy_data.rxn_scores
+
+    def do_ko_analysis(self, method="single_KO", solver="gurobi", **kwargs):
+        analyzer = ko_analyzers.create(method, model=self, solver=solver, log={"name": self.name_tag})
         return analyzer.analyze(**kwargs)
 
     def integrate_gene_data(self, data_name, integrator="GIMME", integrator_init_kwargs=None, **kwargs):

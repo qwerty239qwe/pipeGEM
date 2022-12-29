@@ -220,6 +220,18 @@ class SamplingAnalysis(FluxAnalysis):
                   **kwargs)
 
 
+class Single_KO_Analysis(BaseAnalysis):
+    def __init__(self, log):
+        super().__init__(log)
+
+    @property
+    def result(self):
+        return self._df
+
+    def add_result(self, result):
+        self._df = result
+
+
 def combine(analyses, method, log, **kwargs):
     if len(analyses) < 2:
         raise ValueError("Analyses should be a container with more than 2 analysis objects")
