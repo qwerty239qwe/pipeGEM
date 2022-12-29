@@ -96,7 +96,7 @@ class CORDABuilder:
                 new_sups = support_vars - all_support_vars_for_v
                 all_support_vars_for_v |= support_vars
                 if keep_if_support is not None:
-                    n_sups.loc[set(eval_vars) & support_vars, "n"] += 1
+                    n_sups.loc[list(set(eval_vars) & support_vars), "n"] += 1
 
                 if len(new_sups) == 0:
                     if support_redundancies:

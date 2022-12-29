@@ -16,7 +16,7 @@ def apply_EFlux(model: cobra.Model,
                 min_score = -1e3,
                 ignore: Union[str, List[str], None] = None,
                 return_fluxes: bool = True,
-                transform: Callable = exp_x):
+                transform: Callable = exp_x) -> EFluxAnalysis:
     """
     Parameters
     ----------
@@ -39,7 +39,7 @@ def apply_EFlux(model: cobra.Model,
     -------
     """
     assert max_ub > 0, "max_ub should be a positive number"
-    assert min_lb > 0, "min_lb should be a positive number"
+    assert min_lb >= 0, "min_lb should be zero or a positive number"
     assert max_ub - min_lb > 0, "max_ub should be larger than min_lb"
     if ignore:
         ignore_rxn_ids = select_rxns_from_model(model, ignore, return_id=True)
@@ -51,9 +51,10 @@ def apply_EFlux(model: cobra.Model,
     min_exp = min(exps) if len(exps) != 0 else min_lb
     print(f"Max expression: {max_exp} | Min expression: {min_exp}")
     assert max_exp > 0, "max_exp should be a positive number, all expression values might be zeros"
-    exchanges = model.exchanges
     trans_min_exp = transform(min_exp)
     denominator = transform(max_exp) - trans_min_exp
+    if not np.isfinite(denominator):
+        raise ValueError("Infinite or NaN denominator")
     capped_scores = {k: v if v > min_score else min_score if not np.isnan(v) else v for k, v in rxn_expr_score.items()}
     trans_rxn_exp_dict = {k: min_lb + ((max_ub - min_lb) * (transform(v) - trans_min_exp) / denominator)
                           if not np.isnan(v) else v
@@ -62,7 +63,7 @@ def apply_EFlux(model: cobra.Model,
     assert all([v >= 0 for v in trans_rxn_exp_dict.values() if not np.isnan(v)]), trans_rxn_exp_dict
     r_bounds_dict = {}
     for r in model.reactions:
-        if r not in exchanges and r.id not in ignore_rxn_ids:
+        if r not in model.exchanges and r.id not in ignore_rxn_ids:
             if not np.isnan(trans_rxn_exp_dict[r.id]) and (-trans_rxn_exp_dict[r.id] > r.lower_bound):
                 r.lower_bound = -trans_rxn_exp_dict[r.id]
             if not np.isnan(trans_rxn_exp_dict[r.id]) and (trans_rxn_exp_dict[r.id] < r.upper_bound):

@@ -27,10 +27,12 @@ def apply_RIPTiDe_pruning(model,
     if np.isnan(max_gw):
         raise ValueError("max_gw cannot be NaN")
     min_gw = min([i for i in rxn_expr_score.values() if np.isfinite(i)])
-    obj_dict = {r_id: (max_gw + min_gw - r_exp) / max_gw if (max_gw + min_gw - r_exp) < max_inconsistency_score else 1
+    print(f"Max RAL: {max_gw}, Min RAL: {min_gw}")
+    obj_dict = {r_id: (max_gw - r_exp) / (max_gw - min_gw) if (max_gw + min_gw - r_exp) < max_inconsistency_score else 1
                 for r_id, r_exp in rxn_expr_score.items() if not (np.isnan(r_exp) or r_id in protected_rxns)}
 
-    assert all([0 <= v <= 1 for _, v in obj_dict.items()])
+    if not all([0 <= v <= 1 for _, v in obj_dict.items()]):
+        raise ValueError(f"Some of the obj values are invalid, {[v for _, v in obj_dict.items() if not (0 <= v <= 1)]}")
     sol_df = modified_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac).to_frame()
     rxn_to_remove = list(set(sol_df[abs(sol_df["fluxes"]) < threshold].index.to_list()) - set(protected_rxns))
     output_model = model.copy()
@@ -80,8 +82,6 @@ def apply_RIPTiDe_sampling(model,
             sampling_analyzer = flux_analyzers["sampling"](model, solver, log={"n": sampling_n,
                                                                                "method": sampling_method,
                                                                                **kwargs})
-
-
             sampling_result = sampling_analyzer.analyze(n=sampling_n,
                                                         method=sampling_method,
                                                         obj_lb_ratio=sampling_obj_frac,
