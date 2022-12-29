@@ -1,16 +1,11 @@
 import pandas as pd
 import numpy as np
 import pytest
-from pipeGEM.data.synthesis import get_syn_gene_data
+
 from pipeGEM.core import Model
 from pipeGEM.core import Group
 from pipeGEM.data import GeneData
 from pipeGEM.analysis import DataAggregation
-
-
-@pytest.fixture(scope="session")
-def ecoli_core_data(ecoli_core):
-    return get_syn_gene_data(ecoli_core, n_sample=100)
 
 
 def test_add_data_model(ecoli_core, ecoli_core_data):
