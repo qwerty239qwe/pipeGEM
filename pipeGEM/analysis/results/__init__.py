@@ -6,3 +6,4 @@ from .task import *
 from .consistency import *
 from .group_comp import *
 from .data import *
+from .ko_analysis import *

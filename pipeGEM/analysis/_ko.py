@@ -2,8 +2,9 @@ import numpy as np
 import pandas as pd
 from typing import Optional
 from cobra.flux_analysis.deletion import single_gene_deletion
+from cobra.core.solution import Solution
 from pipeGEM.utils import ObjectFactory
-from pipeGEM.analysis.results import Single_KO_Analysis
+from pipeGEM.analysis.results import Single_KO_Analysis, KO_Analysis
 
 
 def get_ko_df(model, gene_list, method="FBA"):
