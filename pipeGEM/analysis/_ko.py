@@ -12,8 +12,8 @@ from pipeGEM.utils import ObjectFactory
 from pipeGEM.analysis.results import Single_KO_Analysis, KO_Analysis
 
 
-def ko_once(model_ref, g, method="FBA"):
-    with model_ref as model:
+def ko_once(model, g, method="FBA"):
+    with model:
         model.genes.get_by_id(g).knock_out()
         if method == "FBA":
             sol = model.optimize()
@@ -99,7 +99,7 @@ class Single_KO_Analyzer(KO_Analyzer):
                       processes: Optional[int] = 1,
                       **kwargs):
         s = time()
-        result_df = get_ko_df(model=self.model,
+        result_df = get_ko_df(model=self.model.cobra_model,
                               gene_list=[g.id for g in self.model.genes],
                               method=method)
         print(f"KO finished in {time() - s} secs.")
