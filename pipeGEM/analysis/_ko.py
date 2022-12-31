@@ -1,26 +1,38 @@
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+from time import time
+
 from typing import Optional
 from cobra.flux_analysis.deletion import single_gene_deletion
+from cobra.flux_analysis.parsimonious import pfba
+from cobra.flux_analysis.moma import moma
 from cobra.core.solution import Solution
 from pipeGEM.utils import ObjectFactory
 from pipeGEM.analysis.results import Single_KO_Analysis, KO_Analysis
 
 
+def ko_once(model_ref, g, method="FBA"):
+    with model_ref as model:
+        model.genes.get_by_id(g).knock_out()
+        if method == "FBA":
+            sol = model.optimize()
+        elif method == "pFBA":
+            sol = pfba(model)
+        elif method == "moma":
+            sol = moma(model)
+        else:
+            raise ValueError(method, " is not supported")
+    return sol
+
+
 def get_ko_df(model, gene_list, method="FBA"):
     results = {}
-
-    for g in gene_list:
-        with model:
-            if isinstance(g, str):
-                model.genes.get_by_id(g).knock_out()
-            else:
-                g.knock_out()
-            if method == "FBA":
-                sol = model.optimize()
-                results[g] = sol.to_frame()["fluxes"]
-                results[g]["status"] = sol.status
-                results[g]["objective_value"] = sol.objective_value
+    for g in tqdm(gene_list):
+        sol = ko_once(model, g, method)
+        results[g] = sol.to_frame()["fluxes"]
+        results[g]["status"] = sol.status
+        results[g]["objective_value"] = sol.objective_value
     return pd.DataFrame(results)
 
 
@@ -86,27 +98,12 @@ class Single_KO_Analyzer(KO_Analyzer):
                       solution: Optional["Solution"] = None,
                       processes: Optional[int] = 1,
                       **kwargs):
-        ko_impacts = {}
-        reduced_calc = {}
-        for g in self.model.genes:
-            new_ko_impact = self.get_ko_impact([g.id], **kwargs)
-            if new_ko_impact in ko_impacts:
-                reduced_calc[g.id] = new_ko_impact
-            else:
-                ko_impacts[new_ko_impact] = g.id
-        print(f"Reduce the number of KO genes from {len(self.model.genes)} to {len(ko_impacts)}")
-
+        s = time()
         result_df = get_ko_df(model=self.model,
-                              gene_list=list(ko_impacts.values()),
+                              gene_list=[g.id for g in self.model.genes],
                               method=method)
-        # result_df["ids"] = result_df["ids"].apply(lambda x: list(x)[0])
-
-        print(result_df.columns)
-        print(all([ko_impacts[g_ko] in result_df.columns for g_id, g_ko in reduced_calc.items()]))
-        redundant_df = result_df.loc[:, [ko_impacts[g_ko] for g_id, g_ko in reduced_calc.items()]]
-        redundant_df.columns = list(reduced_calc.keys())
-
-        return pd.concat([result_df, redundant_df], axis=1)
+        print(f"KO finished in {time() - s} secs.")
+        return result_df
 
 
 ko_analyzers = KO_Analyzers()
