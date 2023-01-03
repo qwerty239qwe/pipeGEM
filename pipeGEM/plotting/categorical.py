@@ -11,9 +11,9 @@ def plot_model_components(comp_df: pd.DataFrame,
 
     Parameters
     ----------
-    comp_df
-    order
-    group
+    comp_df: pd.DataFrame
+    order: list
+    group: str
     kwargs
 
     Returns

@@ -325,7 +325,8 @@ class Group(GEMComposite):
                     max_g = max(max_g, g.tree_level)
                     group_lis.append(g)
                 elif isinstance(comp, list) or isinstance(comp, np.ndarray):
-                    group_lis.extend(list(comp))
+                    g = Group(group=comp, name_tag=name)
+                    group_lis.append(g)
                     max_g = max([c.tree_level for c in group_lis])
                 elif isinstance(comp, cobra.Model):
                     group_lis.append(Model(model=comp, name_tag=name))
@@ -377,7 +378,8 @@ class Group(GEMComposite):
         else:
             comps = self.iget(index)
 
-        data = np.empty(shape=(comps.size, self.tree_level + (len(features) if features is not None else 0)), dtype="O")
+        data = np.empty(shape=(comps.size,
+                               self.tree_level + 1 + (len(features) if features is not None else 0)), dtype="O")
         row_idx = self._traverse_util(comps, data=data, suffix_row=[],
                                       row_idx=0, features=features if features is not None else [],
                                       **kwargs)
@@ -417,8 +419,8 @@ class Group(GEMComposite):
         return pd.DataFrame(data=data, columns=col_names).infer_objects()
 
     @staticmethod
-    def _compare_components(models,
-                            components="all"):
+    def _compare_components_jaccard(models,
+                                    components="all"):
         label_index = {model.name_tag: ind for ind, model in enumerate(models)}
         jaccard_index = {f'{A.name_tag}_to_{B.name_tag}': calc_jaccard_index(A, B, components)
                          for A, B in itertools.combinations(models, 2)}
@@ -434,14 +436,22 @@ class Group(GEMComposite):
         result.add_result(comp_arr)
         return result
 
-    @staticmethod
-    def _compare_component_num(models,
+    def _compare_component_num(self,
+                               models,
                                components="all",
                                name_order: Union[str, list]="default",
                                present_lvl: int = 1):
+        assert 0 < present_lvl <= self._lvl
         components = ['genes', 'reactions', 'metabolites'] if components == "all" else components
         c_to_f = {"genes": "n_genes", "reactions": "n_rxns", "metabolites": "n_mets"}
         comp_df = models.get_info(features=[c_to_f[c] for c in components])
+        if f"group_{present_lvl-1}" not in comp_df.columns:
+            raise ValueError(f"Cannot find the parent level: {present_lvl - 1}, "
+                             f"maybe increase the value of present_lvl by 1")
+        if f"group_{present_lvl}" not in comp_df.columns:
+            raise ValueError(f"Cannot find the present level: {present_lvl}, "
+                             f"please choose the level between 1 and {self.tree_level}.")
+
         comp_df = comp_df.rename(columns={f"group_{present_lvl-1}": "group", f"group_{present_lvl}": "model"})
         new_comp_df = pd.concat(
             (pd.melt(comp_df, id_vars=["group", "model"], value_vars="n_rxns", var_name="component", value_name="number"),
@@ -457,6 +467,27 @@ class Group(GEMComposite):
                                                   if name_order != "default" else None)
         return result
 
+    def _compare_component_PCA(self,
+                               models,
+                               components="all",
+                               incremental=False):
+        components = ['genes', 'reactions', 'metabolites'] if components == "all" else components
+        comp_id_dic, comp_dfs = {}, {}
+        for c in components:
+            for m in models:
+                if m.name_tag not in comp_id_dic:
+                    comp_id_dic[m.name_tag] = [cmp.id for cmp in getattr(m, c)]
+                else:
+                    comp_id_dic[m.name_tag].extend([cmp.id for cmp in getattr(m, c)])
+
+        for m_name, comp_ids in comp_id_dic.items():
+            comp_dfs[m_name] = pd.Series(data=np.ones((len(comp_ids), )), index=comp_ids)
+        component_df = pd.DataFrame(comp_dfs).T
+        component_df["model"] = [m.name_tag for m in models]
+        del comp_dfs
+
+
+
     def compare(self,
                 tags=None,
                 compare_models: bool = True,
@@ -467,10 +498,11 @@ class Group(GEMComposite):
 
         models: Group = self.tget(tags, compare_models)
         if use == "jaccard":
-            return self._compare_components(models=models, **kwargs)
+            return self._compare_components_jaccard(models=models, **kwargs)
         elif use == "num":
-            return self._compare_component_num(models=models, name_order=[models.name_tag], **kwargs)
-
+            return self._compare_component_num(models=models, name_order=[g.name_tag for g in models], **kwargs)
+        elif use == "PCA":
+            return
 
 
 
