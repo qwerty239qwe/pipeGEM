@@ -16,6 +16,9 @@ def plot_PCA(data,
              plot_scree=True,
              plot_loading=False,
              sheet_file_name=None,
+             score_prefix="PC_",
+             scree_prefix="scree_",
+             loading_prefix="loading_",
              **kwargs):
     pca_df, exp_var_df, component_df = data["PC"], data["exp_var"], data["components"]
 
@@ -32,26 +35,36 @@ def plot_PCA(data,
         component_df.to_csv(comp_path)
 
     if plot_scree:
+        screeplot_kw = {k: v for k, v in kwargs}
+        if "file_name" in screeplot_kw:
+            screeplot_kw["file_name"] = scree_prefix + screeplot_kw["file_name"]
         plot_PCA_screeplot(exp_var_df,
                            fig_title=f"{title} scree plot" if title is not None else "Scree plot",
-                           **kwargs)
+                           **screeplot_kw)
 
     if plot_loading:
+        loading_kw = {k: v for k, v in kwargs}
+        if "file_name" in loading_kw:
+            loading_kw["file_name"] = loading_prefix + loading_kw["file_name"]
         plot_PCA_loading(component_df,
                          fig_title=f"{title} loading plot" if title is not None else "Loading plot",
-                         **kwargs)
+                         **loading_kw)
 
+    pc_kw = {k: v for k, v in kwargs}
+    if "file_name" in pc_kw:
+        pc_kw["file_name"] = score_prefix + pc_kw["file_name"]
     if plot_2D and plot_score:
+
         plot_2D_PCA_score(pca_df, groups,
                           fig_title=f"{title} score plot" if title is not None else "PC Score plot",
                           exp_var_df=exp_var_df,
-                          **kwargs)
+                          **pc_kw)
     elif plot_score:
         plot_3D_PCA_score(pca_df, groups,
                           fig_title=f"{title} score plot" if title is not None else "PC Score plot",
                           exp_var_df=exp_var_df,
-                          **kwargs)
-    return pca_df
+                          **pc_kw)
+    return {}
 
 
 def plot_embedding(embedding_df,
