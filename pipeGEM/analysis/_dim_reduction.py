@@ -1,7 +1,7 @@
 from enum import Enum
 
 import umap
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.manifold import TSNE, Isomap, MDS, SpectralEmbedding, LocallyLinearEmbedding
 from sklearn.preprocessing import StandardScaler
 import pandas as pd
@@ -27,7 +27,8 @@ REDUCER_DICT = {Reducer.TSNE: TSNE,
 def prepare_PCA_dfs(feature_df,
                     transform_func=None,
                     n_components=None,
-                    standardize=True):
+                    standardize=True,
+                    incremental=False):
     """
     Get three dataframes containing PCA results from a feature dataframe
 
@@ -41,6 +42,8 @@ def prepare_PCA_dfs(feature_df,
         Number of components in the result dfs, if None than the minimal number of df.shape[0] and df.shape[1] is used.
     standardize: bool
         If true, standardize the dataframe before the analysis by removing the mean and scaling to unit variance.
+    incremental: bool
+        If true, use a memory-efficient incrementalPCA instead of a PCA.
 
     Returns
     -------
@@ -65,7 +68,10 @@ def prepare_PCA_dfs(feature_df,
 
     if not n_components:
         n_components = min(x.shape[0], x.shape[1])
-    pca = PCA(n_components=n_components)
+    if incremental:
+        pca = IncrementalPCA(n_components=n_components)
+    else:
+        pca = PCA(n_components=n_components)
     principal_components = pca.fit_transform(x)
     final_df = pd.DataFrame(data=principal_components,
                             columns=[f'PC{num + 1}' for num in range(principal_components.shape[1])],

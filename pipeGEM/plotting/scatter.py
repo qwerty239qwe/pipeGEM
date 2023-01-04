@@ -32,21 +32,23 @@ def plot_PCA(data,
         component_df.to_csv(comp_path)
 
     if plot_scree:
-        plot_PCA_screeplot(exp_var_df, fig_title=f"{title} scree plot",
+        plot_PCA_screeplot(exp_var_df,
+                           fig_title=f"{title} scree plot" if title is not None else "Scree plot",
                            **kwargs)
 
     if plot_loading:
-        plot_PCA_loading(component_df, fig_title=f"{title} loading plot",
+        plot_PCA_loading(component_df,
+                         fig_title=f"{title} loading plot" if title is not None else "Loading plot",
                          **kwargs)
 
     if plot_2D and plot_score:
         plot_2D_PCA_score(pca_df, groups,
-                          fig_title=f"{title} score plot",
+                          fig_title=f"{title} score plot" if title is not None else "PC Score plot",
                           exp_var_df=exp_var_df,
                           **kwargs)
     elif plot_score:
         plot_3D_PCA_score(pca_df, groups,
-                          fig_title=f"{title} score plot",
+                          fig_title=f"{title} score plot" if title is not None else "PC Score plot",
                           exp_var_df=exp_var_df,
                           **kwargs)
     return pca_df
@@ -175,7 +177,7 @@ def plot_PCA_screeplot(exp_var_df,
     ax.bar(X, exp_var.flatten(), color=colors[0], width=.4)
     ax.plot(X, cumsum, marker='o', color=colors[1], label="Cumulative (%)")
 
-    ax = _set_default_ax(ax, title=f'PCA_screeplot_{fig_title}',
+    ax = _set_default_ax(ax, title=f'{fig_title}' if fig_title is not None else fig_title,
                          x_label='Principle Component',
                          y_label='Variance Explaned (%)')
 
@@ -202,7 +204,7 @@ def plot_PCA_loading(component_df: pd.DataFrame,
     component_df = component_df.sort_values("key", ascending=False).drop("key", 1).iloc[:n_feature, :]
 
     ax = _set_default_ax(ax,
-                         title=f'PCA_loading_plot_{fig_title}',
+                         title=f'{fig_title}',
                          x_label='PC1',
                          y_label='PC2', with_legend=False)
     for idx, row in component_df.iterrows():

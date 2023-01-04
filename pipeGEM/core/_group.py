@@ -10,7 +10,7 @@ from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, man
 import pipeGEM
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
-from pipeGEM.analysis import ComponentComparisonAnalysis, ComponentNumberAnalysis
+from pipeGEM.analysis import ComponentComparisonAnalysis, ComponentNumberAnalysis, prepare_PCA_dfs, PCA_Analysis
 from pipeGEM.data import GeneData
 from pipeGEM.plotting import plot_clustermap
 from pipeGEM.utils import is_iter, calc_jaccard_index
@@ -467,26 +467,44 @@ class Group(GEMComposite):
                                                   if name_order != "default" else None)
         return result
 
+    def _compare_component_PCA_helper(self, comp_id_dic, model, comp_name, name):
+        if name not in comp_id_dic:
+            comp_id_dic[name] = [cmp.id for cmp in getattr(model, comp_name)]
+        else:
+            comp_id_dic[name].extend([cmp.id for cmp in getattr(model, comp_name)])
+
     def _compare_component_PCA(self,
                                models,
                                components="all",
-                               incremental=False):
+                               n_components=2,
+                               incremental=False,
+                               **kwargs):
         components = ['genes', 'reactions', 'metabolites'] if components == "all" else components
-        comp_id_dic, comp_dfs = {}, {}
+        comp_id_dic, comp_dfs, group_info = {}, {}, {}
+
         for c in components:
             for m in models:
-                if m.name_tag not in comp_id_dic:
-                    comp_id_dic[m.name_tag] = [cmp.id for cmp in getattr(m, c)]
+                if m.is_leaf:
+                    if models.name_tag not in group_info:
+                        group_info[models.name_tag] = []
+                    self._compare_component_PCA_helper(comp_id_dic, m, c, m.name_tag)
+                    group_info[models.name_tag].append(m.name_tag)
                 else:
-                    comp_id_dic[m.name_tag].extend([cmp.id for cmp in getattr(m, c)])
+                    for mi in m:
+                        self._compare_component_PCA_helper(comp_id_dic, mi, c, mi.name_tag)
+                    group_info[m.name_tag] = [mi.name_tag for mi in m]
 
         for m_name, comp_ids in comp_id_dic.items():
             comp_dfs[m_name] = pd.Series(data=np.ones((len(comp_ids), )), index=comp_ids)
-        component_df = pd.DataFrame(comp_dfs).T
-        component_df["model"] = [m.name_tag for m in models]
+        component_df = pd.DataFrame(comp_dfs).fillna(0).T
+        #component_df["model"] = [m.name_tag for m in models]
         del comp_dfs
-
-
+        pca_fitted_df, pca_expvar_df, pca_comp_df = prepare_PCA_dfs(component_df.T,
+                                                                    n_components=n_components,
+                                                                    incremental=incremental, **kwargs)
+        result = PCA_Analysis(log={"group": group_info})
+        result.add_result({"PC": pca_fitted_df, "exp_var": pca_expvar_df, "components": pca_comp_df})
+        return result
 
     def compare(self,
                 tags=None,
@@ -502,7 +520,7 @@ class Group(GEMComposite):
         elif use == "num":
             return self._compare_component_num(models=models, name_order=[g.name_tag for g in models], **kwargs)
         elif use == "PCA":
-            return
+            return self._compare_component_PCA(models=models, **kwargs)
 
 
 
