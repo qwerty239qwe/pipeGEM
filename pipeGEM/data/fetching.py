@@ -7,6 +7,8 @@ import re
 
 import cobra.io
 import requests
+import shutil
+from tqdm.auto import tqdm
 
 import numpy as np
 import pandas as pd
@@ -14,6 +16,8 @@ import zeep.helpers
 from zeep.exceptions import TransportError
 from zeep import Client
 from biodbs.HPA import HPAdb
+
+from pipeGEM.utils import load_model
 
 
 _ORGANISM_DICT = {"human": "Homo sapiens", "mouse": "Mus musculus"}
@@ -259,13 +263,31 @@ def list_models(databases=["metabolic atlas", "BiGG"],
     return mg_df
 
 
-def load_remote_model(model_id):
+def load_remote_model(model_id, format="mat", branch="main", download_dest="default"):
     model_list = list_models()
     if model_id in model_list[model_list["database"]=="BiGG"]["id"].to_list():
         return cobra.io.load_model(model_id)
-    raise NotImplementedError("haven't finished")
+    model_path = download_atlas_model(model_id, format=format, branch=branch, download_dest=download_dest)
+    return load_model(model_path)
 
 
 def download_model(model_id, file_path, format="mat"):
     url = f"http://bigg.ucsd.edu/static/models/{model_id}.{format}"
     raise NotImplementedError("haven't finished")
+
+
+def download_atlas_model(model_id="Human-GEM", format="mat", branch="main", download_dest="default") -> str:
+    download_dest = Path(__file__).resolve().parent.parent.parent / "models" / branch \
+        if download_dest == "default" else download_dest
+    download_dest.mkdir(parents=True, exist_ok=True)
+    if (download_dest / f"{model_id}.{format}").is_file():
+        print(f"Model {model_id} is already downloaded")
+        return download_dest / f"{model_id}.{format}"
+
+    url = f"https://github.com/SysBioChalmers/{model_id}/raw/{branch}/model/{model_id}.{format}"
+    with requests.get(url, stream=True) as r:
+        total_length = int(r.headers.get("Content-Length"))
+        with tqdm.wrapattr(r.raw, "read", total=total_length, desc="") as raw:
+            with open(download_dest / f"{model_id}.{format}", 'wb') as output:
+                shutil.copyfileobj(raw, output)
+    return download_dest / f"{model_id}.{format}"
