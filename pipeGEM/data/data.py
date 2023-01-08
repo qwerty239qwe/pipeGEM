@@ -168,15 +168,17 @@ class GeneData(BaseData):
     def apply(self, func):
         return {k: func(v) for k, v in self.rxn_mapper.rxn_scores.items()}
 
-    def get_threshold(self, name, **kwargs):
+    def get_threshold(self, name, transform=True, **kwargs):
         tf = threshold_finders.create(name)
-        return tf.find_threshold(self.gene_data, **kwargs)
+        return tf.find_threshold({gn: self.data_transform(gv) if transform else gv
+                                  for gn, gv in self.gene_data.items()}, **kwargs)
 
-    def assign_local_threshold(self, local_threshold_result, method="binary", group=None, **kwargs):
+    def assign_local_threshold(self, local_threshold_result, transform=True, method="binary", group=None, **kwargs):
         assert method in ["binary", "ratio", "diff", "rdiff"]
         group = group if group is not None else 'exp_th'
         gene_exp_ths = local_threshold_result.exp_ths[group]
-        data_and_ths = pd.concat([gene_exp_ths, pd.DataFrame({"data": self.gene_data})], axis=1)
+        data_and_ths = pd.concat([gene_exp_ths, pd.DataFrame({"data": {gn: self.data_transform(gv) if transform else gv
+                                                                       for gn, gv in self.gene_data.items()}})], axis=1)
         if method == "binary":
             self.gene_data = (data_and_ths["data"] > data_and_ths[group]).astype(int).to_dict()
         elif method == "ratio":
