@@ -76,15 +76,19 @@ class TaskAnalysis(BaseAnalysis):
         return self._task_support_rxns
 
     @property
+    def result(self):
+        return self._result_df
+
+    @property
     def result_df(self):
         return self._result_df
 
     def add_result(self, result_df, score):
         self._result_df = result_df
         self._model_score = score
-        self._task_support_rxns = dict(self._result_df["task_support_rxns"].iteritems())
-        self._task_support_rxn_fluxes = dict(self._result_df["task_support_rxn_fluxes"].iteritems())
-        self._rxn_supps = dict(self._result_df["rxn_supps"].iteritems())
+        self._task_support_rxns = dict(self._result_df["task_support_rxns"].items())
+        self._task_support_rxn_fluxes = dict(self._result_df["task_support_rxn_fluxes"].items())
+        self._rxn_supps = dict(self._result_df["rxn_supps"].items())
 
     def get_task_support_rxns(self, task_id, include_supps=True):
         return self._task_support_rxns[task_id] + (self._rxn_supps[task_id]
