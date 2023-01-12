@@ -41,11 +41,11 @@ def model_to_excel(model, file_name):
     gens = pd.DataFrame({"ID": [g.id for g in model.genes],
                          "name": [g.name for g in model.genes]})
 
-    writer = pd.ExcelWriter(file_name)
-    gens.to_excel(writer, sheet_name='Genes')
-    mets.to_excel(writer, sheet_name='Metabolites')
-    rxns.to_excel(writer, sheet_name='Reactions')
-    writer.save()
+    with pd.ExcelWriter(file_name) as writer:
+        gens.to_excel(writer, sheet_name='Genes')
+        mets.to_excel(writer, sheet_name='Metabolites')
+        rxns.to_excel(writer, sheet_name='Reactions')
+        writer.save()
 
 
 def _grr_to_rule_field(unified_grr, gene_name_map_to_idx):
