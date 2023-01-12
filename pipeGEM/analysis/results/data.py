@@ -28,13 +28,13 @@ class DataAggregation(BaseAnalysis):
                       ) -> Union[PCA_Analysis, EmbeddingAnalysis]:
 
         if method == "PCA":
-            final_df, exp_var_df, component_df = prepare_PCA_dfs(self._result.T,
+            final_df, exp_var_df, component_df = prepare_PCA_dfs(self._result,
                                                                  **kwargs)
             result = PCA_Analysis(log={**kwargs, **self.log})
             result.add_result({"PC": final_df, "exp_var": exp_var_df, "components": component_df})
             return result
         else:
-            emb_df = prepare_embedding_dfs(self._result.T,
+            emb_df = prepare_embedding_dfs(self._result,
                                            reducer=method,
                                            **kwargs)
             result = EmbeddingAnalysis(log={**kwargs, **self.log})
