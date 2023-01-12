@@ -464,7 +464,8 @@ class Group(GEMComposite):
         new_comp_df["number"] = new_comp_df["number"].astype(dtype=int)
         result = ComponentNumberAnalysis(log={"components": components, 'present_lvl': present_lvl})
         result.add_result(new_comp_df, name_order=name_order
-                                                  if name_order != "default" else None)
+                                                  if name_order != "default" else None,
+                          group="model")
         return result
 
     def _compare_component_PCA_helper(self, comp_id_dic, model, comp_name, name):

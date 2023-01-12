@@ -95,7 +95,20 @@ def test_compare_num(ecoli_core):
     num_comp = g.compare(tags=None, compare_models=False, use="num")
     print(num_comp.result)
     print(num_comp.name_order)
-    num_comp.plot(dpi=150, group="model", name_order=[gi.name_tag for gi in g])
+    num_comp.plot(dpi=150, name_order=[gi.name_tag for gi in g])
 
+
+def test_compare_PCA(ecoli_core):
+    m1 = ecoli_core
+    g = Group(group={"ecoli_g1": {"e11": m1, "e12": m1, "e13": m1},
+                     "ecoli_g2": {"e21": m1, "e22": m1}, "a": m1},
+              name_tag="G2")
+    num_comp = g.compare(tags=None, compare_models=True, use="PCA")
+    print(num_comp.result)
+    num_comp.plot(dpi=150)
+
+    num_comp = g.compare(tags=None, compare_models=False, use="PCA")
+    print(num_comp.result)
+    num_comp.plot(dpi=150)
 
 # TODO: test_add_tasks
