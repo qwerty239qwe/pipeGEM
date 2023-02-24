@@ -1,4 +1,4 @@
-from typing import List, Dict, Union, Any
+from typing import List, Dict, Union, Any, Optional, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,25 +13,32 @@ def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
                  cbar_label: str = '',
                  cbar_kw: Dict[str, Any] = None,
                  annotate: bool = True,
-                 fig_title: str = None,
-                 **kwargs):
+                 fig_title: Optional[str] = None,
+                 **kwargs) -> Dict[str, plt.Figure]:
     """
     Plot a heatmap of the input data and (optional) save it.
 
     Parameters
     ----------
-    data: rectangular dataset
-
-    scale
-    cbar_label
-    cbar_kw
-    annotate
-    fig_title
-    kwargs
+    data : pandas.DataFrame or numpy.ndarray
+        The rectangular dataset to plot.
+    scale : int, optional
+        An integer representing the scaling factor for the heatmap, by default 1.
+    cbar_label : str, optional
+        A string representing the label for the colorbar, by default ''.
+    cbar_kw : dict, optional
+        A dictionary containing additional keyword arguments to be passed to the colorbar, by default None.
+    annotate : bool, optional
+        A boolean value indicating whether to annotate the heatmap with the data values, by default True.
+    fig_title : str, optional
+        A string representing the title of the figure, by default None.
+    **kwargs : optional
+        Additional keyword arguments to be passed to seaborn.heatmap().
 
     Returns
     -------
-
+    dict
+        A dictionary containing the plot figure.
     """
     if cbar_kw is None:
         cbar_kw = {}
@@ -87,19 +94,58 @@ def _modify_clustermap_for_subsys(g, ticks_pos, subsystems):
         label.set_transform(label.get_transform() + offset)
 
 
-def plot_clustermap(data,
-                    model_groups=None,
-                    group_list=None,
-                    row_category=None,
-                    cbar_label=None,
-                    top_ele_ratio=0.1,
-                    row_cluster=False,
-                    row_dendrogram=True,
-                    palette="muted",
-                    c_palette="Spectral",
-                    fig_title=None,
-                    fig_size=(10, 40),
-                    **kwargs):
+def plot_clustermap(
+        data: pd.DataFrame,
+        model_groups: Optional[Dict[str, str]] = None,
+        group_list: Optional[List[str]] = None,
+        row_category: Optional[str] = None,
+        cbar_label: Optional[str] = None,
+        top_ele_ratio: float = 0.1,
+        row_cluster: bool = False,
+        row_dendrogram: bool = True,
+        palette: str = "muted",
+        c_palette: str = "Spectral",
+        fig_title: Optional[str] = None,
+        fig_size: Tuple[float, float] = (10, 40),
+        **kwargs) -> Dict[str, plt.Figure]:
+    """
+    Plot a clustered heatmap of the input data and (optional) save it.
+
+    Parameters
+    ----------
+    data : pd.DataFrame or np.ndarray
+        Rectangular dataset to plot.
+    model_groups : dict or None, optional
+        Dictionary mapping sample ids to group labels used to color the columns.
+    group_list : list or None, optional
+        List of group labels used to color the columns. If None, use all unique values of `model_groups`.
+    row_category : pd.Series or None, optional
+        Pandas series that contains a categorical variable used to color the rows.
+    cbar_label : str or None, optional
+        Colorbar label. If None, no colorbar label is shown.
+    top_ele_ratio : float, optional
+        Ratio of the top elements to the heatmap, given as a float in [0, 1].
+    row_cluster : bool, optional
+        Whether to cluster the rows. Default is False.
+    row_dendrogram : bool, optional
+        Whether to show the dendrogram of the rows. Default is True.
+    palette : str or list-like, optional
+        Palette name (as a string) or list of colors to use for the model groups. Default is "muted".
+    c_palette : str, optional
+        Color palette name (as a string) used to color the rows based on `row_category`.
+        Default is "Spectral".
+    fig_title : str or None, optional
+        Figure title. If None, no title is shown.
+    fig_size : tuple, optional
+        Figure size in inches, as a tuple of width and height. Default is (10, 40).
+    **kwargs
+        Additional keyword arguments passed to `sns.clustermap`.
+
+    Returns
+    -------
+    plotting_kws : dict
+        A dictionary containing the resulting matplotlib figure as a value under the key "g".
+    """
     col_colors, row_colors = None, None
     if model_groups and group_list:
         colors = sns.color_palette(palette)
