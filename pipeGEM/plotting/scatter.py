@@ -4,13 +4,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, List
 
 from pipeGEM.plotting._utils import _set_default_ax
 
 
 def plot_PCA(data: Dict[str, pd.DataFrame],
-             groups: Optional[Dict[str, Union[str, list[str]]]] = None,
+             groups: Optional[Dict[str, Union[str, List[str]]]] = None,
              title: Optional[str] = None,
              plot_2D: bool = True,
              plot_score: bool = True,
