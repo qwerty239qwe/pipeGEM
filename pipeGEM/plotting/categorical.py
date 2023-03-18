@@ -1,11 +1,12 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+from typing import List
 
 
 def plot_model_components(comp_df: pd.DataFrame,
-                          order,
-                          group="group",
+                          order: List[str],
+                          group: str = "group",
                           **kwargs):
     """
     Plots boxplots of model components for different groups.
@@ -29,7 +30,6 @@ def plot_model_components(comp_df: pd.DataFrame,
     fig_titles = ["reactions", "metabolites", "genes"]
     fig, axes = plt.subplots(1, 3, figsize=(12, 7))
     order_key = {v: i for i, v in enumerate(order)}
-    print(order)
     comp_df = comp_df.sort_values(by=[group], key=lambda x: x.apply(lambda x1: order_key[x1]))
     sns.boxplot(data=comp_df[comp_df["component"] == "n_rxns"], y="number", x=group, hue=group,
                 palette="deep", order=order, ax=axes[0], dodge=False, **kwargs)

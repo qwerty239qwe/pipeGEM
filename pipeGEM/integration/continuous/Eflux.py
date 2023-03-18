@@ -13,30 +13,45 @@ def apply_EFlux(model: cobra.Model,
                 rxn_expr_score: Dict[str, float],
                 max_ub: float = 1000,
                 min_lb: float = 1e-6,
-                min_score = -1e3,
+                min_score: float = -1e3,
                 ignore: Union[str, List[str], None] = None,
                 return_fluxes: bool = True,
                 transform: Callable = exp_x) -> EFluxAnalysis:
     """
+    Applies the EFlux algorithm to a metabolic model, using gene expression data
+    to constrain reaction fluxes. The EFlux method scales gene expression values
+    to the range of reaction bounds, effectively enforcing that highly expressed
+    reactions have high fluxes, and vice versa. Returns an EFluxAnalysis object
+    with the calculated reaction bounds, gene expression scores, and fluxes.
+
     Parameters
     ----------
-    model: cobra.Model
-        A cobra model to be analyzed
-    rxn_expr_score: dict
-        A dict with rxn ids as keys and expression as values
-    max_ub: float or int
-        max upper bound that will apply to the max expressed reaction
-    min_lb: float or int
-        min lower bound that will apply to the min expressed reaction
-    ignore: str or list of str
-        rxn_ids / subsystems to be ignored
-    plot_exp: bool
-        To plot expression vs constraints scatter plot or not
-    transform: callable
-        User determined transformation function
+    model : cobra.Model
+        A COBRApy metabolic model to be analyzed.
+    rxn_expr_score : dict
+        A dictionary of reaction IDs (str) to gene expression scores (float).
+    max_ub : float, optional
+        The maximum upper bound value to apply to the most highly expressed reaction
+        (default 1000).
+    min_lb : float, optional
+        The minimum lower bound value to apply to the least expressed reaction
+        (default 1e-6).
+    min_score : float, optional
+        The minimum gene expression score to consider (default -1e3).
+    ignore : str, list of str, or None, optional
+        A single reaction ID, list of reaction IDs, or None. Any reactions in this
+        list will be excluded from the analysis (default None).
+    return_fluxes : bool, optional
+        Whether to return the resulting fluxes as a pandas DataFrame (default True).
+    transform : callable, optional
+        A user-specified transformation function to apply to gene expression scores
+        before scaling. Must take a single float argument and return a float.
 
     Returns
     -------
+    EFluxAnalysis
+        An EFluxAnalysis object containing the calculated reaction bounds, gene
+        expression scores, and optionally, the resulting fluxes.
     """
     assert max_ub > 0, "max_ub should be a positive number"
     assert min_lb >= 0, "min_lb should be zero or a positive number"
