@@ -14,3 +14,12 @@ def test_add_data_model(ecoli_core, ecoli_core_data):
     gene_data = GeneData(data=ecoli_core_data[data_name], data_transform=lambda x: np.log2(x), absent_expression=-np.inf)
     pmod.add_gene_data(data_name, gene_data)
     assert pmod.gene_data[data_name].rxn_scores
+
+
+def test_add_data_model_human(Human_GEM, Human_GEM_data):
+    pmod = Model(model=Human_GEM, name_tag="human")
+    data_name = "sample_0"
+    gene_data = GeneData(data=Human_GEM_data[data_name],
+                         data_transform=lambda x: np.log2(x), absent_expression=-np.inf)
+    pmod.add_gene_data(data_name, gene_data)
+    assert pmod.gene_data[data_name].rxn_scores

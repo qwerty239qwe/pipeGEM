@@ -28,3 +28,8 @@ def ecoli_core_data(ecoli_core):
 @pytest.fixture(scope="session")
 def Human_GEM():
     return load_remote_model(model_id="Human-GEM")
+
+
+@pytest.fixture(scope="session")
+def Human_GEM_data(Human_GEM):
+    return get_syn_gene_data(Human_GEM, n_sample=10)
