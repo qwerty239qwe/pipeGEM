@@ -61,14 +61,14 @@ class RxnMapper:
                 for r in model.reactions if len(set([g.id for g in r.genes]) & set(gene_ids)) > 0}
 
         rxn_score = {}
-        for rxn_id, grr in grrs.items():
+        for rxn_id, grr in tqdm(grrs.items()):
             if len(grr) == 0:
                 rxn_score[rxn_id] = self.missing_value
                 continue
             plus_grr_list = []
             for grr_i in grr.split("plus"):
                 outer_grr_list = []
-                for gl in tqdm(grr_i.split("or")):
+                for gl in grr_i.split("or"):
                     inner_grr_scores = self._inner_grr_helper(gl)
                     outer_grr_list.append(self._outer_grr_helper(inner_grr_scores, and_operation))
                 plus_grr_list.append(self._outer_grr_helper(outer_grr_list, or_operation))

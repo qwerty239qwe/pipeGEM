@@ -168,6 +168,10 @@ class Model(GEMComposite):
             return
         elif isinstance(data, pd.Series):
             data = GeneData(data, **data_kwargs)
+        # elif isinstance(data, AnnData):
+        #     data_dict = {f"{name_or_prefix}_{c}" if name_or_prefix else c:
+        #                      GeneData(data[c], **data_kwargs) for c in data.obs}
+        #     data = GeneData(data[], )
         elif not isinstance(data, GeneData):
             raise ValueError()
 

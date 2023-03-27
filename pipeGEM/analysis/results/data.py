@@ -10,6 +10,9 @@ class DataAggregation(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
 
+    def __getitem__(self, item):
+        return self._result[item]
+
     def add_result(self, result):
         self._result = result
 
