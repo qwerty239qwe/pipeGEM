@@ -155,9 +155,45 @@ class Model(GEMComposite):
 
     def add_gene_data(self,
                       name_or_prefix: str,
-                      data: Union[GeneData, pd.DataFrame],
+                      data: Union[GeneData, pd.DataFrame, pd.Series, AnnData],
                       data_kwargs=None,
-                      **kwargs):
+                      **kwargs) -> None:
+        """
+        Add gene data to the internal dictionary of gene data in MyClass.
+
+        Parameters
+        ----------
+        name_or_prefix : str
+            The name or prefix of the gene data. If a prefix is provided, then
+            the actual column names in the pd.DataFrame will be suffixed with
+            the prefix. If an empty string is provided, then the column names
+            will not be modified.
+        data : Union[GeneData, pd.DataFrame, pd.Series, anndata.AnnData]
+            The gene data to add to the internal dictionary. This can be a
+            pd.DataFrame, pd.Series, anndata.AnnData, or GeneData object.
+            If a pd.DataFrame is provided, then each column of the DataFrame will be converted into
+            a GeneData object with a modified name based on the name_or_prefix
+            argument. If a pd.Series is provided, then it will be converted into
+            a GeneData object with the name provided by name_or_prefix. If a
+            GeneData object is provided, then it will be added to the internal
+            dictionary as-is.
+        data_kwargs : dict, optional
+            Additional keyword arguments to pass to the GeneData constructor
+            when converting a pd.DataFrame or pd.Series into GeneData objects.
+            The default value is None, which means no additional arguments are
+            passed to the GeneData constructor.
+        **kwargs
+            Additional keyword arguments to pass to the align method of the
+            GeneData object(s) after they have been added to the internal
+            dictionary.
+
+        Raises
+        ------
+        ValueError
+            If the data argument is not a pd.DataFrame, pd.Series, or GeneData
+            object.
+
+        """
         data_kwargs = {} if data_kwargs is None else data_kwargs
         if isinstance(data, pd.DataFrame):
             data_dict = {f"{name_or_prefix}_{c}" if name_or_prefix else c:
@@ -168,12 +204,18 @@ class Model(GEMComposite):
             return
         elif isinstance(data, pd.Series):
             data = GeneData(data, **data_kwargs)
-        # elif isinstance(data, AnnData):
-        #     data_dict = {f"{name_or_prefix}_{c}" if name_or_prefix else c:
-        #                      GeneData(data[c], **data_kwargs) for c in data.obs}
-        #     data = GeneData(data[], )
+        elif isinstance(data, AnnData):
+            data_dict = {}
+            for obs in data.obs.index:
+                cell_data = GeneData(pd.Series(data=data[obs, :].X.toarray().ravel(), index=data.var.index),
+                                     **data_kwargs)
+                data_dict[obs] = cell_data
+            self._gene_data.update(data_dict)
+            for k, v in data_dict.items():
+                v.align(self, **kwargs)
+            return
         elif not isinstance(data, GeneData):
-            raise ValueError()
+            raise ValueError("The 'data' argument should be a pd.DataFrame, pd.Series, or GeneData object.")
 
         self._gene_data[name_or_prefix] = data
         self._gene_data[name_or_prefix].align(self._model, **kwargs)
