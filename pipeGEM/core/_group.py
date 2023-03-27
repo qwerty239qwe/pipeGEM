@@ -30,12 +30,13 @@ class Group(GEMComposite):
         ----------
         group: a list of pg.Model or a dict of dicts
             The name_tag and models used to build the pg.Group object,
-            Possible inputs are: {name_tag of subgroup: [pg.Models]} and
+            Possible inputs are:
+            {name_tag of subgroup: [pg.Models]} and
             {name_tag of subgroup: {name_tag of model: cobra.Model}}
         name_tag: optional, str
-            The name of this object
+            The name of this object. If None, this group will be named 'Unnamed_group'
         """
-        super().__init__(name_tag=name_tag)
+        super().__init__(name_tag=name_tag or "Unnamed_group")
         self._group: list = self._form_group(group)
 
     def __repr__(self):

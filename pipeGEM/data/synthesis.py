@@ -6,7 +6,7 @@ def get_syn_gene_data(model,
                       n_sample,
                       n_genes = None,
                       groups = None,
-                      random_state = 34):
+                      random_state = 42):
     genes = [g.id for g in model.genes]
     rng = np.random.default_rng(random_state)
     if n_genes is not None:
@@ -16,6 +16,7 @@ def get_syn_gene_data(model,
     else:
         n_genes = len(genes)
         used_genes = genes
-    return pd.DataFrame(data=rng.negative_binomial(200000, 0.98, (n_genes, n_sample)),
+    return pd.DataFrame(data=np.concatenate([rng.negative_binomial(5000, rng.uniform(1e-7, 1), (1, n_sample))
+                                             for _ in range(n_genes)], axis=0),
                         columns=[f"sample_{i}" for i in range(n_sample)],
                         index=used_genes)

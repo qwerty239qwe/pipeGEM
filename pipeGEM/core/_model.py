@@ -8,6 +8,7 @@ import pandas as pd
 import cobra
 from cobra.util import linear_reaction_coefficients
 import numpy as np
+from anndata import AnnData
 
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.utils import save_model, check_rxn_scales
@@ -29,13 +30,14 @@ class Model(GEMComposite):
 
         Parameters
         ----------
-        name: optional, str
-            The name of this object, it will be used in a pg.Group object
+        name_tag: optional, str
+            The name of this object, it will be used in a pg.Group object.
+            If None, the model will be named 'Unnamed_model'
         model: optional, cobra.Model
             A cobra model analyzed in this object
 
         """
-        super(Model, self).__init__(name_tag=name_tag)
+        super(Model, self).__init__(name_tag=name_tag or "Unnamed_model")
         if not isinstance(model, cobra.Model):
             raise ValueError("input model should be a cobra model")
         self._model = model if model is not None else cobra.Model(name=name_tag)
@@ -151,7 +153,11 @@ class Model(GEMComposite):
     def apply_medium(self, name, **kwargs):
         self._medium_data[name].apply(self, **kwargs)
 
-    def add_gene_data(self, name_or_prefix: str, data: Union[GeneData, pd.DataFrame], data_kwargs=None, **kwargs):
+    def add_gene_data(self,
+                      name_or_prefix: str,
+                      data: Union[GeneData, pd.DataFrame],
+                      data_kwargs=None,
+                      **kwargs):
         data_kwargs = {} if data_kwargs is None else data_kwargs
         if isinstance(data, pd.DataFrame):
             data_dict = {f"{name_or_prefix}_{c}" if name_or_prefix else c:

@@ -1,4 +1,6 @@
 import numpy as np
+from tqdm import tqdm
+from time import time
 
 
 class RxnMapper:
@@ -27,10 +29,10 @@ class RxnMapper:
     def _inner_grr_helper(self, grr_list) -> list:
         inner_grr_scores = []
         for g in grr_list.split('and'):
-            if g == "" or not (g[:g.index(".")] if "." in g else g) in self.genes:
+            if g == "" or not g in self.genes:
                 inner_grr_scores.append(self.missing_value)
             else:
-                inner_grr_scores.append(self.gene_data[g[:g.index(".")] if "." in g else g])
+                inner_grr_scores.append(self.gene_data[g])
         return inner_grr_scores
 
     def _outer_grr_helper(self, inner_grr_scores, operation="nanmin") -> float:
@@ -51,6 +53,8 @@ class RxnMapper:
         """
         :return: dict {rxn_id : score}
         """
+        start_time = time()
+
         grrs = {r.id: r.gene_reaction_rule.replace(' ', '').replace('(', '').replace(')', '')
                 for r in model.reactions} if gene_ids is None else \
                {r.id: r.gene_reaction_rule.replace(' ', '').replace('(', '').replace(')', '')
@@ -64,7 +68,7 @@ class RxnMapper:
             plus_grr_list = []
             for grr_i in grr.split("plus"):
                 outer_grr_list = []
-                for gl in grr_i.split("or"):
+                for gl in tqdm(grr_i.split("or")):
                     inner_grr_scores = self._inner_grr_helper(gl)
                     outer_grr_list.append(self._outer_grr_helper(inner_grr_scores, and_operation))
                 plus_grr_list.append(self._outer_grr_helper(outer_grr_list, or_operation))
@@ -77,6 +81,7 @@ class RxnMapper:
         for k, v in rxn_score.items():
             if v <= threshold:
                 rxn_score[k] = absent_value
+        print(f"Finished mapping in {time() - start_time} seconds.")
         return rxn_score
 
     def partial_map(self, model, new_data, gene_ids, **kwargs):
