@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Optional, Callable
 
 import umap
 from sklearn.decomposition import PCA, IncrementalPCA
@@ -24,36 +25,39 @@ REDUCER_DICT = {Reducer.TSNE: TSNE,
                 Reducer.UMAP: umap.UMAP}
 
 
-def prepare_PCA_dfs(feature_df,
-                    transform_func=None,
-                    n_components=None,
-                    standardize=True,
-                    incremental=False):
+def prepare_PCA_dfs(feature_df: pd.DataFrame,
+                    transform_func: Optional[Callable] = None,
+                    n_components: Optional[int] = None,
+                    standardize: bool = True,
+                    incremental: bool = False):
     """
-    Get three dataframes containing PCA results from a feature dataframe
+    Prepare principal component analysis (PCA) dataframes from a feature dataframe.
 
     Parameters
     ----------
-    feature_df: a pd.DataFrame
-        A dataframe, the rows are features and the columns are samples
-    transform_func: optional, callable
-        A function that will be performed on the dataframe before analysis
-    n_components: optional, int
-        Number of components in the result dfs, if None than the minimal number of df.shape[0] and df.shape[1] is used.
+    feature_df: pd.DataFrame
+        The feature dataframe to analyze. Rows represent features, and columns represent samples.
+    transform_func: callable, optional
+        A function to apply to the feature dataframe before analysis. Default is None.
+    n_components: int, optional
+        The number of components in the result dataframes. If None, the minimum of the feature_df's
+        shape[0] and shape[1] is used. Default is None.
     standardize: bool
-        If true, standardize the dataframe before the analysis by removing the mean and scaling to unit variance.
+        Whether to standardize the feature dataframe before analysis by centering and scaling to unit variance.
+        Default is True.
     incremental: bool
-        If true, use a memory-efficient incrementalPCA instead of a PCA.
+        Whether to use an incremental PCA algorithm instead of a regular PCA algorithm.
+        Default is False.
 
     Returns
     -------
     PC_df: pd.DataFrame
-        The PCA result containing the PCs (columns) values of each data (rows)
+        A dataframe containing the principal components (columns) of each sample (rows).
     exp_var_df: pd.DataFrame
-        The dataframe containing explained_variance_ratio_ of each PC (rows)
+        A dataframe containing the explained variance ratio of each principal component (rows).
     component_df: pd.DataFrame
-        The dataframe containing principal axes in feature space,
-        representing the directions of maximum variance in the data.
+        A dataframe containing the principal axes in feature space, representing the directions of maximum variance
+        in the data.
 
     References
     -----------
@@ -84,25 +88,48 @@ def prepare_PCA_dfs(feature_df,
     return final_df, exp_var_df, component_df
 
 
-def prepare_embedding_dfs(feature_df,
-                          transform_func=None,
-                          n_components=3,
-                          reducer="TSNE",
-                          standardize=True, **kwargs):
+def prepare_embedding_dfs(feature_df: pd.DataFrame,
+                          transform_func: Optional[Callable] = None,
+                          n_components: int = 3,
+                          reducer: str = "TSNE",
+                          standardize: bool = True,
+                          **kwargs):
     """
+    Get a dataframe containing an embedding result from a feature dataframe.
 
     Parameters
     ----------
-    feature_df
-    transform_func
-    n_components
-    reducer
-    standardize
-    kwargs
+    feature_df: pd.DataFrame
+        A dataframe where the rows are features and the columns are samples.
+    transform_func: callable, optional
+        A function that will be performed on the dataframe before analysis.
+    n_components: int, optional
+        Number of components in the result dfs.
+    reducer: str or Reducer enum member, optional
+        A string or enum specifying the dimensionality reduction algorithm to use.
+        Supported options are "TSNE", "Isomap", "MDS", "SpectralEmbedding", "LocallyLinearEmbedding", and "UMAP".
+        Default is "TSNE".
+    standardize: bool, optional
+        If True, standardize the dataframe before analysis by removing the mean and scaling to unit variance.
+        Default is True.
+    **kwargs: dict
+        Additional keyword arguments to be passed to the dimensionality reduction algorithm.
 
     Returns
     -------
+    df: pd.DataFrame
+        The embedding result containing the component values of each data (rows).
+        The index of the returned dataframe is the embedding component number (e.g., "embedding 1", "embedding 2").
+        The columns are the sample names from the input feature_df.
 
+    References
+    ----------
+    https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html
+    https://scikit-learn.org/stable/modules/generated/sklearn.manifold.Isomap.html
+    https://scikit-learn.org/stable/modules/generated/sklearn.manifold.MDS.html
+    https://scikit-learn.org/stable/modules/generated/sklearn.manifold.SpectralEmbedding.html
+    https://scikit-learn.org/stable/modules/generated/sklearn.manifold.LocallyLinearEmbedding.html
+    https://umap-learn.readthedocs.io/en/latest/
     """
     if transform_func:
         x = transform_func(feature_df.values)
