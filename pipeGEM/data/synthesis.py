@@ -55,7 +55,7 @@ def get_syn_gene_data(model: Union[cobra.Model, Model],
     data = np.clip(np.concatenate([
         rng.negative_binomial(100, rng.uniform(0.01, 1), (1, n_sample)) +
         rng.normal(0, rng.uniform(1, 50), (1, n_sample))
-        for _ in range(n_genes)], axis=0), a_min=0, a_max=None)
+        for _ in range(n_genes)], axis=0), a_min=0, a_max=None).astype(np.float64)
 
     if returned_dtype == "DataFrame":
         return pd.DataFrame(data=data, columns=[f"sample_{i}" for i in range(n_sample)], index=used_genes)
