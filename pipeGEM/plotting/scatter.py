@@ -374,7 +374,7 @@ def plot_PCA_loading(component_df: pd.DataFrame,
     --------
     dict:
         Dictionary containing the plot object and the keyword arguments for saving the plot.
-        """
+    """
     plt.style.use("seaborn")
     fig, ax = plt.subplots(figsize=fig_size)
     component_df["key"] = np.sqrt(component_df["PC1"] ** 2 + component_df["PC2"] ** 2)

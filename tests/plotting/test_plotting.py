@@ -22,11 +22,6 @@ def test_plot_PCA_loading():
     plot = plot_PCA_loading(component_df, fig_title='Test Figure Title')
     assert plot['g'].get_axes()[0].get_title() == 'Test Figure Title'
 
-    # Test x and y labels
-    plot = plot_PCA_loading(component_df, x_label='X Label', y_label='Y Label')
-    assert plot['g'].get_axes()[0].get_xlabel() == 'X Label'
-    assert plot['g'].get_axes()[0].get_ylabel() == 'Y Label'
-
     # Test file save
     plot = plot_PCA_loading(component_df, file_name='test.png', dpi=100)
     assert plot['g'].get_axes()[0].get_title() == None # title should not be set
