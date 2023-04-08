@@ -68,7 +68,9 @@ class Group(GEMComposite):
         if isinstance(item, str):
             return self._group[item]
         elif isinstance(item, list) or isinstance(item, np.ndarray):
-            return self.__class__([self._group[i] for i in item], **self._get_converted_grp_annot())
+            return self.__class__([self._group[i] for i in item], **{k: v for k, v in
+                                                                     self._get_converted_grp_annot().items()
+                                                                     if k in item})
 
     def __setitem__(self, key, value):
         if isinstance(value, cobra.Model):
@@ -270,13 +272,13 @@ class Group(GEMComposite):
                 elif isinstance(comp, list):
                     self._form_group_chk_list(comp, existing_gp=groups)
                     for c in comp:
-                        self._group_annotation[c.name_tag] = {"group": name}
+                        self._group_annotation[c.name_tag] = {"group_name": name}
                         groups[c.name_tag] = c
                 elif isinstance(comp, dict):
                     pg_mod_comp = {c_name: Model(model=c, name_tag=c_name) for c_name, c in comp.items()}
                     self._form_group_chk_list([c for _, c in pg_mod_comp.items()], existing_gp=groups)
                     for c_name, c in pg_mod_comp.items():
-                        self._group_annotation[c_name] = {"group": name}
+                        self._group_annotation[c_name] = {"group_name": name}
                         groups[c_name] = c
         elif group_dict is None:
             groups = {}

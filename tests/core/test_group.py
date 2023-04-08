@@ -75,24 +75,18 @@ def test_group_get_items(group):
     assert group["m111"].name_tag == "m111"
 
 
-def test_group_set_items(ecoli_core):
+def test_group_set_items(group, ecoli_core):
     m1 = ecoli_core
-    g = Group({"ecoli_g1": {"m111": m1, "m112": m1, "m12": m1},
-               "ecoli_g2": {"m21": m1, "m22": m1},
-               "ecoli_g3": {"m3": m1}}, name_tag="G1",
-              treatment={"a": ["m3", "m111", "m21"], "b": ["m112", "m12"]})
-    assert len(g)==6
-    assert isinstance(g["m111"], Model)
-    g["ecoli_g3"] = {"e31": m1, "e32": m1}
-    assert len(g)==7
-    for gi in g:
-        print(gi.name_tag)
+    assert len(group)==6
+    assert isinstance(group["m111"], Model)
+    group["m4"] = m1
+    assert len(group)==7
+    assert "m4" in group
 
 
 def test_aggregate_models(group):
     ag_grp_dic = group.aggregate_models("treatment")
     assert isinstance(ag_grp_dic, dict)
-
 
 
 def test_compare_sim(group):
