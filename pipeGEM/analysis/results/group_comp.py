@@ -56,7 +56,6 @@ class ComponentNumberAnalysis(ComparisonAnalysis):
                   **kwargs)
 
 
-
 class FluxCorrAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)

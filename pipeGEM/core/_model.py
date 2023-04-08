@@ -24,7 +24,8 @@ class Model(GEMComposite):
 
     def __init__(self,
                  name_tag: str = None,
-                 model = None):
+                 model = None,
+                 **kwargs):
         """
         Main model used to store cobra.Model, tasks and omics data
 
@@ -47,6 +48,7 @@ class Model(GEMComposite):
         self._merged_rxn_lu_table = {}
         self._original_objs = {}
         self._empty_merged_rxns = []
+        self._annotations = kwargs
 
     def __enter__(self):
         self._model.__enter__()
@@ -55,7 +57,7 @@ class Model(GEMComposite):
         self._model.__exit__(exc_type, exc_val, exc_tb)
 
     def __repr__(self):
-        return f"pipeGEM Model {self._name_tag}"
+        return f"pipeGEM.Model [{self._name_tag}] (g,m,r)=({self.n_genes}, {self.n_mets}, {self.n_rxns})\n"
 
     def __str__(self):
         return self.__repr__()
@@ -64,6 +66,13 @@ class Model(GEMComposite):
         if item not in self.__dict__:
             return getattr(self._model, item)
         return getattr(self, item)
+
+    @property
+    def annotation(self) -> dict:
+        return self._annotations
+
+    def add_annotation(self, key, value):
+        self._annotations[key] = value
 
     @property
     def size(self):
