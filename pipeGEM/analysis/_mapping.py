@@ -9,8 +9,8 @@ from time import time
 
 class RxnMapper:
     def __init__(self,
-                 data: "GeneData",
-                 model: Union[cobra.Model, "Model"],
+                 data,
+                 model: Union[cobra.Model],
                  threshold=0,
                  absent_value=0,
                  missing_value=np.nan,
