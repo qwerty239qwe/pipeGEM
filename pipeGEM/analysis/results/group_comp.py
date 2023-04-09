@@ -42,7 +42,7 @@ class ComponentNumberAnalysis(ComparisonAnalysis):
              dpi=150,
              prefix="",
              group=None,
-             name_order=None,
+             name_order="default",
              *args,
              **kwargs):
         pltr = ComponentNumberPlotter(dpi=dpi, prefix=prefix)

@@ -75,6 +75,14 @@ def test_group_get_items(group):
     assert group["m111"].name_tag == "m111"
 
 
+def test_group_get_many_items(group):
+    subgroup = group[["m111", "m21", "m22"]]
+    assert isinstance(subgroup, Group)
+    print(subgroup._group_annotation)
+    assert subgroup.get_info(features=["n_rxns", "n_mets", "n_genes", "treatment"]).loc["m111", "treatment"] == "a"
+    assert subgroup.get_info(features=["n_rxns", "n_mets", "n_genes", "treatment"]).loc["m21", "group_name"] == "ecoli_g2"
+
+
 def test_group_set_items(group, ecoli_core):
     m1 = ecoli_core
     assert len(group)==6
@@ -89,8 +97,18 @@ def test_aggregate_models(group):
     assert isinstance(ag_grp_dic, dict)
 
 
-def test_compare_sim(group):
+def test_compare_jaccard(group):
+    sim_comp = group.compare(method="jaccard", group_by=None)
+    sim_comp.plot(dpi=150)
+
+
+def test_compare_jaccard_gb(group):
     sim_comp = group.compare(method="jaccard")
+    sim_comp.plot(dpi=150)
+
+
+def test_compare_jaccard_gb_with_nan(group):
+    sim_comp = group.compare(method="jaccard", group_by="treatment")
     sim_comp.plot(dpi=150)
 
 
@@ -104,24 +122,29 @@ def test_compare_num(ecoli_core):
     print(num_comp.name_order)
     num_comp.plot(dpi=150)
 
-    num_comp = g.compare(tags=None, method="num")
+
+def test_compare_num_model_lvl(group):
+    num_comp = group.compare(method="num", group_by=None)
     print(num_comp.result)
     print(num_comp.name_order)
-    num_comp.plot(dpi=150, name_order=[gi.name_tag for gi in g])
+    num_comp.plot(dpi=150, name_order=[gi.name_tag for gi in group])
 
 
-def test_compare_PCA(ecoli_core):
-    m1 = ecoli_core
-    g = Group(group={"ecoli_g1": {"e11": m1, "e12": m1, "e13": m1},
-                     "ecoli_g2": {"e21": m1, "e22": m1}, "a": m1},
-              name_tag="G2")
-    num_comp = g.compare(tags=None, compare_models=True, use="PCA")
-    print(num_comp.result)
+def test_compare_PCA(group):
+    n_pc = 2
+    num_comp = group.compare(group_by=None,
+                             n_components=n_pc,
+                             method="PCA")
+    assert num_comp.result["PC"].shape == (n_pc, len(group))
     num_comp.plot(dpi=150)
+    num_comp.plot(dpi=150, color_by=None)
 
-    num_comp = g.compare(tags=None, compare_models=False, use="PCA")
+
+def test_compare_PCA_2(group):
+    num_comp = group.compare(group_by="treatment",
+                             method="PCA")
     print(num_comp.result)
-    num_comp.plot(dpi=150)
+    num_comp.plot(dpi=150, color_by=None)
 
 # TODO: test_add_tasks
 

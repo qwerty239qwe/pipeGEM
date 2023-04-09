@@ -42,6 +42,7 @@ class Group(GEMComposite):
         """
         super().__init__(name_tag=name_tag or "Unnamed_group")
         self._group_annotation = {}
+        print(kwargs)
         self._group = self._form_group(group, **kwargs)
 
 
@@ -68,9 +69,10 @@ class Group(GEMComposite):
         if isinstance(item, str):
             return self._group[item]
         elif isinstance(item, list) or isinstance(item, np.ndarray):
-            return self.__class__([self._group[i] for i in item], **{k: v for k, v in
-                                                                     self._get_converted_grp_annot().items()
-                                                                     if k in item})
+            return self.__class__([self._group[i] for i in item], **{attrn: {modn: attr for modn, attr in v.items()
+                                                                             if modn in item}
+                                                                     for attrn, v in
+                                                                     self._get_converted_grp_annot().items()})
 
     def __setitem__(self, key, value):
         if isinstance(value, cobra.Model):
@@ -166,6 +168,9 @@ class Group(GEMComposite):
         return {i: row for i, row in gb.items()}
 
     def aggregate_models(self, group_by):
+        if group_by is None:
+            return {self.name_tag: self}
+
         model_annot = self._handle_annotation(self._group, replacing_annot=self._group_annotation)
         gb = model_annot.groupby(group_by).apply(lambda x: list(x.index))  # {'gp1': [mod_name_1, mod_name_2,...], ...}
         return {gp_name: Group([self[mod_names]], name_tag=gp_name) for gp_name, mod_names in gb.items()}
@@ -318,18 +323,23 @@ class Group(GEMComposite):
     def _compare_components_jaccard(models,
                                     group_by=None,
                                     components="all"):
-        label_index = {model.name_tag: ind for ind, model in enumerate(models.aggregate_models())}
+        group_list = [g for g in models] if group_by is None else \
+                [g for g in models.aggregate_models(group_by=group_by).values()]
+
+        label_index = {grp.name_tag: ind
+                       for ind, grp in enumerate(group_list)}
         jaccard_index = {f'{A.name_tag}_to_{B.name_tag}': calc_jaccard_index(A, B, components)
-                         for A, B in itertools.combinations(models, 2)}
-        jaccard_index.update({f'{A.name_tag}_to_{A.name_tag}': 1 for A in models})
-        model_names = [A.name_tag for A in models]
+                         for A, B in itertools.combinations(group_list, 2)}
+        jaccard_index.update({f'{A.name_tag}_to_{A.name_tag}': 1 for A in group_list})
+        group_names = [A.name_tag for A in group_list]
         comp_arr = np.array([[jaccard_index[f'{sorted([A, B], key=lambda x: label_index[x])[0]}'
                                           f'_to_'
                                           f'{sorted([A, B], key=lambda x: label_index[x])[1]}']
-                          for A in model_names]
-                          for B in model_names])
-        comp_arr = pd.DataFrame(comp_arr, index=model_names, columns=model_names)
-        result = ComponentComparisonAnalysis(log={"components": components})
+                            for A in group_names]
+                            for B in group_names])
+        comp_arr = pd.DataFrame(comp_arr, index=group_names, columns=group_names)
+        result = ComponentComparisonAnalysis(log={"components": components,
+                                                  "group_by": group_by})
         result.add_result(comp_arr)
         return result
 
@@ -360,46 +370,43 @@ class Group(GEMComposite):
 
     def _compare_component_PCA_helper(self, comp_id_dic, model, comp_name, name):
         if name not in comp_id_dic:
-            comp_id_dic[name] = [cmp.id for cmp in getattr(model, comp_name)]
+            comp_id_dic[name] = getattr(model, comp_name)
         else:
-            comp_id_dic[name].extend([cmp.id for cmp in getattr(model, comp_name)])
+            comp_id_dic[name].extend(getattr(model, comp_name))
 
     def _compare_component_PCA(self,
                                models,
+                               group_by=None,
                                components="all",
                                n_components=2,
                                incremental=False,
                                **kwargs):
-        components = ['genes', 'reactions', 'metabolites'] if components == "all" else components
+        components = ['gene_ids', 'reaction_ids', 'metabolite_ids'] if components == "all" else components
         comp_id_dic, comp_dfs, group_info = {}, {}, {}
+        group_list = [g for g in models] if group_by is None else \
+            [g for g in models.aggregate_models(group_by=group_by).values()]
 
         for c in components:
-            for m in models:
-                if m.is_leaf:
-                    if models.name_tag not in group_info:
-                        group_info[models.name_tag] = []
-                    self._compare_component_PCA_helper(comp_id_dic, m, c, m.name_tag)
-                    group_info[models.name_tag].append(m.name_tag)
-                else:
-                    for mi in m:
-                        self._compare_component_PCA_helper(comp_id_dic, mi, c, mi.name_tag)
-                    group_info[m.name_tag] = [mi.name_tag for mi in m]
+            for g in group_list:
+                self._compare_component_PCA_helper(comp_id_dic, g, c, g.name_tag)
 
         for m_name, comp_ids in comp_id_dic.items():
             comp_dfs[m_name] = pd.Series(data=np.ones((len(comp_ids), )), index=comp_ids)
         component_df = pd.DataFrame(comp_dfs).fillna(0).T
-        #component_df["model"] = [m.name_tag for m in models]
         del comp_dfs
         pca_fitted_df, pca_expvar_df, pca_comp_df = prepare_PCA_dfs(component_df.T,
                                                                     n_components=n_components,
-                                                                    incremental=incremental, **kwargs)
-        result = PCA_Analysis(log={"group": group_info})
+                                                                    incremental=incremental,
+                                                                    **kwargs)
+        result = PCA_Analysis(log={"group_annotation": self.annotation if group_by is None else
+                                    self.annotation.groupby(group_by).apply(lambda x: list(x.index)).to_frame(),
+                                   "group_name_tag": self.name_tag})
         result.add_result({"PC": pca_fitted_df, "exp_var": pca_expvar_df, "components": pca_comp_df})
         return result
 
     def compare(self,
                 models=None,
-                group_by=None,
+                group_by="group_name",
                 method: str = "jaccard",
                 **kwargs
                 ):
@@ -407,11 +414,11 @@ class Group(GEMComposite):
 
         models: Group = self[models] if models is not None else self
         if method == "jaccard":
-            return self._compare_components_jaccard(models=models, group_by=group_by, **kwargs)  #TODO
+            return self._compare_components_jaccard(models=models, group_by=group_by, **kwargs)
         elif method == "num":
             return self._compare_component_num(models=models, group_by=group_by, **kwargs)
         elif method == "PCA":
-            return self._compare_component_PCA(models=models, **kwargs)  #TODO
+            return self._compare_component_PCA(models=models, group_by=group_by, **kwargs)  #TODO
 
 
 
