@@ -378,7 +378,7 @@ def plot_PCA_loading(component_df: pd.DataFrame,
     plt.style.use("seaborn")
     fig, ax = plt.subplots(figsize=fig_size)
     component_df["key"] = np.sqrt(component_df["PC1"] ** 2 + component_df["PC2"] ** 2)
-    component_df = component_df.sort_values("key", ascending=False).drop("key", 1).iloc[:n_feature, :]
+    component_df = component_df.sort_values("key", ascending=False).drop(columns=["key"]).iloc[:n_feature, :]
 
     ax = _set_default_ax(ax,
                          title=f'{fig_title}',

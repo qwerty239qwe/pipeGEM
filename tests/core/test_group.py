@@ -31,7 +31,7 @@ def test_init_group2(ecoli_core):
     print(g2._group_annotation)
     print(g2.annotation)
     assert g2["e11"].name_tag == 'e11'
-    assert g2.annotation.loc["e11", "group"] == "ecoli_g1"
+    assert g2.annotation.loc["e11", "group_name"] == "ecoli_g1"
 
 
 def test_group_get_info(group, ecoli_core):

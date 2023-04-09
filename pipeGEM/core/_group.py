@@ -171,7 +171,7 @@ class Group(GEMComposite):
         return {gp_name: Group([self[mod_names]], name_tag=gp_name) for gp_name, mod_names in gb.items()}
 
     def do_flux_analysis(self, method, aggregate_method="concat",
-                         solver="gurobi", group_by="group", **kwargs):
+                         solver="gurobi", group_by="group_name", **kwargs):
         results = []
         for name, c in self._group.items():
             if c.__class__ == self.__class__:
