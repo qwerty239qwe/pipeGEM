@@ -57,19 +57,19 @@ def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
     return plotting_kws
 
 
-def plot_heatmap2(data: Union[pd.DataFrame, np.ndarray],
-                  scale: int = 1,
-                  row_color_dict = None,
-                  row_color_order = None,
-                  col_color_dict = None,
-                  col_color_order = None,
-                  cbar_label: str = '',
-                  cbar_kw: Dict[str, Any] = None,
-                  row_palette: str = "muted",
-                  col_palette: str = "muted",
-                  annotate: bool = True,
-                  fig_title: str = None,
-                  ):
+def plot_clustermap(data: Union[pd.DataFrame, np.ndarray],
+                    scale: int = 1,
+                    row_color_dict=None,
+                    row_color_order=None,
+                    col_color_dict=None,
+                    col_color_order=None,
+                    cbar_label: str = '',
+                    cbar_kw: Dict[str, Any] = None,
+                    row_palette: str = "muted",
+                    col_palette: str = "muted",
+                    annotate: bool = True,
+                    fig_title: str = None,
+                    ):
     if cbar_kw is None:
         cbar_kw = {}
     cbar_kw.update({"label": cbar_label})

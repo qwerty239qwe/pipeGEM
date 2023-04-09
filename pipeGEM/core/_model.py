@@ -104,6 +104,11 @@ class Model(GEMComposite):
                 subs[r.subsystem] = [r.id]
         return subs
 
+    def get_rxn_info(self, attrs):
+        return pd.DataFrame([{attr: getattr(r, attr) for attr in attrs}
+                             for r in self._model.reactions],
+                            index=[r.id for r in self._model.reactions])
+
     @property
     def gene_data(self):
         return self._gene_data

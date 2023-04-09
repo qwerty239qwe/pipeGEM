@@ -146,6 +146,11 @@ def test_compare_PCA_2(group):
     print(num_comp.result)
     num_comp.plot(dpi=150, color_by=None)
 
+
+def test_get_rxn_info(group):
+    rxn_info = group.get_rxn_info(models="all", attrs=["subsystem"])
+    print(rxn_info)
+
 # TODO: test_add_tasks
 
 def test_add_data_group(ecoli_core, ecoli_core_data):

@@ -76,9 +76,10 @@ class FBA_Analysis(FluxAnalysis):
     def solution(self):
         return self._sol
 
-    def add_result(self, result):
+    def add_result(self, result, rxn_annotations=None):
         self._sol = result
         self._df = self._sol.to_frame()
+        self._rxn_annotations = rxn_annotations
 
     def plot(self,
              dpi=150,

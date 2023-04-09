@@ -175,8 +175,26 @@ class Group(GEMComposite):
         gb = model_annot.groupby(group_by).apply(lambda x: list(x.index))  # {'gp1': [mod_name_1, mod_name_2,...], ...}
         return {gp_name: Group([self[mod_names]], name_tag=gp_name) for gp_name, mod_names in gb.items()}
 
-    def do_flux_analysis(self, method, aggregate_method="concat",
-                         solver="gurobi", group_by="group_name", **kwargs):
+    def get_rxn_info(self,
+                     models,
+                     attrs,
+                     drop_duplicates=True):
+        if models is not None and models != "all":
+            selected_models = self[models]
+        else:
+            selected_models = self
+        rxn_info_dfs = [mod.get_rxn_info(attrs) for mod in selected_models]
+        mg_info = pd.concat(rxn_info_dfs, axis=0)
+        if drop_duplicates:
+            mg_info = mg_info.drop_duplicates()
+        return mg_info
+
+    def do_flux_analysis(self,
+                         method,
+                         aggregate_method="concat",
+                         solver="gurobi",
+                         group_by="group_name",
+                         **kwargs):
         results = []
         for name, c in self._group.items():
             if c.__class__ == self.__class__:
@@ -188,7 +206,10 @@ class Group(GEMComposite):
             results.append(result)
         return results[0].__class__.aggregate(results, method=aggregate_method,
                                               log={"name": self.name_tag,
-                                                   "group": self._get_group_model(group_by)})
+                                                   "group": self._get_group_model(group_by),
+                                                   "group_annotation": self.annotation,
+                                                   "rxn_annotation": self.get_rxn_info(models="all",
+                                                                                       attrs=["subsystem"])})
 
     @staticmethod
     def _check_rxn_id(comp: GEMComposite, index, subsystems):

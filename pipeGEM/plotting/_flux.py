@@ -20,6 +20,8 @@ def plot_fba(flux_df: pd.DataFrame,
              fig_title: str = None,
              threshold: float = 1e-6,
              vertical: bool = True,
+             height: int = 6,
+             aspect: int = 2,
              name_format: str = "{method}_result.png",
              flux_unit: str = "($m$mol/hr/gDW)",
              verbosity: int = 0,
@@ -31,7 +33,7 @@ def plot_fba(flux_df: pd.DataFrame,
         if verbosity > 0:
             print(f"Found reactions contain zeros fluxes: {n_all_zeros_rxn} rxns were removed from the plot")
         flux_df = flux_df.query(f"fluxes > {threshold}")
-    #flux_df.index.name = "Reactions"
+
     flux_df = flux_df.reset_index().rename(columns={"fluxes": f'Flux {flux_unit}'})
     x_var = "Reaction" if vertical else f'Flux {flux_unit}'
     y_var = "Reaction" if not vertical else f'Flux {flux_unit}'
@@ -41,7 +43,8 @@ def plot_fba(flux_df: pd.DataFrame,
                     hue="name" if model_hue else None,
                     kind=kind,
                     palette=palette,
-                    height=6, aspect=2)
+                    height=height,
+                    aspect=aspect)
     if fig_title is not None:
         g.set_title(fig_title)
     plot_kws = {"g": g}
