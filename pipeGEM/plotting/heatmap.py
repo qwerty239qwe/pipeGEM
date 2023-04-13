@@ -45,14 +45,15 @@ def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
     cbar_kw.update({"label": cbar_label})
     grid_kws = {"width_ratios": (.9, .05), "wspace": .3}
     fig, (ax, cbar_ax) = plt.subplots(1, 2, figsize=(data.shape[0] * scale, data.shape[1] * scale), gridspec_kw=grid_kws)
-    ax = sns.heatmap(data,
-                     ax=ax,
-                     cbar_ax=cbar_ax,
-                     cbar_kws=cbar_kw,
-                     annot=annotate,
-                     **kwargs
-                     )
-    ax.set_title(fig_title)
+    ax = sns.clustermap(data,
+                         ax=ax,
+                         cbar_ax=cbar_ax,
+                         cbar_kws=cbar_kw,
+                         annot=annotate,
+                         **kwargs
+                         )
+    if fig_title is not None:
+        ax.fig.suptitle(fig_title)
     plotting_kws = {"g": fig}
     return plotting_kws
 

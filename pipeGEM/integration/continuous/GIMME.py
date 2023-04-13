@@ -38,6 +38,7 @@ def apply_GIMME(model: cobra.Model,
     -------
     result: GIMMEAnalysis
     """
+    protected_rxns = [] if protected_rxns is None else protected_rxns
     ori_obj = [r.id for r in model.reactions if r.objective_coefficient != 0]
     obj_dict = {r_id: (high_exp - r_exp)
                 if high_exp - r_exp < max_inconsistency_score else max_inconsistency_score  # for preventing -np.inf values

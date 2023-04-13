@@ -42,7 +42,6 @@ class Group(GEMComposite):
         """
         super().__init__(name_tag=name_tag or "Unnamed_group")
         self._group_annotation = {}
-        print(kwargs)
         self._group = self._form_group(group, **kwargs)
 
 
@@ -291,8 +290,10 @@ class Group(GEMComposite):
             for name, comp in group_dict.items():
                 if isinstance(comp, cobra.Model):
                     groups[name] = Model(model=comp, name_tag=name)
+                    self._group_annotation[name] = {}
                 elif isinstance(comp, pipeGEM.Model):
                     groups[name] = comp
+                    self._group_annotation[name] = {}
                     if name != comp.name_tag:
                         warn(f"Assigned name ({name}) is not equal to model's name_tag ({comp.name_tag})")
                 elif isinstance(comp, list):

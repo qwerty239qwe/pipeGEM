@@ -2,7 +2,7 @@ import pandas as pd
 
 from typing import Optional, Union
 from ._base import *
-from pipeGEM.plotting import FBAPlotter, FVAPlotter, SamplingPlotter
+from pipeGEM.plotting import FBAPlotter, FVAPlotter, SamplingPlotter, HeatmapPlotter
 from pipeGEM.analysis._dim_reduction import prepare_PCA_dfs, prepare_embedding_dfs
 from .corr import CorrelationAnalysis
 from .dim_reduction import PCA_Analysis, EmbeddingAnalysis
@@ -90,6 +90,17 @@ class FBA_Analysis(FluxAnalysis):
         pltr.plot(flux_df=self._df,
                   *args,
                   **kwargs)
+
+    def plot_heatmap(self,
+                     rxn_group_by,
+                     sample_group_by,
+                     dpi=150,
+                     prefix="FBA_",
+                     *args,
+                     **kwargs
+                     ):
+        pltr = HeatmapPlotter(dpi=dpi, prefix=prefix)
+
 
     def dim_reduction(self,
                       method="PCA",
