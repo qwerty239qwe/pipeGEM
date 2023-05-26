@@ -158,3 +158,24 @@ class CORDA_Analysis(BaseAnalysis):
         self._conf_scores = conf_scores
         self._threshold_analysis = threshold_analysis
 
+
+class MBA_Analysis(BaseAnalysis):
+    def __init__(self, log):
+        super().__init__(log)
+        self._model = None
+        self._removed_rxns = None
+        self._threshold_analysis = None
+
+    @property
+    def threshold_analysis(self):
+        return self._threshold_analysis
+
+    @property
+    def result_model(self):
+        return self._model
+
+    def add_result(self, model, removed_rxns, threshold_analysis):
+        self._model = model
+        self._removed_rxns = removed_rxns
+        self._threshold_analysis = threshold_analysis
+
