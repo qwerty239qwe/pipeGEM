@@ -80,11 +80,19 @@ def get_organic_exs(model,
                     except_mets: List[str],
                     except_rxns: List[str]) -> List[cobra.Reaction]:
     ex_rxns = model.exchanges + model.sinks + model.demands
-    return [r
-            for r in ex_rxns
-            if r.id not in except_rxns and
-               all([m.id not in except_mets for m in r.metabolites]) and
-               any(["C" in m.formula for m in r.metabolites])]
+    organic_ex = []
+    for r in ex_rxns:
+        if r.id in except_rxns:
+            continue
+        if any([m.id not in except_mets for m in r.metabolites]):
+            continue
+        if any(["C" in m.formula and "H" in m.formula for m in r.metabolites]) or \
+                any(["C" in m.formula and "R" in m.formula for m in r.metabolites]) or \
+                any(["C" in m.formula and "X" in m.formula for m in r.metabolites]) or \
+                any(["X" in m.formula and "H" in m.formula for m in r.metabolites]) or \
+                any(["X" in m.formula and "R" in m.formula for m in r.metabolites]):
+            organic_ex.append(r)
+    return organic_ex
 
 
 def get_not_met_exs(model,
