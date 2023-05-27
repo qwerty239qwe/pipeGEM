@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Dict, Any, Union, List, Optional
+from typing import Dict, Any, Union, List, Optional, Literal
 from pathlib import Path
 
 import pandas as pd
@@ -9,6 +9,7 @@ import cobra
 from cobra.flux_analysis.parsimonious import pfba
 from cobra.exceptions import Infeasible
 
+from pipeGEM.utils import get_organic_exs
 from pipeGEM.integration.mapping import Expression
 from pipeGEM.analysis import flux_analyzers, TaskAnalysis
 from ._var import TASKS_FILE_PATH
@@ -21,6 +22,8 @@ class Task:
                  out_mets: List[Dict[str, Any]],
                  knockout_input_flag: bool = True,
                  knockout_output_flag: bool = True,
+                 ko_input_type: Literal["all", "organic"] = "all",
+                 ko_output_type: Literal["all", "organic"] = "all",
                  compartment_parenthesis: str = "[{}]",
                  met_id_str: str = "met_id",
                  lower_bound_str: str = "lb",
@@ -66,6 +69,7 @@ class Task:
         self.upper_bound_str = upper_bound_str
         self.compartment_str = compartment_str
         self.knockout_input_flag, self.knockout_output_flag = knockout_input_flag, knockout_output_flag
+        self.ko_input_type, self.ko_output_type = ko_input_type, ko_output_type
 
     def to_dict(self):
         return {"system": self.system,
@@ -233,7 +237,10 @@ def get_met_prod_task(met_id: str,
 
 
 class TaskContainer:
-    ALLOW_BATCH_CHANGED_ATTR = ["compartment_parenthesis", "lower_bound_str", "upper_bound_str", "compartment_str"]
+    ALLOW_BATCH_CHANGED_ATTR = ["compartment_parenthesis",
+                                "lower_bound_str",
+                                "upper_bound_str",
+                                "compartment_str"]
 
     def __init__(self, tasks = None):
         self.tasks = {} if tasks is None else tasks
@@ -317,36 +324,67 @@ class TaskHandler:
                 "task_support_rxn_fluxes": dict(zip(sup_rxns,
                                                     sol_df.loc[sup_rxns, "fluxes"].values))}
 
-    def test_one_task(self, task, model, all_mets_in_model, method, method_kws, solver, fail_threshold, **kwargs):
+    def test_one_task(self,
+                      task,
+                      model,
+                      all_mets_in_model,
+                      method,
+                      method_kws,
+                      solver,
+                      fail_threshold,
+                      n_additional_path=0,
+                      **kwargs):
         all_met_exist, dummy_rxns, obj_rxns = task.assign(model, all_mets_in_model, **kwargs)
+        assert n_additional_path >= 0
+
         if not all_met_exist:
             return {'Passed': False,
                     'Should fail': task.should_fail,
                     'Missing mets': True,
                     'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": obj_rxns}
-        if method == "pFBA":
-            model.objective = {rxn: 1 for rxn in obj_rxns}
 
-        analyzer = flux_analyzers[method](model=model, solver=solver)
-        sol = model.optimize(raise_error=False, objective_sense="minimize")
-        true_status = sol.status
-        if true_status == 'optimal':
+        all_supp_rxns = {}
+        test_results = {}
+        true_status = "not analyzed"
+        obj_val = np.nan
+        for i in range(n_additional_path + 1):
+            if i == 0:
+                if method == "pFBA":
+                    model.objective = {rxn: 1 for rxn in obj_rxns}
+            elif i > 0:
+                model.objective = {rxn: 1 for rxn in all_supp_rxns}
+                method = "FBA"
+
+            analyzer = flux_analyzers[method](model=model, solver=solver)
+            #sol = model.optimize(raise_error=False, objective_sense="minimize")
+            #true_status = sol.status
             try:
-                result = analyzer.analyze(**(method_kws if method_kws is not None else {}))
-                result = self._get_test_result(result.result, dummy_rxns, fail_threshold)
+                if i == 0:
+                    result = analyzer.analyze(**(method_kws if method_kws is not None else {}))
+                    test_results["task_support_rxns"] = []
+                    test_results["task_support_rxn_fluxes"] = []
+                else:
+                    result = analyzer.analyze(objective_sense="minimize",
+                                              **(method_kws if method_kws is not None else {}))
+                test_result = self._get_test_result(result.result, dummy_rxns, fail_threshold)
+                obj_val = result.solution.objective_value
+                all_supp_rxns |= set(test_result["task_support_rxns"])
+                test_results["task_support_rxns"].append(test_result["task_support_rxns"])
+                test_results["task_support_rxn_fluxes"].append(test_result["task_support_rxn_fluxes"])
+                true_status = result.solution.status
+
             except Infeasible:
                 true_status = "infeasible"
-                result = {}
-                print("get an unexpected result")
-        else:
-            result = {}
+                print("Got an infeasible result")
+                break
+
 
         return {'Passed': (((true_status == 'optimal') != task.should_fail) and all_met_exist),
                 'Should fail': task.should_fail,
                 'Missing mets': not all_met_exist,
                 'Status': true_status,
-                'Obj_value': sol.objective_value,
-                "Obj_rxns": obj_rxns, **result}
+                'Obj_value': obj_val,
+                "Obj_rxns": obj_rxns, **test_results}
 
     @staticmethod
     def _test_task_sinks_utils(ID, task, model, rxn_fluxes):
@@ -360,7 +398,7 @@ class TaskHandler:
         return sol
 
     def test_task_sinks(self, ID, task, model, fail_threshold, rxn_fluxes):
-        supp_sol = self._test_task_sinks_utils(ID, task, model, rxn_fluxes)
+        supp_sol = self._test_task_sinks_utils(ID, task, model, rxn_fluxes[0])
         supp_status = supp_sol.status if supp_sol is not None else "infeasible"
         if supp_status == "optimal":
             status = "optimal"
@@ -383,16 +421,20 @@ class TaskHandler:
         boundary = [r.id for r in self.model.exchanges] + \
                    [r.id for r in self.model.demands] + \
                    [r.id for r in self.model.sinks]
+        org_boundary = get_organic_exs(self.model, [], [])
+        ko_types = {"all": boundary, "organic": org_boundary}
+
         task_info = {}
         all_mets_in_model = [m.id for m in self.model.metabolites]
         for ID, task in self.tasks.items():
             if task_ids != "all" and ID not in task_ids:
                 continue
             with self.model as model:
-                for r in boundary:
-                    if task.knockout_output_flag:
+                if task.knockout_output_flag:
+                    for r in ko_types[task.ko_output_type]:
                         model.reactions.get_by_id(r).upper_bound = 0
-                    if task.knockout_input_flag:
+                if task.knockout_input_flag:
+                    for r in ko_types[task.ko_output_type]:
                         model.reactions.get_by_id(r).lower_bound = 0
                 if verbosity >= 2:
                     print(f'Checking Task {ID}')
