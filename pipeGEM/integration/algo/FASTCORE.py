@@ -6,18 +6,18 @@ import cobra
 import numpy as np
 
 from pipeGEM.utils import get_rxn_set, flip_direction
-from pipeGEM.analysis import find_sparse_mode
+from pipeGEM.analysis import find_sparse_mode, FASTCOREAnalysis, timing
 
 
-def fastCore(C: Union[List[str], Set[str]],
-             nonP: Union[List[str], Set[str]],
-             model: cobra.Model,
-             epsilon: float,
-             return_model: bool,
-             return_rxn_ids: bool,
-             return_removed_rxn_ids: bool,
-             raise_err: bool = True,
-             scale_by_coef: bool = True):
+@timing
+def apply_FASTCORE(C: Union[List[str], Set[str]],
+                   nonP: Union[List[str], Set[str]],
+                   model: cobra.Model,
+                   epsilon: float,
+                   return_model: bool,
+                   raise_err: bool = True,
+                   scale_by_coef: bool = True) -> FASTCOREAnalysis:
+    output_model = None
     if return_model:
         output_model = model.copy()
     if not isinstance(C, np.ndarray):
@@ -88,14 +88,8 @@ def fastCore(C: Union[List[str], Set[str]],
                         flip_direction(model, Jrev)
                         flipped = True
     rxns_to_remove = np.setdiff1d(all_rxns, A)
-    output = {}
-    if return_model:
-        output_model.remove_reactions(rxns_to_remove, remove_orphans=True)
-        output["model"] = output_model
+    result = FASTCOREAnalysis(log={"epsilon": epsilon,})
 
-    if return_removed_rxn_ids:
-        output["removed_rxn_ids"] = rxns_to_remove
-
-    if return_rxn_ids:
-        output["rxn_ids"] = A
-    return output
+    result.add_result(model=output_model, removed_rxn_ids=rxns_to_remove,
+                      rxn_ids=A)
+    return result

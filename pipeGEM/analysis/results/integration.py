@@ -109,6 +109,31 @@ class RIPTiDeSamplingAnalysis(BaseAnalysis):
         return pd.concat(results, axis=0)
 
 
+class FASTCOREAnalysis(BaseAnalysis):
+    def __init__(self, log):
+        super().__init__(log)
+        self._model = None
+        self._rxn_ids = None
+        self._removed_rxn_ids = None
+
+    def add_result(self, model, rxn_ids, removed_rxn_ids):
+        self._model = model
+        self._rxn_ids = rxn_ids
+        self._removed_rxn_ids = removed_rxn_ids
+
+    @property
+    def result_model(self):
+        return self._model
+
+    @property
+    def removed_rxn_ids(self):
+        return self._removed_rxn_ids
+
+    @property
+    def rxn_ids(self):
+        return self._rxn_ids
+
+
 class rFastCormicAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
@@ -128,10 +153,14 @@ class rFastCormicAnalysis(BaseAnalysis):
     def result_model(self):
         return self._model
 
-    def add_result(self, fastcore_result, core_rxns, noncore_rxns, nonP_rxns, threshold_analysis):
-        self._model = fastcore_result.get("model")
-        self._rxn_ids = fastcore_result.get("rxn_ids")
-        self._removed_rxn_ids = fastcore_result.get("removed_rxn_ids")
+    def add_result(self, fastcore_result: FASTCOREAnalysis,
+                   core_rxns,
+                   noncore_rxns,
+                   nonP_rxns,
+                   threshold_analysis):
+        self._model = fastcore_result.result_model
+        self._rxn_ids = fastcore_result.rxn_ids
+        self._removed_rxn_ids = fastcore_result.removed_rxn_ids
         self._core_rxns = core_rxns
         self._noncore_rxns = noncore_rxns
         self._nonP_rxns = nonP_rxns
