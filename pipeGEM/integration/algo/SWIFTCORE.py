@@ -4,7 +4,7 @@ from scipy.linalg import qr, norm
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import svds
 
-from ._LP import BlockedProblem, Problem
+from pipeGEM.analysis import BlockedProblem, Problem
 from pipeGEM.analysis import ProblemAnalyzer
 from pipeGEM.utils import get_rev_arr
 

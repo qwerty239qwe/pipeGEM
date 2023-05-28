@@ -14,8 +14,7 @@ from pipeGEM.core._base import GEMComposite
 from pipeGEM.utils import save_model, check_rxn_scales
 from pipeGEM.data import GeneData, MediumData
 from pipeGEM.integration import integrator_factory
-from pipeGEM.integration.algo.fastcore import fastcc
-from pipeGEM.analysis import flux_analyzers, FastCCAnalysis, TaskAnalysis, ko_analyzers
+from pipeGEM.analysis import flux_analyzers, consistency_testers, TaskAnalysis, ko_analyzers
 from pipeGEM.analysis.tasks import TaskHandler
 
 
@@ -267,24 +266,20 @@ class Model(GEMComposite):
                                                                     include_supps=include_supp_rxns)
                                 for task_id in activated_tasks])))
 
-    def check_rxn_scales(self, threshold=1e4):
+    def check_rxn_scales(self,
+                         threshold=1e4):
         check_rxn_scales(mod=self._model, threshold=threshold)
 
-    def check_consistency(self, method="fastcc", threshold=1e-6, **kwargs):
-        if method == "fastcc":
-            cons_obj = FastCCAnalysis(log={"threshold": threshold})
-            fastcc_result = fastcc(self._model,
-                                   epsilon=threshold,
-                                   return_model=True,
-                                   return_rxn_ids=True,
-                                   return_removed_rxn_ids=True,
-                                   **kwargs)
-            new_model = self.__class__(model=fastcc_result["model"], name_tag=self._name_tag + "_consist")
-            fastcc_result["model"] = new_model
-            cons_obj.add_result(result=fastcc_result)
-        else:
-            raise ValueError()
-        return cons_obj
+    def check_consistency(self,
+                          method="FASTCC",
+                          tol=1e-6,
+                          **kwargs):
+        cons_tester = consistency_testers[method](model=self._model)
+        test_result = cons_tester.analyze(tol=tol,
+                                          **kwargs)
+        test_result.add_result(model=self.__class__(model=test_result.consist_model,
+                                                    name_tag=self._name_tag + "_consist_model"))
+        return test_result
 
     def do_flux_analysis(self, method, solver="gurobi", **kwargs):
         analyzer = flux_analyzers.create(method, model=self._model, solver=solver, log={"name": self.name_tag})

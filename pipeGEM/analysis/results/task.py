@@ -91,7 +91,12 @@ class TaskAnalysis(BaseAnalysis):
         self._rxn_supps = dict(self._result_df["rxn_supps"].items())
 
     def get_task_support_rxns(self, task_id, include_supps=True):
-        return self._task_support_rxns[task_id] + (self._rxn_supps[task_id]
+        return self._task_support_rxns[task_id][0] + (self._rxn_supps[task_id]
                                                    if include_supps and task_id in self._rxn_supps and isinstance(self._rxn_supps[task_id], list)
                                                    else [])
 
+    def get_all_possible_sups(self, task_id):
+        return self._task_support_rxns[task_id]
+
+    def is_essential(self, task_id, rxn_id) -> bool:
+        return all([rxn_id in supp_path for supp_path in self._task_support_rxns[task_id]])

@@ -343,8 +343,9 @@ class TaskHandler:
                     'Missing mets': True,
                     'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": obj_rxns}
 
-        all_supp_rxns = {}
+        all_supp_rxns = set()
         test_results = {}
+        n_pos_supps = 0
         true_status = "not analyzed"
         obj_val = np.nan
         for i in range(n_additional_path + 1):
@@ -363,15 +364,18 @@ class TaskHandler:
                     result = analyzer.analyze(**(method_kws if method_kws is not None else {}))
                     test_results["task_support_rxns"] = []
                     test_results["task_support_rxn_fluxes"] = []
+                    true_status = result.solution.status
+                    obj_val = result.solution.objective_value
                 else:
                     result = analyzer.analyze(objective_sense="minimize",
                                               **(method_kws if method_kws is not None else {}))
                 test_result = self._get_test_result(result.result, dummy_rxns, fail_threshold)
-                obj_val = result.solution.objective_value
                 all_supp_rxns |= set(test_result["task_support_rxns"])
+                if n_pos_supps == len(all_supp_rxns):
+                    break
+                n_pos_supps = len(all_supp_rxns)
                 test_results["task_support_rxns"].append(test_result["task_support_rxns"])
                 test_results["task_support_rxn_fluxes"].append(test_result["task_support_rxn_fluxes"])
-                true_status = result.solution.status
 
             except Infeasible:
                 true_status = "infeasible"
@@ -416,6 +420,7 @@ class TaskHandler:
                    task_ids="all",
                    verbosity=0,
                    fail_threshold=1e-6,
+                   n_additional_path=0,
                    log=None):
         # maybe needs some modifications
         boundary = [r.id for r in self.model.exchanges] + \
@@ -447,7 +452,8 @@ class TaskHandler:
                                                    method=method,
                                                    method_kws=method_kws,
                                                    solver=solver,
-                                                   fail_threshold=fail_threshold)
+                                                   fail_threshold=fail_threshold,
+                                                   n_additional_path=n_additional_path)
             if task_info[ID]['Passed'] and not task.should_fail and get_support_rxns:
                 sup_exp_result = self.test_task_sinks(ID, task, self.model,
                                                       fail_threshold,

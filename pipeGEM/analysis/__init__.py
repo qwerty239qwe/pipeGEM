@@ -8,3 +8,5 @@ from pipeGEM.analysis._gapsplit import gapsplit
 from pipeGEM.analysis._reducing import *
 from pipeGEM.analysis._mapping import *
 from pipeGEM.analysis._ko import *
+from pipeGEM.analysis.lp import *
+from pipeGEM.analysis._consistency import *

@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from cobra.util.array import create_stoichiometric_matrix
 from pipeGEM.analysis.tasks import Task, TaskContainer, TaskHandler
+from pipeGEM.analysis import consistency_testers
+from tqdm import tqdm
 
 
 def calc_expr_score(data, expr_th, nonexpr_th, absent_value, absent_value_indicator=-1e-6) -> dict:
@@ -83,6 +85,61 @@ def _get_mCADRE_default_salvage_test_tasks(gmp_m_id = "MAM02016",
     return tasks
 
 
+def _check_all_test(rxn_id, func_test_result, salv_test_result):
+    pass_func_test, pass_salv_test = True, True
+    if func_test_result is not None:
+        pass_func_test = not func_test_result.is_essential(rxn_id)
+
+    if salv_test_result is not None:
+        pass_salv_test = not salv_test_result.is_essential(rxn_id)
+
+    return pass_salv_test and pass_func_test
+
+
+def _prune_model(model,
+                 score_df,
+                 core_rxns,
+                 non_expressed_rxns,
+                 func_test_result,
+                 salv_test_result,
+                 eta=0.333,
+                 consistency_test_method="FASTCC",
+                 tolerance=1e-8,
+                 ):
+    non_core_df = score_df.loc[~score_df.index.isin(core_rxns), :]
+    all_removed_rxn_ids = []
+
+    for non_core_rxn_id in tqdm(non_core_df.index):
+        if non_core_rxn_id in all_removed_rxn_ids:
+            continue
+
+        pass_tests = _check_all_test(non_core_rxn_id, func_test_result, salv_test_result)
+        if not pass_tests:
+            continue
+
+        with model:
+            model.reactions.get_by_id(non_core_rxn_id).bounds = (0, 0)
+            #consistency check
+            cons_tester = consistency_testers[consistency_test_method](model)
+            test_result = cons_tester.analyze(tol=tolerance,
+                                              return_model=False)
+            removed_rxns = test_result.removed_rxn_ids
+            pruned_model = test_result.consist_model
+
+        pass_tests = all(_check_all_test(rid, func_test_result, salv_test_result) for rid in removed_rxns)
+        if not pass_tests:
+            continue
+
+        n_core_rm = len(set(core_rxns) & set(removed_rxns))
+        n_non_core_rm = len(set(non_core_df.index) & set(removed_rxns))
+
+        if (non_core_rxn_id in non_expressed_rxns and (n_core_rm <= n_non_core_rm * eta)) or (n_core_rm == 0):
+            model = pruned_model
+            all_removed_rxn_ids.extend(removed_rxns)
+
+    return model
+
+
 def apply_mCADRE(model,
                  data,
                  expr_th,
@@ -105,7 +162,13 @@ def apply_mCADRE(model,
                                                            absent_value_indicator=absent_value_indicator,
                                                            evidence_scores=evidence_scores)
 
+    func_task_handler = None
     if required_met_ids is not None:
         if use_default_inp_for_func_test:
             tasks = _get_mCADRE_default_func_test_tasks(required_met_ids)
             func_task_handler = TaskHandler(model=model, tasks_path_or_container=tasks)
+    elif func_test_tasks is not None:
+        func_task_handler = TaskHandler(model=model, tasks_path_or_container=func_test_tasks)
+
+    if func_task_handler is not None:
+        func_test_result = func_task_handler.test_tasks(n_additional_path=100)

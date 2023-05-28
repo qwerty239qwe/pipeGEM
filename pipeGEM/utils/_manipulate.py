@@ -1,6 +1,6 @@
 import re
 from warnings import warn
-from typing import List
+from typing import Sequence, List
 
 import numpy as np
 import pandas as pd
@@ -219,7 +219,7 @@ def apply_medium_constraint(model,
     return constraint_rxns
 
 
-def flip_direction(model, to_flip: List[str]):
+def flip_direction(model, to_flip: Sequence[str]):
     for rxn_id in to_flip:
         rxn = model.reactions.get_by_id(rxn_id)
         rxn.lower_bound, rxn.upper_bound = -rxn.upper_bound if rxn.upper_bound != 0 else 0, -rxn.lower_bound if rxn.lower_bound != 0 else 0
