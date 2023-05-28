@@ -208,3 +208,33 @@ class MBA_Analysis(BaseAnalysis):
         self._removed_rxns = removed_rxns
         self._threshold_analysis = threshold_analysis
 
+
+class mCADRE_Analysis(BaseAnalysis):
+    def __init__(self, log):
+        super().__init__(log)
+        self._model = None
+        self._removed_rxns = None
+        self._threshold_analysis = None
+        self._score_df = None
+        self._core_rxns = None
+        self._non_expressed_rxns = None
+        self._func_test_result = None
+        self._salvage_test_result = None
+
+    @property
+    def threshold_analysis(self):
+        return self._threshold_analysis
+
+    @property
+    def result_model(self):
+        return self._model
+
+    def add_result(self, model, removed_rxns, score_df, core_rxns, non_expressed_rxns,
+                   func_test_result, salvage_test_result):
+        self._model = model
+        self._removed_rxns = removed_rxns
+        self._score_df = score_df
+        self._core_rxns = core_rxns
+        self._non_expressed_rxns = non_expressed_rxns
+        self._func_test_result = func_test_result
+        self._salvage_test_result = salvage_test_result

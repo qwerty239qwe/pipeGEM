@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from cobra.util.array import create_stoichiometric_matrix
 from pipeGEM.analysis.tasks import Task, TaskContainer, TaskHandler
-from pipeGEM.analysis import consistency_testers
+from pipeGEM.analysis import consistency_testers, timing, mCADRE_Analysis
 from tqdm import tqdm
 
 
@@ -31,7 +31,7 @@ def get_score_df(model,
                  expr_th,
                  nonexpr_th,
                  exp_cutoff=0.9,
-                 absent_value=0,
+                 absent_value: float = 0,
                  absent_value_indicator=-1e-6,
                  evidence_scores=None):
     expr_scores = calc_expr_score(data, expr_th, nonexpr_th, absent_value, absent_value_indicator)
@@ -83,6 +83,39 @@ def _get_mCADRE_default_salvage_test_tasks(gmp_m_id = "MAM02016",
                                     out_mets=[{"met_id": imp_m_id, "lb": 0, "ub": 1e-6, "compartment": cytosol_comp}],
                                     ko_input_type="organic", ko_output_type="organic")
     return tasks
+
+
+def _get_func_test_result(model,
+                          func_test_tasks=None,
+                          required_met_ids=None,
+                          default_func_test=False,):
+    func_task_handler, func_test_result = None, None
+    if required_met_ids is not None:
+        if default_func_test:
+            tasks = _get_mCADRE_default_func_test_tasks(required_met_ids)
+            func_task_handler = TaskHandler(model=model, tasks_path_or_container=tasks)
+    elif func_test_tasks is not None:
+        func_task_handler = TaskHandler(model=model, tasks_path_or_container=func_test_tasks)
+
+    if func_task_handler is not None:
+        func_test_result = func_task_handler.test_tasks(n_additional_path=100)
+    return func_test_result
+
+
+def _get_salv_test_result(model,
+                          salvage_check_tasks=None,
+                          default_salv_test=False,
+                          **kwargs):
+    salvage_task_handler, salvage_test_result = None, None
+    if default_salv_test:
+        tasks = _get_mCADRE_default_salvage_test_tasks(**kwargs)
+        salvage_task_handler = TaskHandler(model=model, tasks_path_or_container=tasks)
+    elif salvage_check_tasks is not None:
+        salvage_task_handler = TaskHandler(model=model, tasks_path_or_container=salvage_check_tasks)
+
+    if salvage_task_handler is not None:
+        salvage_test_result = salvage_task_handler.test_tasks(n_additional_path=100)
+    return salvage_test_result
 
 
 def _check_all_test(rxn_id, func_test_result, salv_test_result):
@@ -137,22 +170,24 @@ def _prune_model(model,
             model = pruned_model
             all_removed_rxn_ids.extend(removed_rxns)
 
-    return model
+    return model, all_removed_rxn_ids
 
 
+@timing
 def apply_mCADRE(model,
                  data,
                  expr_th,
                  nonexpr_th,
-                 exp_cutoff=0.9,
-                 absent_value=0,
-                 absent_value_indicator=-1e-6,
+                 exp_cutoff: float = 0.9,
+                 absent_value: float = 0,
+                 absent_value_indicator: float = -1e-6,
                  evidence_scores=None,
                  salvage_check_tasks=None,
+                 default_salv_test=False,
                  func_test_tasks=None,
                  required_met_ids=None,
-                 use_default_inp_for_func_test=False,
-                 ):
+                 default_func_test=False,
+                 ) -> mCADRE_Analysis:
     score_df, core_rxns, non_expressed_rxns = get_score_df(model,
                                                            data,
                                                            expr_th,
@@ -162,13 +197,41 @@ def apply_mCADRE(model,
                                                            absent_value_indicator=absent_value_indicator,
                                                            evidence_scores=evidence_scores)
 
-    func_task_handler = None
-    if required_met_ids is not None:
-        if use_default_inp_for_func_test:
-            tasks = _get_mCADRE_default_func_test_tasks(required_met_ids)
-            func_task_handler = TaskHandler(model=model, tasks_path_or_container=tasks)
-    elif func_test_tasks is not None:
-        func_task_handler = TaskHandler(model=model, tasks_path_or_container=func_test_tasks)
+    func_test_result = _get_func_test_result(model=model,
+                                             func_test_tasks=func_test_tasks,
+                                             required_met_ids=required_met_ids,
+                                             default_func_test=default_func_test,)
+    if func_test_result is not None and (not func_test_result.result_df["Passed"].all()):
+        raise RuntimeError(f"The input model could not perform all provided metabolic tests,"
+                           f"Test details: {func_test_result.result_df}")
 
-    if func_task_handler is not None:
-        func_test_result = func_task_handler.test_tasks(n_additional_path=100)
+    salvage_test_result = _get_salv_test_result(model=model,
+                                                salvage_check_tasks=salvage_check_tasks,
+                                                default_salv_test=default_salv_test,)
+
+    if salvage_test_result is not None and (not salvage_test_result.result_df["Passed"].all()):
+        raise RuntimeError(f"The input model could not perform all provided salvage tests,"
+                           f"Test details: {salvage_test_result.result_df}")
+
+    result_model, removed_rxn_ids = _prune_model(model,
+                                                    score_df,
+                                                    core_rxns,
+                                                    non_expressed_rxns,
+                                                    func_test_result,
+                                                    salvage_test_result,
+                                                    eta=0.333,
+                                                    consistency_test_method="FASTCC",
+                                                    tolerance=1e-8,)
+    result = mCADRE_Analysis(log=dict(exp_cutoff=exp_cutoff,
+                                      absent_value=absent_value,
+                                      absent_value_indicator=absent_value_indicator,
+                                      evidence_scores=evidence_scores,))
+
+    result.add_result(model=result_model,
+                      removed_rxns=removed_rxn_ids,
+                      core_rxns=core_rxns,
+                      score_df=score_df,
+                      non_expressed_rxns=non_expressed_rxns,
+                      salvage_test_result=salvage_test_result,
+                      func_test_result=func_test_result)
+    return result
