@@ -238,3 +238,51 @@ class mCADRE_Analysis(BaseAnalysis):
         self._non_expressed_rxns = non_expressed_rxns
         self._func_test_result = func_test_result
         self._salvage_test_result = salvage_test_result
+
+
+class iMAT_Analysis(BaseAnalysis):
+    def __init__(self, log):
+        super().__init__(log)
+        self._model = None
+        self._removed_rxns = None
+        self._threshold_analysis = None
+
+    @property
+    def threshold_analysis(self):
+        return self._threshold_analysis
+
+    @property
+    def result_model(self):
+        return self._model
+
+    def add_result(self, model, removed_rxns, threshold_analysis):
+        self._model = model
+        self._removed_rxns = removed_rxns
+        self._threshold_analysis = threshold_analysis
+
+
+class INIT_Analysis(BaseAnalysis):
+    def __init__(self, log):
+        super().__init__(log)
+        self._model = None
+        self._removed_rxns = None
+        self._threshold_analysis = None
+        self._weight_dic = None
+
+    @property
+    def threshold_analysis(self):
+        return self._threshold_analysis
+
+    @property
+    def result_model(self):
+        return self._model
+
+    @property
+    def weight_dic(self):
+        return self._weight_dic
+
+    def add_result(self, model, removed_rxns, threshold_analysis, weight_dic):
+        self._model = model
+        self._removed_rxns = removed_rxns
+        self._threshold_analysis = threshold_analysis
+        self._weight_dic = weight_dic
