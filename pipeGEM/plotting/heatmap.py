@@ -12,7 +12,6 @@ def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
                  scale: int = 1,
                  cbar_label: str = '',
                  cbar_kw: Dict[str, Any] = None,
-                 annotate: bool = True,
                  fig_title: Optional[str] = None,
                  **kwargs) -> Dict[str, plt.Figure]:
     """
@@ -28,12 +27,10 @@ def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
         A string representing the label for the colorbar, by default ''.
     cbar_kw : dict, optional
         A dictionary containing additional keyword arguments to be passed to the colorbar, by default None.
-    annotate : bool, optional
-        A boolean value indicating whether to annotate the heatmap with the data values, by default True.
     fig_title : str, optional
         A string representing the title of the figure, by default None.
     **kwargs : optional
-        Additional keyword arguments to be passed to seaborn.heatmap().
+        Additional keyword arguments to be passed to seaborn.clustermap().
 
     Returns
     -------
@@ -43,18 +40,14 @@ def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
     if cbar_kw is None:
         cbar_kw = {}
     cbar_kw.update({"label": cbar_label})
-    grid_kws = {"width_ratios": (.9, .05), "wspace": .3}
-    fig, (ax, cbar_ax) = plt.subplots(1, 2, figsize=(data.shape[0] * scale, data.shape[1] * scale), gridspec_kw=grid_kws)
-    ax = sns.clustermap(data,
-                         ax=ax,
-                         cbar_ax=cbar_ax,
-                         cbar_kws=cbar_kw,
-                         annot=annotate,
-                         **kwargs
-                         )
+    cluster_grid = sns.clustermap(data,
+                                  figsize=(data.shape[0] * scale, data.shape[1] * scale),
+                                  cbar_kws=cbar_kw,
+                                  **kwargs
+                                  )
     if fig_title is not None:
-        ax.fig.suptitle(fig_title)
-    plotting_kws = {"g": fig}
+        cluster_grid.figure.suptitle(fig_title)
+    plotting_kws = {"g": cluster_grid.figure}
     return plotting_kws
 
 
