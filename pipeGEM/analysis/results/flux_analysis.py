@@ -25,14 +25,14 @@ class FluxAnalysis(BaseAnalysis):
     @classmethod
     def aggregate(cls, analyses, method, log, **kwargs):
         """
-        Returns a aggregated dataframe,
+        Returns an aggregated dataframe,
         if concat method is used, return a df with 'name' column representing the model name
 
         Parameters
         ----------
-        analyses
-        method
-        log
+        analyses: list of FluxAnalysis
+        method: str
+        log: dict
         kwargs
 
         Returns

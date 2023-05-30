@@ -9,14 +9,6 @@ from pipeGEM.data import GeneData
 from pipeGEM.analysis import DataAggregation
 
 
-@pytest.fixture(scope="module")
-def group(ecoli_core):
-    return Group({"ecoli_g1": {"m111": ecoli_core, "m112": ecoli_core, "m12": ecoli_core},
-                    "ecoli_g2": {"m21": ecoli_core, "m22": ecoli_core},
-                    "ecoli_g3": {"m3": ecoli_core}}, name_tag="G2",
-                    treatment={"m111": "a", "m112": "b", "m12": "b"})
-
-
 def test_init_group(ecoli_core):
     m1 = ecoli_core
     g = Group({"ecoli": m1, "ecoli_2": m1.copy()}, name_tag="G1", treatment={"ecoli": "a", "ecoli_2": "b"})
