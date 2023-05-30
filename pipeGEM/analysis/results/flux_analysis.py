@@ -18,9 +18,9 @@ class FluxAnalysis(BaseAnalysis):
         self._sol = None
         self._df: Optional[pd.DataFrame] = None
 
-    def add_name(self, name):
-        self._df["name"] = name
-        self._df["name"] = pd.Categorical(self._df["name"])
+    def add_name(self, name, col_name="name"):
+        self._df[col_name] = name
+        self._df[col_name] = pd.Categorical(self._df[col_name])
 
     @classmethod
     def aggregate(cls, analyses, method, log, **kwargs):

@@ -162,6 +162,9 @@ class Group(GEMComposite):
         return GeneData.aggregate(gene_data, prop="data")
 
     def _get_group_model(self, group_by):
+        if group_by is None:
+            return {"model": [m for m in self._group.keys()]}
+
         model_annot = self._handle_annotation(self._group, replacing_annot=self._group_annotation)
         gb = model_annot.groupby(group_by).apply(lambda x: list(x.index))
         return {i: row for i, row in gb.items()}
@@ -172,7 +175,7 @@ class Group(GEMComposite):
 
         model_annot = self._handle_annotation(self._group, replacing_annot=self._group_annotation)
         gb = model_annot.groupby(group_by).apply(lambda x: list(x.index))  # {'gp1': [mod_name_1, mod_name_2,...], ...}
-        return {gp_name: Group([self[mod_names]], name_tag=gp_name) for gp_name, mod_names in gb.items()}
+        return {gp_name: self[mod_names].rename(gp_name) for gp_name, mod_names in gb.items()}
 
     def get_rxn_info(self,
                      models,
@@ -188,11 +191,17 @@ class Group(GEMComposite):
             mg_info = mg_info.drop_duplicates()
         return mg_info
 
+    def rename(self, new_name_tag, inplace=False):
+        if inplace:
+            self._name_tag = new_name_tag
+            return
+        return self.__class__(self._group, name_tag=new_name_tag)
+
     def do_flux_analysis(self,
                          method,
                          aggregate_method="concat",
                          solver="gurobi",
-                         group_by="group_name",
+                         group_by=None,
                          **kwargs):
         results = []
         for name, c in self._group.items():
@@ -201,7 +210,7 @@ class Group(GEMComposite):
                                             solver=solver, **kwargs)
             else:
                 result = c.do_flux_analysis(method=method, solver=solver, **kwargs)
-                result.add_name(c.name_tag)
+                result.add_name(c.name_tag, col_name="model")
             results.append(result)
         return results[0].__class__.aggregate(results, method=aggregate_method,
                                               log={"name": self.name_tag,

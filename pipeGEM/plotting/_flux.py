@@ -13,9 +13,9 @@ from ._prep import prep_fva_plotting_data, filter_fva_df
 
 def plot_fba(flux_df: pd.DataFrame,
              rxn_ids: Union[List[str], Dict[str, str]],
+             group_by=None,
              kind: str = "bar",
              palette: Union[str] = "deep",
-             model_hue: bool = False,
              filter_all_zeros: bool = True,
              fig_title: str = None,
              threshold: float = 1e-6,
@@ -27,6 +27,9 @@ def plot_fba(flux_df: pd.DataFrame,
              verbosity: int = 0,
              **kwargs
              ):
+    if "Reaction" not in flux_df.columns:
+        flux_df = flux_df.reset_index().rename(columns={"index": "Reaction"})
+        print("Use index as the reaction IDs")
     flux_df = flux_df.loc[flux_df["Reaction"].isin(rxn_ids), [c for c in flux_df.columns if c != "reduced_costs"]]
     if filter_all_zeros:
         n_all_zeros_rxn = flux_df.query(f"fluxes < {threshold}").shape[0]
@@ -40,7 +43,7 @@ def plot_fba(flux_df: pd.DataFrame,
     g = sns.catplot(data=flux_df,
                     x=x_var,
                     y=y_var,
-                    hue="name" if model_hue else None,
+                    hue=group_by,
                     kind=kind,
                     palette=palette,
                     height=height,
