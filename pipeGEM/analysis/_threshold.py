@@ -330,5 +330,5 @@ class LocalThreshold(RankBased):
 
 threshold_finders = ThresholdFinders()
 threshold_finders.register("rFASTCORMICS", rFastCormicsThreshold)
-threshold_finders.register("percentile", PercentileThreshold)
+threshold_finders.register("percentile", PercentileThreshold)  # which is also called global threshold in some papers
 threshold_finders.register("local", LocalThreshold)

@@ -309,11 +309,12 @@ class MediumData(BaseData):
                 r.bounds = (r.bounds[0], max(influx_ub, threshold))
 
     @classmethod
-    def from_file(cls, file_name="DMEM", **kwargs):
+    def from_file(cls, file_name="DMEM", csv_kw=None, **kwargs):
         medium_file_dir = Path(__file__).parent.parent.parent / "medium"
         if (medium_file_dir / file_name).with_suffix(".tsv").is_file():
             data = pd.read_csv((medium_file_dir / file_name).with_suffix(".tsv"), sep='\t', index_col=0)
         else:
-            data = pd.read_csv(file_name, sep='\t', index_col=0)
+            csv_kw = csv_kw or {}
+            data = pd.read_csv(file_name, **csv_kw)
         return cls(data, **kwargs)
 

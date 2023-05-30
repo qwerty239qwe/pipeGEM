@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-from typing import List
+from typing import List, Optional, Tuple, Union
 
 
 def plot_model_components(comp_df: pd.DataFrame,
@@ -42,4 +42,27 @@ def plot_model_components(comp_df: pd.DataFrame,
         axes[i].set_title(fig_titles[i])
         if i != 0:
             axes[i].set_ylabel("")
+    return {"g": fig}
+
+
+def plot_local_threshold_boxplot(data,
+                                 gene,
+                                 local_th,
+                                 global_on_th,
+                                 global_off_th,
+                                 figsize: Tuple[float, float] = (8, 6)
+                                 ):
+    fig, ax = plt.subplots(figsize=figsize)
+    data = data.loc[gene, :].reset_index().melt(id_vars=["index"],
+                                                var_name="model",
+                                                value_name="expression").rename(columns={"index": "gene"})  # S * G
+    sns.boxplot(data=data, y="expression", x="gene", hue="gene",
+                ax=ax)
+
+    x_lims = ax.get_xlim()
+    ax.axhline(y=global_on_th, xmax=x_lims[1], label="Global on threshold")
+    ax.axhline(y=global_off_th, xmax=x_lims[1], label="Global off threshold")
+    ax.axhline(y=local_th, xmax=x_lims[1], label="Local threshold")
+    ax.set_xlim(*x_lims)
+
     return {"g": fig}
