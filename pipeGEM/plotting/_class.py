@@ -8,7 +8,7 @@ from ._flux import plot_fba, plot_fva, plot_sampling
 from .curve import plot_rFastCormic_thresholds, plot_percentile_thresholds
 from .heatmap import plot_heatmap
 from .scatter import plot_PCA, plot_embedding
-from .categorical import plot_model_components
+from .categorical import plot_model_components, plot_local_threshold_boxplot
 
 
 class BasePlotter:
@@ -154,6 +154,33 @@ class PercentileThresholdPlotter(BasePlotter):
 
         return plot_percentile_thresholds(data=data,
                                           exp_th=exp_th, *args, **kwargs)
+
+
+class LocalThresholdPlotter(BasePlotter):
+    def __init__(self, dpi=150, prefix="threshold_"):
+        super().__init__(dpi, prefix)
+
+    def plot_func(self,
+                  data,
+                  genes,
+                  groups,
+                  group_dic,
+                  local_th,
+                  global_on_th,
+                  global_off_th,
+                  kind="box",
+                  *args, **kwargs):
+        if kind == "box":
+            return plot_local_threshold_boxplot(data=data,
+                                                genes=genes,
+                                                group_dic=group_dic,
+                                                groups=groups,
+                                                local_th=local_th,
+                                                global_on_th=global_on_th,
+                                                global_off_th=global_off_th,
+                                                *args, **kwargs)
+
+        raise ValueError(f"kind={kind} is not implemented")
 
 
 class ComponentNumberPlotter(BasePlotter):

@@ -46,23 +46,38 @@ def plot_model_components(comp_df: pd.DataFrame,
 
 
 def plot_local_threshold_boxplot(data,
-                                 gene,
+                                 genes,
+                                 groups,
+                                 group_dic,
                                  local_th,
                                  global_on_th,
                                  global_off_th,
                                  figsize: Tuple[float, float] = (8, 6)
                                  ):
     fig, ax = plt.subplots(figsize=figsize)
-    data = data.loc[gene, :].reset_index().melt(id_vars=["index"],
-                                                var_name="model",
-                                                value_name="expression").rename(columns={"index": "gene"})  # S * G
-    sns.boxplot(data=data, y="expression", x="gene", hue="gene",
+    if groups == "all":
+        groups = [g for g in group_dic]
+
+    selected_samples = [i for g in groups for i in group_dic[g]]
+    group_map = {i: g for g in groups for i in group_dic[g]}
+
+    data = data.loc[genes, selected_samples].reset_index().melt(id_vars=["index"],
+                                                                var_name="model",
+                                                                value_name="expression").rename(columns={"index": "gene"})  # S * G
+    data["group"] = data["model"].map(group_map)
+    sns.boxplot(data=data,
+                y="expression",
+                x="group",
+                hue="gene",
                 ax=ax)
 
     x_lims = ax.get_xlim()
-    ax.axhline(y=global_on_th, xmax=x_lims[1], label="Global on threshold")
-    ax.axhline(y=global_off_th, xmax=x_lims[1], label="Global off threshold")
-    ax.axhline(y=local_th, xmax=x_lims[1], label="Local threshold")
+    for g in groups:
+        ax.axhline(y=global_on_th.loc[g], xmax=x_lims[1], label="Global-on threshold", lw=2, ls="--", color="k")
+        ax.axhline(y=global_off_th.loc[g], xmax=x_lims[1], label="Global-off threshold", lw=2, ls="--", color="b")
+
+        for gene in genes:
+            ax.axhline(y=local_th.loc[gene, g], xmax=x_lims[1], label="Local threshold", lw=2, ls="--", color="r")
     ax.set_xlim(*x_lims)
 
     return {"g": fig}

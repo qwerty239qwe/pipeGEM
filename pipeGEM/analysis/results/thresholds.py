@@ -1,7 +1,7 @@
 import json
 
 from ._base import *
-from pipeGEM.plotting import rFastCormicThresholdPlotter, PercentileThresholdPlotter
+from pipeGEM.plotting import rFastCormicThresholdPlotter, PercentileThresholdPlotter, LocalThresholdPlotter
 
 
 class rFastCormicThresholdAnalysis(BaseAnalysis):
@@ -95,14 +95,53 @@ class PercentileThresholdAnalysis(BaseAnalysis):
 class LocalThresholdAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log=log)
-        self._exp_ths = None
+        self._groups = log.get("groups")
+        self._local_ths = None
+        self._data = None
+        self._global_off_th = None
+        self._global_on_th = None
 
     def save(self, file_path):
         pass
 
-    def add_result(self, exp_ths):
-        self._exp_ths = exp_ths
+    def add_result(self,
+                   data,
+                   local_ths,
+                   global_on_ths,
+                   global_off_ths):
+        self._local_ths = local_ths
+        self._global_off_th = global_on_ths
+        self._global_on_th = global_off_ths
+        self._data = data
 
     @property
-    def exp_ths(self):
-        return self._exp_ths
+    def local_ths(self):
+        return self._local_ths
+
+    @property
+    def global_off_th(self):
+        return self._global_off_th
+
+    @property
+    def global_on_th(self):
+        return self._global_on_th
+
+    def _get_group_dic(self):
+        groups = self._groups.unique()
+        return {g: self._groups[self._groups == g].to_list() for g in groups}
+
+    def plot(self,
+             genes,
+             groups="all",
+             dpi=150,
+             prefix="",
+             *args,
+             **kwargs):
+        pltr = LocalThresholdPlotter(dpi=dpi, prefix=prefix)
+        pltr.plot(data=self._data,
+                  groups=groups,
+                  local_th=self._local_ths,
+                  global_on_th=self._global_on_th,
+                  global_off_th=self._global_off_th,
+                  group_dict=self._get_group_dic(),
+                  )
