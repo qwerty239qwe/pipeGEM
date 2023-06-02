@@ -248,12 +248,12 @@ class HeatmapPlotter(BasePlotter):
         super().__init__(dpi, prefix)
 
     def plot_func(self,
-                  method,
-                  flux_df,
-                  groups,
+                  result,
                   *args,
                   **kwargs):
-        plot_heatmap
+        return plot_heatmap(data=result,
+                            *args,
+                            **kwargs)
 
 
 class CorrelationPlotter(BasePlotter):

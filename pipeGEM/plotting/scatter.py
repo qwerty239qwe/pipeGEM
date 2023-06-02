@@ -64,7 +64,7 @@ def plot_PCA(data: Dict[str, pd.DataFrame],
     pca_df, exp_var_df, component_df = data["PC"], data["exp_var"], data["components"]
 
     if groups is None:
-        groups = {m: [m] for m in pca_df.columns}
+        groups = {m: [m] for m in pca_df.index}
 
     if sheet_file_name is not None:
         sh_path = Path(sheet_file_name)
@@ -159,16 +159,16 @@ def plot_embedding(embedding_df: pd.DataFrame,
         embedding_df.to_csv(sheet_file_name)
 
     if groups is None:
-        groups = {m: [m] for m in embedding_df.columns}
+        groups = {m: [m] for m in embedding_df.index}
 
     for i, (group_name, model_names) in enumerate(groups.items()):
-        em1, em2 = np.array([embedding_df.loc['embedding 1', name] for name in model_names]), \
-                   np.array([embedding_df.loc['embedding 2', name] for name in model_names])
+        em1, em2 = np.array([embedding_df.loc[name, 'embedding 1'] for name in model_names]), \
+                   np.array([embedding_df.loc[name, 'embedding 2'] for name in model_names])
 
         if plot_2D:
             ax.scatter(em1, em2, s=50, label=group_name, c=[colors[i]])
         else:
-            em3 = np.array([embedding_df.loc['embedding 3', name] for name in model_names])
+            em3 = np.array([embedding_df.loc[name, 'embedding 3'] for name in model_names])
             ax.scatter(em1, em2, em3, s=50, label=group_name, c=[colors[i]])
 
     x_label = f'{reducer} 1'

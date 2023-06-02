@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 from typing import Optional, Union
 from ._base import *
@@ -92,8 +93,9 @@ class FBA_Analysis(FluxAnalysis):
                   **kwargs)
 
     def plot_heatmap(self,
-                     rxn_group_by,
-                     sample_group_by,
+                     rxn_group_by=None,
+                     sample_group_by=None,
+                     group_by_agg_method="mean",
                      dpi=150,
                      prefix="FBA_",
                      *args,
@@ -101,27 +103,49 @@ class FBA_Analysis(FluxAnalysis):
                      ):
         pltr = HeatmapPlotter(dpi=dpi, prefix=prefix)
 
+        data = self._df.copy()
+
+        if rxn_group_by is not None:
+            data["rxn_group_by"] = data.index.map(self._rxn_annotations[rxn_group_by]).astype("category")
+
+        if sample_group_by is not None:
+            data = data.groupby(sample_group_by)
+            data["fluxes"].apply(getattr(np, group_by_agg_method)
+                       if isinstance(group_by_agg_method, str) else group_by_agg_method)
+
+        pltr.plot(result=data,
+                  *args,
+                  **kwargs)
 
     def dim_reduction(self,
                       method="PCA",
                       **kwargs
                       ) -> Union[PCA_Analysis, EmbeddingAnalysis]:
-        if "group" not in self._log:
-            raise NotAggregatedError("This analysis result contains only 1 model's fluxes, "
+        if "group" not in self.log:
+            raise NotAggregatedError("This analysis result only contains fluxes of a model, "
                                      "please use Group.do_flux_analysis to get a proper result for dim reduction")
+        flux_df = self._df.pivot_table(index="Reaction", columns=self.log["group_by"],
+                                       values="fluxes", aggfunc="mean").fillna(0).T
 
-        flux_df = self._df.pivot_table(index="Reaction", columns="name", values="fluxes", aggfunc="mean").fillna(0).T
+        dim_log = {**kwargs, **self.log} if self.log["group_by"] == "model" else \
+            {"group": {self.log["group_by"]: flux_df.index},
+             **kwargs, **{k: v for k, v in self.log.items() if k != "group"}}
+
+        print(f"This data is groupby {self.log['group_by']}")
+        print(dim_log)
         if method == "PCA":
             final_df, exp_var_df, component_df = prepare_PCA_dfs(flux_df.T,
                                                                  **kwargs)
-            result = PCA_Analysis(log={**kwargs, **self.log})
-            result.add_result({"PC": final_df, "exp_var": exp_var_df, "components": component_df})
+            result = PCA_Analysis(log=dim_log)
+            result.add_result({"PC": final_df,
+                               "exp_var": exp_var_df,
+                               "components": component_df})
             return result
         else:
             emb_df = prepare_embedding_dfs(flux_df.T,
                                            reducer=method,
                                            **kwargs)
-            result = EmbeddingAnalysis(log={**kwargs, **self.log})
+            result = EmbeddingAnalysis(log=dim_log)
             result.add_result(emb_df, method=method)
             return result
 

@@ -56,10 +56,12 @@ class BaseAnalysis:
         return str(self._log)
 
     def format_str(self):
-        showed_str = f"{self.__class__.__name__} at {hex(id(self))} \n" \
-                     f"Parameters:"\
-                     f"{self._log}"\ 
-                     f"Results:"
+        showed_str = f"""{self.__class__.__name__} at {hex(id(self))} \n
+        Parameters:\n
+        {self._log}\n
+        Results:
+        
+        """
 
         if self._running_time:
             showed_str += f"Running time: \n {self._running_time}"

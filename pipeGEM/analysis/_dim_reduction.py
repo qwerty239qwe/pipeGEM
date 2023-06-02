@@ -145,4 +145,4 @@ def prepare_embedding_dfs(feature_df: pd.DataFrame,
     df = pd.DataFrame(X_embedded,
                       columns=["embedding {}".format(i) for i in range(1, n_components + 1)],
                       index=sample_names)
-    return df.T
+    return df

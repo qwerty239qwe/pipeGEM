@@ -44,7 +44,6 @@ class Group(GEMComposite):
         self._group_annotation = {}
         self._group = self._form_group(group, **kwargs)
 
-
     def __repr__(self):
         return self.__str__()
 
@@ -166,6 +165,7 @@ class Group(GEMComposite):
             return {"model": [m for m in self._group.keys()]}
 
         model_annot = self._handle_annotation(self._group, replacing_annot=self._group_annotation)
+        print(model_annot)
         gb = model_annot.groupby(group_by).apply(lambda x: list(x.index))
         return {i: row for i, row in gb.items()}
 
@@ -216,10 +216,14 @@ class Group(GEMComposite):
                     result.add_name(self._group_annotation[c.name_tag][group_by],
                                     col_name=group_by)
             results.append(result)
+        gp_annot = pd.DataFrame({group_by: self.annotation[group_by].unique()},
+                                index=self.annotation[group_by].unique()) if group_by is not None else self.annotation
+
         return results[0].__class__.aggregate(results, method=aggregate_method,
                                               log={"name": self.name_tag,
+                                                   "group_by": group_by if group_by is not None else "model",
                                                    "group": self._get_group_model(group_by),
-                                                   "group_annotation": self.annotation,
+                                                   "group_annotation": gp_annot,
                                                    "rxn_annotation": self.get_rxn_info(models="all",
                                                                                        attrs=["subsystem"])})
 
