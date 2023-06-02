@@ -3,12 +3,12 @@ import pytest
 
 @pytest.fixture(scope="module")
 def group_pfba_result(group):
-    yield group.do_flux_analysis(method="pFBA")
+    yield group.do_flux_analysis(method="pFBA", solver="glpk")
 
 
 @pytest.fixture(scope="module")
 def group_pfba_result_gb_gp(group):
-    yield group.do_flux_analysis(method="pFBA", group_by="group_name")
+    yield group.do_flux_analysis(method="pFBA", group_by="group_name", solver="glpk")
 
 
 def test_plot_three_rxn_fluxes(group, group_pfba_result):

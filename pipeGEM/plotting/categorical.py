@@ -52,7 +52,9 @@ def plot_local_threshold_boxplot(data,
                                  local_th,
                                  global_on_th,
                                  global_off_th,
-                                 figsize: Tuple[float, float] = (8, 6)
+                                 width = 0.8,
+                                 figsize: Tuple[float, float] = (8, 6),
+                                 **kwargs
                                  ):
     fig, ax = plt.subplots(figsize=figsize)
     if groups == "all":
@@ -69,15 +71,27 @@ def plot_local_threshold_boxplot(data,
                 y="expression",
                 x="group",
                 hue="gene",
-                ax=ax)
+                hue_order=genes,
+                order=groups,
+                ax=ax,
+                **kwargs)
 
+    x1_, x2_ = len(data["group"].unique()), len(data["gene"].unique())
+    block_w = 1 / x1_
+    gap = ((1 - width) / x1_) / 2
+    actual_width = (1 / x1_ - 2 * gap) / x2_
     x_lims = ax.get_xlim()
-    for g in groups:
-        ax.axhline(y=global_on_th.loc[g], xmax=x_lims[1], label="Global-on threshold", lw=2, ls="--", color="k")
-        ax.axhline(y=global_off_th.loc[g], xmax=x_lims[1], label="Global-off threshold", lw=2, ls="--", color="b")
-
-        for gene in genes:
-            ax.axhline(y=local_th.loc[gene, g], xmax=x_lims[1], label="Local threshold", lw=2, ls="--", color="r")
+    for gpi, g in enumerate(groups):
+        ax.axhline(y=global_on_th.loc[g], xmin=block_w * gpi, xmax=block_w * (gpi + 1),
+                   label="Global-on threshold", lw=2, ls=":", color="k")
+        ax.axhline(y=global_off_th.loc[g], xmin=block_w * gpi, xmax=block_w * (gpi + 1),
+                   label="Global-off threshold", lw=2, ls=":", color="b")
+        local_width_init = block_w * gpi + gap
+        for gni, gene in enumerate(genes):
+            ax.axhline(y=local_th.loc[gene, g],
+                       xmax=local_width_init + actual_width * (gni + 1),
+                       xmin=local_width_init + actual_width * gni,
+                       label="Local threshold", lw=2, ls="-", color="r")
     ax.set_xlim(*x_lims)
 
     return {"g": fig}
