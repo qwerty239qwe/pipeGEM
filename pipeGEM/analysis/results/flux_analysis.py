@@ -131,8 +131,6 @@ class FBA_Analysis(FluxAnalysis):
             {"group": {self.log["group_by"]: flux_df.index},
              **kwargs, **{k: v for k, v in self.log.items() if k != "group"}}
 
-        print(f"This data is groupby {self.log['group_by']}")
-        print(dim_log)
         if method == "PCA":
             final_df, exp_var_df, component_df = prepare_PCA_dfs(flux_df.T,
                                                                  **kwargs)

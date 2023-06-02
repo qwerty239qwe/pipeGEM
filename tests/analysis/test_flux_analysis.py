@@ -20,13 +20,11 @@ def pFBA_result(ecoli_core):
 
 def test_PCA(pFBA_result):
     pca = pFBA_result.dim_reduction()
-    print(pca.result)
     pca.plot(dpi=150, color_by="treatments")
 
 
 def test_TSNE(pFBA_result):
     tsne = pFBA_result.dim_reduction(method="TSNE", n_components=2)
-    print(tsne.result)
     tsne.plot(dpi=150, color_by="treatments")
 
 
