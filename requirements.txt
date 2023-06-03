@@ -18,3 +18,4 @@ zeep
 pint
 openpyxl
 anndata
+toml
