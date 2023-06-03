@@ -249,7 +249,6 @@ class MediumData(BaseData):
         self._u = UnitRegistry()
         self.conc_unit = self._u.Quantity(conc_unit)
 
-
     @staticmethod
     def _find_simple_rxn(rxns):
         cur_simp_ix, best_c, best_nm = -1, 1000, 1000

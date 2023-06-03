@@ -1,0 +1,11 @@
+[input]
+    input_file_path = ""
+    sep = "\t"
+    header = true
+[params]
+    convert_to_str = true
+    expression_threshold = 0
+    absent_expression = 0
+    data_transform = "log2"
+    discrete_transform = nan
+    ordered_thresholds = nan
