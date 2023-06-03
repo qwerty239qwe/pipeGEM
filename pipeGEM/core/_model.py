@@ -297,8 +297,10 @@ class Model(GEMComposite):
     def integrate_gene_data(self, data_name, integrator="GIMME", integrator_init_kwargs=None, **kwargs):
         if isinstance(integrator, str):
             integrator_init_kwargs = {} if integrator_init_kwargs is None else integrator_init_kwargs
-            integrator = integrator_factory.create(integrator, model=self._model, **integrator_init_kwargs)
-        return integrator.integrate(data=self._gene_data[data_name], **kwargs)
+            integrator = integrator_factory.create(integrator, **integrator_init_kwargs)
+        return integrator.integrate(data=self._gene_data[data_name],
+                                    model=self._model,
+                                    **kwargs)
 
     def get_RAS(self, data_name, method="mean"):
         return self._gene_data[data_name].calc_rxn_score_stat([r.id for r in self._model.reactions])
