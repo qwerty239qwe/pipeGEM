@@ -5,23 +5,6 @@ from pathlib import Path
 import scanpy as sc
 
 
-def _traverse_dic(dic):
-    for k, v in dic.items():
-        if isinstance(v, dict):
-            _traverse_dic(v)
-        elif isinstance(v, float) and np.isnan(v):
-            dic[k] = None
-
-
-def parse_toml_file(file_name):
-    with open(file_name) as f:
-        toml_file = tomlkit.load(f)
-    toml_dict = toml_file.unwrap()
-    _traverse_dic(toml_dict)
-
-    return toml_dict
-
-
 dense_data_loader = {"csv": pd.read_csv,
                      "tsv": pd.read_csv,
                      "txt": pd.read_csv,

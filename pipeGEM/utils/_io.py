@@ -5,6 +5,7 @@ from os import PathLike
 from warnings import warn
 from functools import reduce
 
+import tomlkit
 import pandas as pd
 import numpy as np
 import cobra
@@ -19,7 +20,8 @@ except ImportError:
     scipy_io = None
 
 
-__all__ = ("model_to_excel", "model_to_mat", "load_test_model", "save_model", "load_model")
+__all__ = ("model_to_excel", "model_to_mat", "load_test_model", "save_model", "load_model",
+           "parse_toml_file", "save_toml_file")
 
 
 def model_to_excel(model, file_name):
@@ -214,3 +216,42 @@ def sheet_to_comp(model, excel_file_name, raise_err=False):
             model.add_reactions([added_rxn])
 
             added_rxn.build_reaction_from_string(r[1]["reaction"])
+
+
+def _traverse_dic_replace_nan(dic):
+    for k, v in dic.items():
+        if isinstance(v, dict):
+            _traverse_dic_replace_nan(v)
+        elif isinstance(v, float) and np.isnan(v):
+            dic[k] = None
+
+
+def parse_toml_file(file_name):
+    with open(file_name) as f:
+        toml_file = tomlkit.load(f)
+    toml_dict = toml_file.unwrap()
+    _traverse_dic_replace_nan(toml_dict)
+
+    return toml_dict
+
+
+def _traverse_dic_add_doc(dic, table_or_doc):
+    if table_or_doc is None:
+        table_or_doc = tomlkit.document()
+
+    for k, v in dic.items():
+        if isinstance(v, dict):
+            new_tab = tomlkit.table()
+            table_or_doc[k] = _traverse_dic_add_doc(v, new_tab)
+        elif v is None:
+            table_or_doc[k] = np.nan
+        else:
+            table_or_doc[k] = v
+    return table_or_doc
+
+
+
+def save_toml_file(file_name, dic):
+    doc = _traverse_dic_add_doc(dic, None)
+    with open(file_name, "w+") as f:
+        tomlkit.dump(doc, f)

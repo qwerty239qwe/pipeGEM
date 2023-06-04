@@ -81,9 +81,9 @@ class FASTCC(ConsistencyTester):
         rxns_to_remove = np.setdiff1d(all_rxns, A)
 
         result = FastCCAnalysis(log={"is_convex": is_convex, "tol": tol})
-        result.add_result(model=consistent_model,
-                          removed_rxn_ids=rxns_to_remove,
-                          rxn_ids=A)
+        result.add_result(dict(consistent_model=consistent_model,
+                               removed_rxn_ids=rxns_to_remove,
+                               kept_rxn_ids=A))
 
         return result
 
