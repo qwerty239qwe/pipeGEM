@@ -1,6 +1,7 @@
-from typing import Dict, Optional, List
+from typing import Dict, Union
 from pathlib import Path
 
+import anndata as ad
 import numpy as np
 import pandas as pd
 from pint import UnitRegistry
@@ -25,7 +26,7 @@ dis_trans = {"HPA": HPA_scores}
 
 class GeneData(BaseData):
     def __init__(self,
-                 data,
+                 data: Union[ad.AnnData, pd.Series, dict],
                  convert_to_str: bool = True,
                  expression_threshold: float = 1e-4,
                  absent_expression: float = 0,
@@ -37,7 +38,7 @@ class GeneData(BaseData):
 
         Parameters
         ----------
-        data: pd.Series or dict
+        data: pd.Series, ad.AnnData, or dict
             Data contains pairs of gene IDs and expression values.
         convert_to_str: bool
             Convert the gene names into strings
@@ -70,8 +71,14 @@ class GeneData(BaseData):
             self.gene_data = {str(gene_id) if convert_to_str else gene_id:
                               exp if exp > expression_threshold else absent_expression
                               for gene_id, exp in data.items()}
+        elif isinstance(data, ad.AnnData):
+            if data.obs.shape[0] > 1:
+                raise ValueError(f"Input anndata should contain only one observation, found {data.obs.shape[0]} instead.")
+            self.gene_data = {str(gene_id) if convert_to_str else gene_id:
+                              exp if exp > expression_threshold else absent_expression
+                              for gene_id, exp in zip(data.var.index, data[0, :].X.toarray().ravel())}
         else:
-            raise ValueError("Expression data should be a dict or a pandas series")
+            raise ValueError("Expression data should be a dict, an AnnData or a pandas series.")
         self.genes = list(self.gene_data.keys())
         self._digitize_data(ordered_thresholds)
         self.rxn_mapper = None

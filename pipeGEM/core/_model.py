@@ -220,7 +220,7 @@ class Model(GEMComposite):
         elif isinstance(data, AnnData):
             data_dict = {}
             for obs in data.obs.index:
-                cell_data = GeneData(pd.Series(data=data[obs, :].X.toarray().ravel(), index=data.var.index),
+                cell_data = GeneData(data[obs, :],
                                      **data_kwargs)
                 data_dict[obs] = cell_data
             self._gene_data.update(data_dict)
