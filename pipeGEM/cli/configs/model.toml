@@ -3,6 +3,7 @@
 [param]
     name_tag = "human"
 [medium_data]
+    name = "Ham"
     apply_before = true  # applied before consistency and functionality test
     apply_after = false   # applied after consistency and functionality test
     [medium_data.params]
@@ -13,7 +14,9 @@
         name_index = true
         id_col_label = "human_1"
         name_col_label = nan
-    [medium_data.apply]
+        [medium_data.params.csv_kw]
+            sep = "\t"
+    [medium_data.apply_params]
         cell_dgw = 1e-12
         n_cells_per_l = 1e6
         time_hr = 96
@@ -21,8 +24,9 @@
         threshold = 1e-6
 [consistency]
     method = "FASTCC"
-    tol = 1e-6
     saved_path = "./consistency_test"
+    [consistency.params]
+        tol = 1e-6
 [functionality_test]
     method = "default"
     saved_path = "./functionality_test"
