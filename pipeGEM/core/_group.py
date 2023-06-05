@@ -8,7 +8,6 @@ import pandas as pd
 import cobra
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, manhattan_distances
 
-import pipeGEM
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
 from pipeGEM.analysis import ComponentComparisonAnalysis, ComponentNumberAnalysis, prepare_PCA_dfs, PCA_Analysis
@@ -308,7 +307,7 @@ class Group(GEMComposite):
                 if isinstance(comp, cobra.Model):
                     groups[name] = Model(model=comp, name_tag=name)
                     self._group_annotation[name] = {}
-                elif isinstance(comp, pipeGEM.Model):
+                elif isinstance(comp, self.__class__):
                     groups[name] = comp
                     self._group_annotation[name] = {}
                     if name != comp.name_tag:

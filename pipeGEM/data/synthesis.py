@@ -3,10 +3,9 @@ import numpy as np
 from anndata import AnnData
 from typing import Optional, Union
 import cobra
-from pipeGEM import Model
 
 
-def get_syn_gene_data(model: Union[cobra.Model, Model],
+def get_syn_gene_data(model: Union[cobra.Model, "pipeGEM.Model"],
                       n_sample: int,
                       n_genes: Optional[int] = None,
                       groups: Optional[str] = None,

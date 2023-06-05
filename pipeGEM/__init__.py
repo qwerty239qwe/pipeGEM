@@ -1,4 +1,4 @@
-from .core import Group, Model
+from pipeGEM.core import Group, Model
 from .utils import load_model
 from .data.fetching import load_remote_model
 
