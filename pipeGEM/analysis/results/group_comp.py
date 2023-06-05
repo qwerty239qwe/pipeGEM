@@ -10,10 +10,6 @@ class ComparisonAnalysis(BaseAnalysis):
 class ComponentComparisonAnalysis(ComparisonAnalysis):
     def __init__(self, log):
         super().__init__(log)
-        self._result = None
-
-    def add_result(self, result):
-        self._result = result
 
     def plot(self,
              dpi=150,
@@ -21,7 +17,7 @@ class ComponentComparisonAnalysis(ComparisonAnalysis):
              *args,
              **kwargs):
         pltr = ComponentComparisonPlotter(dpi=dpi, prefix=prefix)
-        pltr.plot(result=self._result,
+        pltr.plot(result=self._result["comparison_df"],
                   *args,
                   **kwargs)
 

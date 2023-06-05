@@ -28,33 +28,33 @@ class FluxAnalyzers(ObjectFactory):
 class FluxAnalyzer:
     def __init__(self,
                  model,
-                 analysis_obj: "FluxAnalysis",
                  solver = "glpk"):
         self.model = model
         self.model.solver = solver
         self._solver_name = solver
-        self._analysis_obj = analysis_obj
 
     @property
     def solver_name(self):
         return self._solver_name
 
-    def analysis_func(self, **kwargs):
-        raise NotImplementedError
-
     def analyze(self, **kwargs) -> "FluxAnalysis":
-        self._analysis_obj.add_result(self.analysis_func(**kwargs))
-        return self._analysis_obj
+        raise NotImplementedError
 
 
 class FBA_Analyzer(FluxAnalyzer):
     def __init__(self, model, solver, log=None):
+        self._log = log or {}
         super().__init__(model=model,
-                         solver=solver,
-                         analysis_obj=FBA_Analysis(log=log))
+                         solver=solver)
 
-    def analysis_func(self, **kwargs):
-        return self.model.optimize(**kwargs)
+    def analyze(self, **kwargs):
+        result = FBA_Analysis(log={"solver": self.solver_name,
+                                   **kwargs, **self._log})
+
+        sol = self.model.optimize(**kwargs)
+        result.add_result({"solution": sol,
+                           "flux_df": sol.to_frame()})
+        return result
 
 
 class pFBA_Analyzer(FBA_Analyzer):
@@ -64,46 +64,58 @@ class pFBA_Analyzer(FBA_Analyzer):
                          log=log)
 
     def analysis_func(self, fraction_of_optimum=1.0, **kwargs):
-        return pfba(model=self.model,
-                    fraction_of_optimum=fraction_of_optimum,
-                    **kwargs)
+        result = FBA_Analysis(log={"solver": self.solver_name,
+                                   **kwargs, **self._log})
+
+        sol = pfba(model=self.model,
+                   fraction_of_optimum=fraction_of_optimum,
+                   **kwargs)
+        result.add_result({"solution": sol,
+                           "flux_df": sol.to_frame()})
+        return result
 
 
 class FVA_Analyzer(FluxAnalyzer):
     def __init__(self, model, solver, log=None):
+        self._log = log or {}
         super().__init__(model=model,
-                         solver=solver,
-                         analysis_obj=FVA_Analysis(log=log))
+                         solver=solver)
 
     def analysis_func(self,
                       is_loopless=True,
                       fraction_of_optimum=0,
                       **kwargs):
-        return flux_variability_analysis(self.model,
-                                         loopless=is_loopless,
-                                         fraction_of_optimum=fraction_of_optimum,
-                                         **kwargs)
+        result = FVA_Analysis(log={"solver": self.solver_name,
+                                   **kwargs, **self._log})
+
+        result.add_result({"flux_df": flux_variability_analysis(self.model,
+                                                     loopless=is_loopless,
+                                                     fraction_of_optimum=fraction_of_optimum,
+                                                     **kwargs)})
+        return result
 
 
 class SamplingAnalyzer(FluxAnalyzer):
     def __init__(self, model, solver, log=None):
+        self._log = log or {}
         super().__init__(model=model,
-                         solver=solver,
-                         analysis_obj=SamplingAnalysis(log=log))
+                         solver=solver)
 
     def analysis_func(self,
                       obj_lb_ratio=0.75,
                       n=5000,
                       **kwargs):
-
+        result = SamplingAnalysis(log={"solver": self.solver_name,
+                                       **kwargs, **self._log})
         with self.model as model:
             fix_objective_as_constraint(model, fraction=obj_lb_ratio)
             if kwargs.get("method") == "gapsplit":
                 kwargs["gurobi_direct"] = (self.solver_name == "gurobi")
                 kwargs.pop("method")
-                return gapsplit(model, n=n, **kwargs)
-
-            return sampling.sample(model, n=n, **kwargs)
+                result.add_result(dict(flux_df = gapsplit(model, n=n, **kwargs)))
+                return result
+            result.add_result(dict(flux_df=sampling.sample(model, n=n, **kwargs)))
+            return result
 
 
 flux_analyzers = FluxAnalyzers()

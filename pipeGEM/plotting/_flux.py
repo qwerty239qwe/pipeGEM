@@ -94,6 +94,74 @@ def plot_fva(fva_df: pd.DataFrame,
     return plot_kws
 
 
+def plot_sampling_displot(flux_df,
+                          rxn_id,
+                          kind,
+                          group_by,
+                          vertical,
+                          stat_analysis=None):
+    xy_val = {"x": rxn_id if vertical else None,
+              "y": rxn_id if not vertical else None}
+    facet = sns.displot(data=flux_df,
+                        x=xy_val["x"],
+                        y=xy_val["y"],
+                        kind=kind,
+                        hue=group_by)
+    if stat_analysis is not None:
+        pass
+
+    return facet
+
+
+def plot_sampling_catplot(flux_df,
+                          rxn_id,
+                          kind,
+                          group_by,
+                          vertical,
+                          stat_analysis=None):
+    xy_val = {"x": rxn_id if vertical else group_by,
+              "y": rxn_id if not vertical else group_by}
+    facet = sns.catplot(data=flux_df,
+                        x=xy_val["x"],
+                        y=xy_val["y"],
+                        kind=kind,
+                        hue=group_by)
+    if stat_analysis is not None:
+        pass
+
+    return facet
+
+
+def plot_sampling_df(flux_df,
+                     rxn_id,
+                     kind,
+                     group_by,
+                     vertical=True,
+                     plotting_type = "displot",
+                     stat_analysis = None,
+                     ):
+    assert plotting_type in ["displot", "catplot"]
+
+    if plotting_type == "displot":
+        facet = plot_sampling_displot(flux_df=flux_df,
+                                      rxn_id=rxn_id,
+                                      kind=kind,
+                                      group_by=group_by,
+                                      vertical=vertical,
+                                      stat_analysis=stat_analysis)
+    else:
+        facet = plot_sampling_catplot(flux_df=flux_df,
+                                      rxn_id=rxn_id,
+                                      kind=kind,
+                                      group_by=group_by,
+                                      vertical=vertical,
+                                      stat_analysis=stat_analysis)
+    fig_kws = {"g": facet.figure}
+
+    return fig_kws
+
+
+#  the codes below are deprecated
 def plot_one_sampling(flux_df,
                       r: str,
                       color_maps,

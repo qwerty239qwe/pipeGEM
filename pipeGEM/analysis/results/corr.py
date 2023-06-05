@@ -14,5 +14,5 @@ class CorrelationAnalysis(BaseAnalysis):
              prefix="Dim_reduction_",
              **kwargs):
         pltr = CorrelationPlotter(dpi=dpi, prefix=prefix)
-        pltr.plot(result=self._result,
+        pltr.plot(result=self._result["correlation_result"],
                   **kwargs)

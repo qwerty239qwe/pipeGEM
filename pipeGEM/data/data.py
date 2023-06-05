@@ -212,7 +212,7 @@ class GeneData(BaseData):
             mg_d = getattr(mg_d, method)(axis=1).to_frame()
         result = DataAggregation(log={"method": method, "prop": prop,
                                       "absent_expression": absent_expression, "group": _data_parse_group_models(data)})
-        result.add_result(mg_d)
+        result.add_result(dict(agg_data=mg_d))
         return result
 
 

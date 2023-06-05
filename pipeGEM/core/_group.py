@@ -378,7 +378,7 @@ class Group(GEMComposite):
         comp_arr = pd.DataFrame(comp_arr, index=group_names, columns=group_names)
         result = ComponentComparisonAnalysis(log={"components": components,
                                                   "group_by": group_by})
-        result.add_result(comp_arr)
+        result.add_result({"comparison_df": comp_arr})
         return result
 
     def _compare_component_num(self,

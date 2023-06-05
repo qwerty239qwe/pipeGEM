@@ -4,7 +4,7 @@ from typing import Union, Dict, List
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from ._flux import plot_fba, plot_fva, plot_sampling
+from ._flux import plot_fba, plot_fva, plot_sampling_df
 from .curve import plot_rFastCormic_thresholds, plot_percentile_thresholds
 from .heatmap import plot_heatmap
 from .scatter import plot_PCA, plot_embedding
@@ -122,13 +122,13 @@ class SamplingPlotter(BasePlotter):
         super(SamplingPlotter, self).__init__(dpi, prefix)
 
     def plot_func(self,
-                  flux_df_dic: Dict[str, pd.DataFrame],
-                  rxn_ids: Union[List[str], Dict[str, str]],
+                  flux_df: pd.DataFrame,
+                  rxn_id: str,
                   **kwargs
                   ):
-        return plot_sampling(sampling_flux_df=flux_df_dic,
-                             rxn_ids=rxn_ids,
-                             **kwargs)
+        return plot_sampling_df(flux_df=flux_df,
+                                rxn_id=rxn_id,
+                                **kwargs)
 
 
 class rFastCormicThresholdPlotter(BasePlotter):

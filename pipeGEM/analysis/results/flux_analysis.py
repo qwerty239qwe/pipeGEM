@@ -58,9 +58,6 @@ class FluxAnalysis(BaseAnalysis):
             new._df.columns = ["fluxes"]
         return new
 
-    def add_result(self, sol):
-        raise NotImplementedError()
-
     def plot(self, **kwargs):
         raise NotImplementedError()
 
@@ -130,7 +127,7 @@ class FBA_Analysis(FluxAnalysis):
         dim_log = {**kwargs, **self.log} if self.log["group_by"] == "model" else \
             {"group": {self.log["group_by"]: flux_df.index},
              **kwargs, **{k: v for k, v in self.log.items() if k != "group"}}
-
+        dim_log.update({"method": method})
         if method == "PCA":
             final_df, exp_var_df, component_df = prepare_PCA_dfs(flux_df.T,
                                                                  **kwargs)
@@ -144,7 +141,7 @@ class FBA_Analysis(FluxAnalysis):
                                            reducer=method,
                                            **kwargs)
             result = EmbeddingAnalysis(log=dim_log)
-            result.add_result(emb_df, method=method)
+            result.add_result(emb_df)
             return result
 
     def hclust(self):
@@ -163,7 +160,7 @@ class FBA_Analysis(FluxAnalysis):
             flux_df = flux_df.T
         corr_result = flux_df.fillna(0).corr().fillna(0.)
         result = CorrelationAnalysis(log={"by": by})
-        result.add_result(corr_result)
+        result.add_result(dict(correlation_result=corr_result))
         return result
 
 
@@ -218,38 +215,27 @@ class FVA_Analysis(FluxAnalysis):
 class SamplingAnalysis(FluxAnalysis):
     def __init__(self, log):
         super(SamplingAnalysis, self).__init__(log)
-        self._df_dic = {}
 
     @classmethod
     def aggregate(cls, analyses, method, log, **kwargs):
         new = cls(log=log)
         if method == "concat":
-            for a in analyses:
-                new._df_dic.update(a._df_dic)
+            new.add_result(pd.concat([i.flux_df for i in analyses],
+                                     axis=0))
         return new
 
-    @property
-    def result(self):
-        return self._df_dic
-
-    def add_name(self, name):
-        for i in self._df_dic:
-            self._df_dic[i]["name"] = name
-
-    def add_result(self, result: pd.DataFrame):
-        for i in range(result.shape[0]):
-            one_sample = result.loc[i, :].to_frame()
-            one_sample = one_sample.reset_index()
-            one_sample.columns = ["rxn_id", "flux"]
-            self._df_dic[i] = one_sample
+    def add_name(self, name, col_name="name"):
+        self._result["flux_df"][col_name] = name
 
     def plot(self,
+             rxn_id,
              dpi=150,
              prefix="sampling_",
              *args,
              **kwargs):
         pltr = SamplingPlotter(dpi=dpi, prefix=prefix)
-        pltr.plot(flux_df_dic=self._df_dic,
+        pltr.plot(flux_df=self._result["flux_df"],
+                  rxn_id=rxn_id,
                   *args,
                   **kwargs)
 

@@ -5,10 +5,6 @@ from pipeGEM.plotting import DimReductionPlotter
 class PCA_Analysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
-        self._method = "PCA"
-
-    def add_result(self, result, method="PCA"):
-        self._result = result
 
     def plot(self,
              dpi=150,
@@ -24,15 +20,10 @@ class PCA_Analysis(BaseAnalysis):
         pltr = DimReductionPlotter(dpi, prefix)
         pltr.plot(flux_df=self._result,
                   groups=groups,
-                  method=self._method,
+                  method=self._log["method"],
                   **kwargs)
 
 
 class EmbeddingAnalysis(PCA_Analysis):
     def __init__(self, log):
         super().__init__(log)
-        self._method = None
-
-    def add_result(self, result, method=None):
-        self._result = result
-        self._method = method
