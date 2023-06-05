@@ -66,6 +66,12 @@ class Model(GEMComposite):
             return getattr(self._model, item)
         return getattr(self, item)
 
+    def rename(self, name_tag=None):
+        if name_tag is not None:
+            if not isinstance(name_tag, str):
+                TypeError("name_tag must be a string.")
+            self._name_tag = name_tag
+
     @property
     def annotation(self) -> dict:
         return self._annotations
@@ -158,7 +164,7 @@ class Model(GEMComposite):
             data_kwargs = {} if data_kwargs is None else data_kwargs
             data = MediumData(data, **data_kwargs)
         elif not isinstance(data, MediumData):
-            raise TypeError()
+            raise TypeError(f"data should be a MediumData object or a pd.DataFrame, got {type(data)} instead")
 
         self._medium_data[name] = data
         self._medium_data[name].align(self, **kwargs)
@@ -274,11 +280,10 @@ class Model(GEMComposite):
                           method="FASTCC",
                           tol=1e-6,
                           **kwargs):
-        cons_tester = consistency_testers[method](model=self._model)
+        cons_tester = consistency_testers[method](model=self)
         test_result = cons_tester.analyze(tol=tol,
                                           **kwargs)
-        test_result.add_result(model=self.__class__(model=test_result.consist_model,
-                                                    name_tag=self._name_tag + "_consist_model"))
+        test_result.consistent_model.rename(name_tag=f"consistent_{self.name_tag}")
         return test_result
 
     def do_flux_analysis(self, method, solver="gurobi", **kwargs):

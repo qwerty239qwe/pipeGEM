@@ -1,6 +1,7 @@
 from tqdm import tqdm
 import numpy as np
 
+import pipeGEM
 from pipeGEM.analysis import LP3, LP7, non_convex_LP7, non_convex_LP3, FastCCAnalysis
 from pipeGEM.utils import ObjectFactory
 from pipeGEM.utils import get_rxn_set, flip_direction
@@ -79,6 +80,11 @@ class FASTCC(ConsistencyTester):
                             flip_direction(model, Jirev)
                             flipped = True
         rxns_to_remove = np.setdiff1d(all_rxns, A)
+
+        if consistent_model is not None:
+            consistent_model.remove_reactions(rxns_to_remove)
+            if isinstance(consistent_model, pipeGEM.Model):
+                consistent_model.rename(name_tag=f"consistent_{self.model.name_tag}")
 
         result = FastCCAnalysis(log={"is_convex": is_convex, "tol": tol})
         result.add_result(dict(consistent_model=consistent_model,

@@ -4,8 +4,10 @@ from textwrap import dedent
 from pathlib import Path
 
 import pandas as pd
+import cobra
 
-from pipeGEM.utils import save_toml_file, parse_toml_file, ObjectFactory
+from pipeGEM.utils import save_toml_file, parse_toml_file, ObjectFactory, \
+    save_model, load_model
 
 
 def timing(f):
@@ -35,15 +37,17 @@ def _add_plot_doc(func, default_docs):
     def wrapped(*args, **kwargs):
         return func(*args, **kwargs)
 
-    func.__doc__ = """
-    {descriptions}
-    
-    Parameters
-    -------
-    {parameters}
-    {added_params}
+    func.__doc__ = dedent(
+        """
+        {descriptions}
         
-    """.format(**default_docs)
+        Parameters
+        -------
+        {parameters}
+        {added_params}
+        
+        """.format(**default_docs)
+    )
     return wrapped
 
 
@@ -82,6 +86,22 @@ class CSVFileManager(BaseFileManager):
         return pd.read_csv(file_name, **kwargs)
 
 
+class CobraModelFileManager(BaseFileManager):
+    def __init__(self):
+        super(CobraModelFileManager, self).__init__(cobra.Model,
+                                                    default_suffix=".json")
+
+    def write(self, obj, file_name, **kwargs):
+        if "suffix" in kwargs:
+            suffix = kwargs.pop("suffix")
+        else:
+            suffix = self.suffix
+        save_model(model=obj, output_file_name=Path(file_name).with_suffix(suffix))
+
+    def read(self, file_name, **kwargs):
+        return load_model(model_file_path=file_name)
+
+
 class FileManagers(ObjectFactory):
     def __init__(self):
         super().__init__()
@@ -89,6 +109,7 @@ class FileManagers(ObjectFactory):
 
 _fmanagers = FileManagers()
 _fmanagers.register(type(pd.DataFrame), CSVFileManager)
+_fmanagers.register(type(cobra.Model), CobraModelFileManager)
 
 
 class BaseAnalysis:
@@ -107,14 +128,16 @@ class BaseAnalysis:
         return self.format_str
 
     def format_str(self) -> str:
-        showed_str = f"""{self.__class__.__name__} at {hex(id(self))} \n
+        showed_str = dedent(f"""{self.__class__.__name__} at {hex(id(self))} \n
+        -----------
         Parameters:
-        {self._log}\n
+        {self._log}
+        -----------
         Result keys:
-        {self._result.keys()}
-        """
+        {', '.join([i for i in self._result.keys()])}
+        """)
         if self._running_time:
-            showed_str += f"Running time: \n {self._running_time}"
+            showed_str += f"-----------\nRunning time: \n {self._running_time}"
         return showed_str
 
     def __getattr__(self, item):

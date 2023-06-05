@@ -53,15 +53,14 @@ def model_preprocess(model_conf):
     # consistency
     cons_tester = consistency_testers[model_conf["consistency"]["method"]](model)
     cons_result = cons_tester.analyze(**model_conf["consistency"]["params"])
-    cons_result.save()
-
+    cons_result.save(model_conf["consistency"]["saved_path"])
+    model = cons_result.consistent_model
 
 
 
 
 def main():
     pass
-
 
 
 if __name__ == "__main__":

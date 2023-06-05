@@ -74,7 +74,7 @@ def apply_rFASTCORMICS(model,
             model.reactions.get_by_id(r).bounds = (0, 0)
         consistency_tester = consistency_testers[consistent_checking_method](model=model)
         consistency_tester.analyze(tol=threshold)
-        model = consistency_tester.consist_model
+        model = consistency_tester.consistent_model
         pr_result = apply_FASTCORE(C=core_rxns,
                                    nonP=unpenalized_rxns,
                                    model=model,

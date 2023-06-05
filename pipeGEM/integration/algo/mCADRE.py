@@ -157,7 +157,7 @@ def _prune_model(model,
             test_result = cons_tester.analyze(tol=tolerance,
                                               return_model=False)
             removed_rxns = test_result.removed_rxn_ids
-            pruned_model = test_result.consist_model
+            pruned_model = test_result.consistent_model
 
         pass_tests = all(_check_all_test(rid, func_test_result, salv_test_result) for rid in removed_rxns)
         if not pass_tests:

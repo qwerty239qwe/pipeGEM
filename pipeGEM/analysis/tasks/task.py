@@ -353,7 +353,8 @@ class TaskHandler:
                 if method == "pFBA":
                     model.objective = {rxn: 1 for rxn in obj_rxns}
             elif i > 0:
-                model.objective = {rxn: 1 for rxn in all_supp_rxns}
+                model.objective = {model.reactions.get_by_id(rxn): 1
+                                   for rxn in all_supp_rxns}
                 method = "FBA"
 
             analyzer = flux_analyzers[method](model=model, solver=solver)
@@ -381,7 +382,6 @@ class TaskHandler:
                 true_status = "infeasible"
                 print("Got an infeasible result")
                 break
-
 
         return {'Passed': (((true_status == 'optimal') != task.should_fail) and all_met_exist),
                 'Should fail': task.should_fail,
@@ -478,7 +478,8 @@ class TaskHandler:
 
                **(log if log is not None else {})}
         task_result = TaskAnalysis(log=log)
-        task_result.add_result(result_df=result_df, score=score)
+        task_result.add_result(dict(result_df=result_df,
+                                    score=score))
         return task_result
 
 
