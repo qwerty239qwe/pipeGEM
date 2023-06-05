@@ -1,17 +1,17 @@
 Installation
 -------------
 
-To use pipeGEM, first install it using pip:
+To use PipeGEM, first install it using pip:
 
 .. code-block:: console
 
-    $ pip install pipeGEM
+    $ pip install pipegem
 
 
 QuickStart
 -------------
 
-To do model comparison using pipeGEM, create a Group object and call do_analysis method.
+To do model comparison using pipeGEM, create a Group object and call do_flux_analysis method.
 Then use plotting functions to visualize the results
 
 .. code-block:: python
@@ -78,3 +78,10 @@ To run existing or create a new pipeline, use the classes defined in pipeGEM.pip
     rnaseq_data = pd.read_csv("your_dataset_path")
     my_pipeline = MyPipeLine(rnaseq_data)
     my_pipeline(template_model)
+
+Command-line tool
+------------------
+
+.. code-block:: console
+
+    $ python -m pipeGEM -d path-to-data-config.toml

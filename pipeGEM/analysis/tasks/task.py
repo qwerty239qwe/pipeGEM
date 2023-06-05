@@ -10,7 +10,6 @@ from cobra.flux_analysis.parsimonious import pfba
 from cobra.exceptions import Infeasible
 
 from pipeGEM.utils import get_organic_exs
-from pipeGEM.integration.mapping import Expression
 from pipeGEM.analysis import flux_analyzers, TaskAnalysis
 from ._var import TASKS_FILE_PATH
 

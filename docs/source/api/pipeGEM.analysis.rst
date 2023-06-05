@@ -5,9 +5,10 @@ Subpackages
 -----------
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 2
 
    pipeGEM.analysis.tasks
+   pipeGEM.analysis.results
 
 Module contents
 ---------------

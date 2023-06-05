@@ -1,10 +1,10 @@
-pipeGEM.core package
+pipeGEM.data package
 ====================
 
 Module contents
 ---------------
 
-.. automodule:: pipeGEM.core
+.. automodule:: pipeGEM.data
    :members:
    :undoc-members:
    :show-inheritance:

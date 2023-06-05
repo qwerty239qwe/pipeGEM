@@ -32,10 +32,24 @@ dependencies = [
     "zeep",
     "pint"
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 
 [project.optional-dependencies]
-dev = ["pip-tools", "pytest"]
+dev = [
+    "pip-tools",
+    "pytest",
+    "flake8"
+]
+doc = [
+    "numpydoc",
+    "nbconvert",
+    "ipykernel",
+    "sphinx",
+    "sphinx-copybutton",
+    "sphinx-issues",
+    "sphinx-design",
+    "pydata_sphinx_theme",
+]
 
 [project.urls]
 Homepage = "https://github.com/qwerty239qwe/pipeGEM"

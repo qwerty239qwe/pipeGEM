@@ -1,19 +1,7 @@
+{{ fullname | escape | underline}}
+
 pipeGEM package
 ===============
-
-Subpackages
------------
-
-.. toctree::
-   :maxdepth: 4
-
-   pipeGEM.analysis
-   pipeGEM.core
-   pipeGEM.data
-   pipeGEM.integration
-   pipeGEM.pipeline
-   pipeGEM.plotting
-   pipeGEM.utils
 
 Module contents
 ---------------
@@ -22,3 +10,16 @@ Module contents
    :members:
    :undoc-members:
    :show-inheritance:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   pipeGEM.analysis
+   pipeGEM.data
+   pipeGEM.integration
+   pipeGEM.plotting
+   pipeGEM.utils
+   pipeGEM.cli
