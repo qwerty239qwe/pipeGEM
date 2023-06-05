@@ -1,11 +1,14 @@
 import pandas as pd
 import numpy as np
 from anndata import AnnData
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
 import cobra
 
+if TYPE_CHECKING:
+    from pipeGEM import Model
 
-def get_syn_gene_data(model: Union[cobra.Model, "pipeGEM.Model"],
+
+def get_syn_gene_data(model: Union[cobra.Model, Model],
                       n_sample: int,
                       n_genes: Optional[int] = None,
                       groups: Optional[str] = None,
