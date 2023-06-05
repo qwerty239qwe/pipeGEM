@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from pipeGEM import Model
 
 
-def get_syn_gene_data(model: Union[cobra.Model, Model],
+def get_syn_gene_data(model: Union[cobra.Model, "Model"],
                       n_sample: int,
                       n_genes: Optional[int] = None,
                       groups: Optional[str] = None,
