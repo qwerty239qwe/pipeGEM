@@ -25,28 +25,19 @@ class ComponentComparisonAnalysis(ComparisonAnalysis):
 class ComponentNumberAnalysis(ComparisonAnalysis):
     def __init__(self, log):
         super().__init__(log)
-        self._result = None
-        self.name_order = None
-        self._group_name = None
-
-    def add_result(self, result, name_order=None, group="group"):
-        self._result = result
-        self.name_order = name_order
-        self._group_name = group
 
     def plot(self,
              dpi=150,
              prefix="",
-             group=None,
+             group="group_name",
              name_order="default",
              *args,
              **kwargs):
         pltr = ComponentNumberPlotter(dpi=dpi, prefix=prefix)
-        group = self._group_name if group is None else group
         if name_order == "default":
             name_order = sorted(self._result[group].unique())
         pltr.plot(result=self._result,
-                  name_order=self.name_order if name_order is None else name_order,
+                  name_order=name_order,
                   group=group,
                   *args,
                   **kwargs)

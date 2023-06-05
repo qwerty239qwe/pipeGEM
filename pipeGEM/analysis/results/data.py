@@ -14,10 +14,11 @@ class DataAggregation(BaseAnalysis):
         return self._result["agg_data"][item]
 
     def corr(self,
-             by="sample"):
+             by="sample",
+             method='pearson'):
         if by not in ["sample", "feature"]:
             raise ValueError("argument 'by' should be 'sample' or 'feature'")
-        corr_result = self._result["agg_data"].fillna(0).corr().fillna(0.) \
+        corr_result = self._result["agg_data"].fillna(0).corr(method=method).fillna(0.) \
             if by == "sample" else self._result["agg_data"].T.fillna(0).corr().fillna(0.)
         result = CorrelationAnalysis(log={"by": by})
         result.add_result(dict(correlation_result=corr_result))

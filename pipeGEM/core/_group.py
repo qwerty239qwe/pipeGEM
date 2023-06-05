@@ -190,11 +190,11 @@ class Group(GEMComposite):
             mg_info = mg_info.drop_duplicates()
         return mg_info
 
-    def rename(self, new_name_tag, inplace=False):
+    def rename(self, name_tag, inplace=False):
         if inplace:
-            self._name_tag = new_name_tag
+            self._name_tag = name_tag
             return
-        return self.__class__(self._group, name_tag=new_name_tag)
+        return self.__class__(self._group, name_tag=name_tag)
 
     def do_flux_analysis(self,
                          method,
@@ -493,26 +493,6 @@ class Group(GEMComposite):
                             index=model_names)
         plot_clustermap(data=data,
                         cbar_label=f'{similarity} similarity',
-                        cmap='magma',
-                        square=True,
-                        fig_size=fig_size,
-                        file_name=file_name,
-                        **kwargs
-                        )
-
-    def plot_expr_heatmap(self,
-                          tags: Union[str, List[str]] = "all",
-                          get_model_level=True,
-                          aggregation_method="mean",
-                          fig_size=(10, 10),
-                          file_name=None,
-                          **kwargs
-                          ):
-        # TODO: replace it
-
-        data = self.data
-        plot_clustermap(data=data,
-                        cbar_label=f'expression',
                         cmap='magma',
                         square=True,
                         fig_size=fig_size,
