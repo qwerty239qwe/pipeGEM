@@ -99,10 +99,10 @@ class LocalThresholdAnalysis(BaseAnalysis):
              *args,
              **kwargs):
         pltr = LocalThresholdPlotter(dpi=dpi, prefix=prefix)
-        pltr.plot(data=self._data,
+        pltr.plot(data=self._result["data"],
                   groups=groups,
-                  local_th=self._local_ths,
-                  global_on_th=self._global_on_th,
-                  global_off_th=self._global_off_th,
+                  local_th=self._result["local_ths"],
+                  global_on_th=self._result["global_on_th"],
+                  global_off_th=self._result["global_off_th"],
                   group_dict=self._get_group_dic(),
                   )

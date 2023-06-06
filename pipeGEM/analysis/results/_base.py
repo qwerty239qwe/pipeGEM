@@ -3,11 +3,11 @@ from time import time
 from textwrap import dedent
 from pathlib import Path
 
-import pandas as pd
-import cobra
+import numpy as np
 
 from pipeGEM.utils import save_toml_file, parse_toml_file, ObjectFactory, \
     save_model, load_model
+from ._file_manager import fmanagers
 
 
 def timing(f):
@@ -51,67 +51,6 @@ def _add_plot_doc(func, default_docs):
     return wrapped
 
 
-class BaseFileManager:
-    def __init__(self, type, default_suffix):
-        self._type = type
-        self._default_suffix = default_suffix
-
-    @property
-    def suffix(self):
-        return self._default_suffix
-
-    def is_valid_type(self, obj):
-        return isinstance(obj, self._type)
-
-    def write(self, obj, file_name, **kwargs):
-        raise NotImplementedError()
-
-    def read(self, file_name, **kwargs):
-        raise NotImplementedError()
-
-
-class CSVFileManager(BaseFileManager):
-    def __init__(self):
-        super(CSVFileManager, self).__init__(pd.DataFrame, default_suffix=".csv")
-
-    def write(self, obj, file_name, **kwargs):
-        if "suffix" in kwargs:
-            suffix = kwargs.pop("suffix")
-        else:
-            suffix = self.suffix
-
-        obj.to_csv(Path(file_name).with_suffix(suffix), **kwargs)
-
-    def read(self, file_name, **kwargs):
-        return pd.read_csv(file_name, **kwargs)
-
-
-class CobraModelFileManager(BaseFileManager):
-    def __init__(self):
-        super(CobraModelFileManager, self).__init__(cobra.Model,
-                                                    default_suffix=".json")
-
-    def write(self, obj, file_name, **kwargs):
-        if "suffix" in kwargs:
-            suffix = kwargs.pop("suffix")
-        else:
-            suffix = self.suffix
-        save_model(model=obj, output_file_name=Path(file_name).with_suffix(suffix))
-
-    def read(self, file_name, **kwargs):
-        return load_model(model_file_path=file_name)
-
-
-class FileManagers(ObjectFactory):
-    def __init__(self):
-        super().__init__()
-
-
-_fmanagers = FileManagers()
-_fmanagers.register(type(pd.DataFrame), CSVFileManager)
-_fmanagers.register(type(cobra.Model), CobraModelFileManager)
-
-
 class BaseAnalysis:
     def __init__(self, log):
         self._log = log  # analysis record (parameters used to reproduce the same result)
@@ -119,7 +58,9 @@ class BaseAnalysis:
         self._result = {}
         self._docs = {}
         self._result_saving_params = {}
-        self._fmanagers = _fmanagers
+        self._result_loading_params = {}
+        self._fmanagers = fmanagers
+        self._result_folder_name = "result"
 
     def __repr__(self):
         return self.format_str
@@ -159,13 +100,26 @@ class BaseAnalysis:
     def log(self):
         return self._log
 
-    def _save_result(self, parent_dir):
-        for k, v in self._result.items():
-            file_manager = self._fmanagers[type(v)].create()
-            kws = {} if k not in self._result_saving_params else self._result_saving_params[k]
-            file_manager.write(v, parent_dir / k, **kws)
+    def _load_results(self, parent_dir, result_types):
+        result_dic = {}
+        for fn in Path(parent_dir).iterdir():
+            file_manager = self._fmanagers[result_types[fn.stem]].create()
+            kws = {} if fn.stem not in self._result_loading_params else self._result_loading_params[fn.stem]
+            result_dic[fn.stem] = file_manager.read(fn, **kws)
+        self.add_result(result_dic)
 
-    def save(self, file_path):
+    def _save_results(self, parent_dir):
+        (parent_dir / self._result_folder_name).mkdir()
+        for k, v in self._result.items():
+            if any([isinstance(v, sp_type) for sp_type in [list, dict, set, np.ndarray]]):
+                file_manager = self._fmanagers[self._result_saving_params[k]["fm_name"]].create()
+            else:
+                file_manager = self._fmanagers[str(type(v))].create()
+            kws = {} if k not in self._result_saving_params else self._result_saving_params[k]
+            file_manager.write(v, parent_dir / self._result_folder_name / k, **kws)
+
+    def save(self,
+             file_path):
         saved_dir = Path(file_path)
         saved_dir.mkdir(parents=True)
         print(f"Created a folder {file_path} to store the result")
@@ -173,11 +127,18 @@ class BaseAnalysis:
                                                             "log": self.log,
                                                             "result_types": {k: str(type(v))
                                                                              for k, v in self._result.items()}})
-        self._save_result(parent_dir=saved_dir)
+        self._save_results(parent_dir=saved_dir)
 
     @classmethod
-    def load(cls, file_path, **kwargs):
-        pass
+    def load(cls,
+             file_path: str,
+             **kwargs):
+        file_path = Path(file_path)
+        all_configs = parse_toml_file(file_path / "analysis_params.toml")
+        new_analysis = cls(log=all_configs["log"])
+        new_analysis.add_running_time(all_configs["running_time"])
+        new_analysis._load_results(parent_dir=file_path / new_analysis._result_folder_name,
+                                   result_types=all_configs["result_types"])
 
     def plot(self, **kwargs):
         raise NotImplementedError()

@@ -10,12 +10,18 @@ class TaskAnalysis(BaseAnalysis):
                                   'Sink Status']
 
     def __init__(self, log):
-        self._result_df = None
-        self._model_score = 0
-        self._task_support_rxns = {}
-        self._task_support_rxn_fluxes = {}
-
-        self._rxn_supps = {}
+        """
+        An object containing task analysis result.
+        This should contain results including:
+            result_df: dict
+                A dataframe recording the details of all tests
+            score: int
+                Number of passed functionality (metabolic task) tests.
+        Parameters
+        ----------
+        log: dict
+            A dict storing parameters used to perform this analysis
+        """
         super(TaskAnalysis, self).__init__(log)
 
     @classmethod
@@ -69,34 +75,35 @@ class TaskAnalysis(BaseAnalysis):
 
     @property
     def model_score(self):
-        return self._model_score
+        return self._result["score"]
 
     @property
-    def task_support_rxns(self):
-        return self._task_support_rxns
+    def task_support_rxns(self) -> dict:
+        return dict(self._result_df["task_support_rxns"].items())
 
     @property
-    def result(self):
-        return self._result_df
+    def task_support_rxn_fluxes(self) -> dict:
+        return dict(self._result_df["task_support_rxn_fluxes"].items())
 
     @property
-    def result_df(self):
-        return self._result_df
+    def rxn_supps(self) -> dict:
+        return dict(self._result_df["rxn_supps"].items())
 
-    def add_result(self, result_df, score):
-        self._result_df = result_df
-        self._model_score = score
-        self._task_support_rxns = dict(self._result_df["task_support_rxns"].items())
-        self._task_support_rxn_fluxes = dict(self._result_df["task_support_rxn_fluxes"].items())
-        self._rxn_supps = dict(self._result_df["rxn_supps"].items())
+    @property
+    def task_ids(self) -> list:
+        return self._result["result_df"].index.to_list()
 
-    def get_task_support_rxns(self, task_id, include_supps=True):
-        return self._task_support_rxns[task_id][0] + (self._rxn_supps[task_id]
-                                                   if include_supps and task_id in self._rxn_supps and isinstance(self._rxn_supps[task_id], list)
-                                                   else [])
+    def get_task_support_rxns(self,
+                              task_id,
+                              include_supps=True):
+        return self.task_support_rxns[task_id][0] + (self.rxn_supps[task_id]
+                                                     if include_supps and
+                                                        task_id in self.rxn_supps and
+                                                        isinstance(self.rxn_supps[task_id], list)
+                                                     else [])
 
     def get_all_possible_sups(self, task_id):
-        return self._task_support_rxns[task_id]
+        return self.task_support_rxns[task_id]
 
     def is_essential(self, task_id, rxn_id) -> bool:
-        return all([rxn_id in supp_path for supp_path in self._task_support_rxns[task_id]])
+        return all([rxn_id in supp_path for supp_path in self.task_support_rxns[task_id]])

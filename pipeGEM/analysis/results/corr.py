@@ -6,9 +6,6 @@ class CorrelationAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
 
-    def add_result(self, result):
-        self._result = result
-
     def plot(self,
              dpi=150,
              prefix="Dim_reduction_",
