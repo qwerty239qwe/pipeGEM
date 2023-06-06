@@ -4,4 +4,10 @@ API
 .. toctree::
    :maxdepth: 4
 
-   pipeGEM
+   data
+   model
+   group
+   task
+   threshold
+   integration
+   analysis

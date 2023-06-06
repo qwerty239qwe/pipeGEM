@@ -25,6 +25,30 @@ dis_trans = {"HPA": HPA_scores}
 
 
 class GeneData(BaseData):
+    """
+    A GeneData object stores gene data using a dict. It can also calculate rxn scores for a given model.
+
+    Parameters
+    ----------
+    data: pd.Series, ad.AnnData, or dict
+        Data contains pairs of gene IDs and expression values.
+    convert_to_str: bool
+        Convert the gene names into strings
+    expression_threshold: float
+        The absent_expression will be assigned to the expression values below this threshold
+    absent_expression: float
+        The value assigned to the low-expressed genes
+    data_transform: callable
+        Transformation applied to the rxn_scores and the transformed_gene_data. e.g. np.log2
+    discrete_transform: str, dict, or callable
+        Discrete data transformation applied to the rxn_scores.
+    ordered_thresholds: list
+        Ascending thresholds indicating how the gene level will be transformed discretely
+
+    Examples
+    ----------
+    """
+
     def __init__(self,
                  data: Union[ad.AnnData, pd.Series, dict],
                  convert_to_str: bool = True,
@@ -33,29 +57,7 @@ class GeneData(BaseData):
                  data_transform = None,
                  discrete_transform = None,
                  ordered_thresholds: list = None):
-        """
-        A GeneData object stores gene data using a dict. It can also calculate rxn scores for a given model.
 
-        Parameters
-        ----------
-        data: pd.Series, ad.AnnData, or dict
-            Data contains pairs of gene IDs and expression values.
-        convert_to_str: bool
-            Convert the gene names into strings
-        expression_threshold: float
-            The absent_expression will be assigned to the expression values below this threshold
-        absent_expression: float
-            The value assigned to the low-expressed genes
-        data_transform: callable
-            Transformation applied to the rxn_scores and the transformed_gene_data. e.g. np.log2
-        discrete_transform: str, dict, or callable
-            Discrete data transformation applied to the rxn_scores.
-        ordered_thresholds: list
-            Ascending thresholds indicating how the gene level will be transformed discretely
-
-        Examples
-        ----------
-        """
         super().__init__("genes")
         self.convert_to_str = convert_to_str
         discrete_transform = self._parse_discrete_transform(discrete_transform, ordered_thresholds)

@@ -16,4 +16,3 @@ Module contents
 .. automodule:: pipeGEM.analysis
    :members:
    :undoc-members:
-   :show-inheritance:

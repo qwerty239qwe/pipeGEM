@@ -19,24 +19,22 @@ from pipeGEM.analysis.tasks import TaskHandler
 
 
 class Model(GEMComposite):
-    _is_leaf = True
+    """
+    Main model used to store cobra.Model, tasks and omics data
 
+    Parameters
+    ----------
+    name_tag: optional, str
+        The name of this object, it will be used in a pg.Group object.
+        If None, the model will be named 'Unnamed_model'
+    model: optional, cobra.Model
+        A cobra model analyzed in this object
+
+    """
     def __init__(self,
                  name_tag: str = None,
                  model = None,
                  **kwargs):
-        """
-        Main model used to store cobra.Model, tasks and omics data
-
-        Parameters
-        ----------
-        name_tag: optional, str
-            The name of this object, it will be used in a pg.Group object.
-            If None, the model will be named 'Unnamed_model'
-        model: optional, cobra.Model
-            A cobra model analyzed in this object
-
-        """
         super(Model, self).__init__(name_tag=name_tag or "Unnamed_model")
         if not isinstance(model, cobra.Model):
             raise ValueError("input model should be a cobra model")

@@ -244,7 +244,7 @@ def list_models(databases=["metabolic atlas", "BiGG"],
                 max_n_rxns=np.inf,
                 max_n_mets=np.inf,
                 max_n_genes=np.inf,
-                **kwargs):
+                **kwargs) -> pd.DataFrame:
     fetchers = DataBaseFetcherIniter(**kwargs)
     fetchers.register("BiGG", BiggDataBaseFetcher)
     fetchers.register("metabolic atlas", AtlasDataBaseFetcher)
@@ -263,7 +263,10 @@ def list_models(databases=["metabolic atlas", "BiGG"],
     return mg_df
 
 
-def load_remote_model(model_id, format="mat", branch="main", download_dest="default"):
+def load_remote_model(model_id,
+                      format="mat",
+                      branch="main",
+                      download_dest="default"):
     model_list = list_models()
     if model_id in model_list[model_list["database"]=="BiGG"]["id"].to_list():
         return cobra.io.load_model(model_id)
