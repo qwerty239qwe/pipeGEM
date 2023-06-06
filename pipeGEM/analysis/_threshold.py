@@ -214,11 +214,17 @@ class rFastCormicsThreshold(DistributionBased):
 
         result = rFastCormicThresholdAnalysis(log={"use_first_guess": return_heuristic,
                                                    "cut_off": cut_off,
-                                                   'hard_x_lims': hard_x_lims})
+                                                   'hard_x_lims': hard_x_lims,
+                                                   "k_best": k_best})
         right_c = None if return_heuristic else np.array([self.gaussian_dist(x, *tuple(params_arr[k, 0:3])) for k in range(k_best)])
         left_c = None if return_heuristic else np.array([self.gaussian_dist(x, *tuple(params_arr[k, 3:6])) for k in range(k_best)])
-        result.add_result(exp_th=params_arr[:, 1], nonexp_th=params_arr[:, 4],
-                          right_curve=right_c, left_curve=left_c, x=x, y=y, init_exp=c2, init_nonexp=c1)
+        result.add_result(dict(data=(x, y),
+                               exp_th_arr=params_arr[:, 1],
+                               nonexp_th_arr=params_arr[:, 4],
+                               right_curve_arr=right_c,
+                               left_curve_arr=left_c,
+                               init_exp=c2,
+                               init_nonexp=c1))
 
         return result
 
@@ -249,7 +255,7 @@ class PercentileThreshold(RankBased):
         arr = arr[np.isfinite(arr)]
         result = PercentileThresholdAnalysis(log={"p": p})
         exp_th = np.percentile(arr, q=p)
-        result.add_result(data=arr, exp_th=exp_th)
+        result.add_result(dict(data=arr, exp_th=exp_th))
         return result
 
 
@@ -324,11 +330,12 @@ class LocalThreshold(RankBased):
                 exp_ths.loc[exp_ths.index[np.nanmax(arr[:, samples.isin(groups[groups == grp].index)],
                                                     axis=1) < global_off_dic[grp]], grp] = glob_off_th_grp
 
-        result = LocalThresholdAnalysis(log={"p": p, "groups": groups})
-        result.add_result(local_ths=exp_ths,
-                          global_on_ths=pd.Series(global_on_dic),
-                          global_off_ths=pd.Series(global_off_dic),
-                          data=pd.DataFrame(data=arr, index=genes, columns=samples))
+        result = LocalThresholdAnalysis(log={"p": p})
+        result.add_result(dict(local_ths=exp_ths,
+                               global_on_th=pd.Series(global_on_dic),
+                               global_off_th=pd.Series(global_off_dic),
+                               data=pd.DataFrame(data=arr, index=genes, columns=samples),
+                               groups=groups))
         return result
 
 

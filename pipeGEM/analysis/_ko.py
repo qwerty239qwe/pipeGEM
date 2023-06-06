@@ -103,7 +103,7 @@ class Single_KO_Analyzer(KO_Analyzer):
                               gene_list=[g.id for g in self.model.genes],
                               method=method)
         print(f"KO finished in {time() - s} secs.")
-        return result_df
+        return {"result_df": result_df}
 
 
 ko_analyzers = KO_Analyzers()
