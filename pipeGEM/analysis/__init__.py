@@ -24,5 +24,5 @@ __all__ = ("flux_analyzers", "ProblemAnalyzer", "modified_pfba",
            "FBA_Analysis", "FVA_Analysis", "FVAConsistencyAnalysis",
            "SamplingAnalysis", "INIT_Analysis", "CorrelationAnalysis",
            "ComponentComparisonAnalysis", "LocalThresholdAnalysis",
-           "PercentileThresholdAnalysis", "rFastCormicThresholdAnalysis",
+           "PercentileThresholdAnalysis", "rFASTCORMICSThresholdAnalysis",
            "Single_KO_Analysis",)

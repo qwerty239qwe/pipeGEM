@@ -60,13 +60,14 @@ class SPOTAnalysis(BaseAnalysis):
 
 
 class RIPTiDePruningAnalysis(BaseAnalysis):
-    def  __init__(self, log):
+    def __init__(self, log):
         """
         An object containing RIPTiDe pruning part result.
         This should contain results including:
             obj_dict: dict[str, float]
             flux_result: pd.DataFrame, optional
             result_model: pd.Model or cobra.Model, optional
+
         Parameters
         ----------
         log: dict
@@ -77,17 +78,22 @@ class RIPTiDePruningAnalysis(BaseAnalysis):
 
 class RIPTiDeSamplingAnalysis(BaseAnalysis):
     def __init__(self, log):
-        super().__init__(log)
-        self._model = None
-        self._sampling_result = None
+        """
+        An object containing RIPTiDe sampling part result.
+        This should contain results including:
+            sampling_result: SamplingAnalysis
 
-    def add_result(self, sampling_result):
-        self._sampling_result = sampling_result
+        Parameters
+        ----------
+        log: dict
+            A dict storing parameters used to perform this analysis
+        """
+        super().__init__(log)
 
     @property
     def flux_result(self):
         results = []
-        for i, result_df in self._sampling_result.result.items():
+        for i, result_df in self.sampling_result.result.items():
             result_df = result_df.rename(columns={"flux": i})
             result_df.index = result_df["rxn_id"]
             result_df = result_df[i].to_frame().T
@@ -97,31 +103,50 @@ class RIPTiDeSamplingAnalysis(BaseAnalysis):
 
 class FASTCOREAnalysis(BaseAnalysis):
     def __init__(self, log):
+        """
+        An object containing FASTCORE result.
+        This should contain results including:
+            result_model: pg.Model or cobra.Model
+                A model containing the most core reactions and the least non-core reactions.
+            removed_rxn_ids: np.ndarray
+                An array contains the ids of removed reactions
+            kept_rxn_ids: np.ndarray
+                An array contains the ids of remaining reactions
+        Parameters
+        ----------
+        log: dict
+            A dict storing parameters used to perform this analysis
+        """
         super().__init__(log)
-        self._model = None
-        self._rxn_ids = None
-        self._removed_rxn_ids = None
-
-    def add_result(self, model, rxn_ids, removed_rxn_ids):
-        self._model = model
-        self._rxn_ids = rxn_ids
-        self._removed_rxn_ids = removed_rxn_ids
-
-    @property
-    def result_model(self):
-        return self._model
-
-    @property
-    def removed_rxn_ids(self):
-        return self._removed_rxn_ids
-
-    @property
-    def rxn_ids(self):
-        return self._rxn_ids
 
 
-class rFastCormicAnalysis(BaseAnalysis):
+class rFASTCORMICSAnalysis(BaseAnalysis):
     def __init__(self, log):
+        """
+        An object containing rFASTCORMICS result.
+        This should contain results including:
+            fastcore_result: FASTCOREAnalysis
+                This analysis object contains:
+                result_model: pg.Model or cobra.Model
+                    A model containing the most core reactions and the least non-core reactions.
+                removed_rxn_ids: np.ndarray
+                    An array contains the ids of removed reactions
+                kept_rxn_ids: np.ndarray
+                    An array contains the ids of remaining reactions
+            threshold_analysis: rFASTCORMICSThresholdAnalysis
+                A threshold analysis object containing the thresholds to define the core and non-core reactions
+            core_rxns: set[str]
+                A set of identified core reactions' IDs
+            noncore_rxns: set[str]
+                A set of identified non-core reactions' IDs
+            nonP_rxns: set[str]
+                A set of identified undefined reactions' IDs
+        Parameters
+        ----------
+        log: dict
+            A dict storing parameters used to perform this analysis
+        """
+
         super().__init__(log)
 
     @property
@@ -139,44 +164,40 @@ class rFastCormicAnalysis(BaseAnalysis):
 
 class CORDA_Analysis(BaseAnalysis):
     def __init__(self, log):
+        """
+        An object containing CORDA result.
+        This should contain results including:
+            result_model: pg.Model or cobra.Model
+                A model containing the most core reactions and the least non-core reactions.
+            threshold_analysis: rFASTCORMICSThresholdAnalysis
+                A threshold analysis object containing the thresholds to calculate the confidence scores
+            conf_scores: dict[str, float]
+                A dict containing the confidence scores used to define the importance of reactions
+        Parameters
+        ----------
+        log: dict
+            A dict storing parameters used to perform this analysis
+        """
         super().__init__(log)
-        self._model = None
-        self._conf_scores = None
-        self._threshold_analysis = None
-
-    @property
-    def threshold_analysis(self):
-        return self._threshold_analysis
-
-    @property
-    def result_model(self):
-        return self._model
-
-    def add_result(self, model, conf_scores, threshold_analysis):
-        self._model = model
-        self._conf_scores = conf_scores
-        self._threshold_analysis = threshold_analysis
 
 
 class MBA_Analysis(BaseAnalysis):
     def __init__(self, log):
+        """
+        An object containing MBA result.
+        This should contain results including:
+            result_model: pg.Model or cobra.Model
+                A model containing the most core reactions and the least non-core reactions.
+            threshold_analysis: rFASTCORMICSThresholdAnalysis
+                A threshold analysis object containing the thresholds to calculate the confidence scores
+            removed_rxn_ids: np.ndarray
+                An array contains the ids of removed reactions
+        Parameters
+        ----------
+        log: dict
+            A dict storing parameters used to perform this analysis
+        """
         super().__init__(log)
-        self._model = None
-        self._removed_rxns = None
-        self._threshold_analysis = None
-
-    @property
-    def threshold_analysis(self):
-        return self._threshold_analysis
-
-    @property
-    def result_model(self):
-        return self._model
-
-    def add_result(self, model, removed_rxns, threshold_analysis):
-        self._model = model
-        self._removed_rxns = removed_rxns
-        self._threshold_analysis = threshold_analysis
 
 
 class mCADRE_Analysis(BaseAnalysis):

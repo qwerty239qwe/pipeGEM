@@ -1,5 +1,5 @@
 from typing import Literal
-from pipeGEM.analysis import rFastCormicAnalysis, timing, FastCCAnalysis, consistency_testers
+from pipeGEM.analysis import rFASTCORMICSAnalysis, timing, FastCCAnalysis, consistency_testers
 from pipeGEM.utils import get_rxns_in_subsystem
 from pipeGEM.integration.algo.FASTCORE import apply_FASTCORE
 from pipeGEM.integration.utils import parse_predefined_threshold
@@ -32,7 +32,7 @@ def apply_rFASTCORMICS(model,
     unpenalized_rxns = set(get_rxns_in_subsystem(model, unpenalized_subsystem)) & rxn_in_model
     non_core_rxns = non_core_rxns - unpenalized_rxns
 
-    pr_result_obj = rFastCormicAnalysis(log={"name": model.name,
+    pr_result_obj = rFASTCORMICSAnalysis(log={"name": model.name,
                                              "unpenalized_subsystem": unpenalized_subsystem,
                                              "use_heuristic_th": use_heuristic_th,
                                              "method": method,

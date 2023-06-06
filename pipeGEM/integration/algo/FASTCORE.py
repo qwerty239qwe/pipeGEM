@@ -90,6 +90,7 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
     rxns_to_remove = np.setdiff1d(all_rxns, A)
     result = FASTCOREAnalysis(log={"epsilon": epsilon,})
 
-    result.add_result(model=output_model, removed_rxn_ids=rxns_to_remove,
-                      rxn_ids=A)
+    result.add_result(dict(result_model=output_model,
+                           removed_rxn_ids=rxns_to_remove,
+                           kept_rxn_ids=A))
     return result

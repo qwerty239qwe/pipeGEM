@@ -300,5 +300,7 @@ def apply_CORDA(model,
                                  "threshold": threshold,
                                  "support_flux_value": support_flux_value})
 
-    result.add_result(model=result_model, conf_scores=conf_scores, threshold_analysis=th_result)
+    result.add_result(dict(result_model=result_model,
+                           conf_scores=conf_scores,
+                           threshold_analysis=th_result))
     return result

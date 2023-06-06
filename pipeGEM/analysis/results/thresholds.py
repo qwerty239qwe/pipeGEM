@@ -4,12 +4,12 @@ from ._base import *
 from pipeGEM.plotting import rFastCormicThresholdPlotter, PercentileThresholdPlotter, LocalThresholdPlotter
 
 
-class rFastCormicThresholdAnalysis(BaseAnalysis):
+class rFASTCORMICSThresholdAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log=log)
 
     def save(self, file_path, index=0):
-        result_dic = {"exp_th": self._result["_exp_th_arr"][index],
+        result_dic = {"exp_th": self._result["exp_th_arr"][index],
                       "non_exp_th": self._result["nonexp_th_arr"][index]}
 
         with open(file_path, "w") as f:
@@ -17,7 +17,7 @@ class rFastCormicThresholdAnalysis(BaseAnalysis):
 
     @property
     def exp_th(self):
-        return self._result["_exp_th_arr"][0]
+        return self._result["exp_th_arr"][0]
 
     @property
     def non_exp_th(self):
@@ -28,7 +28,7 @@ class rFastCormicThresholdAnalysis(BaseAnalysis):
         return self._result["init_exp"], self._result["init_nonexp"]
 
     def get_other_exp_th(self, k):
-        return self._result["_exp_th_arr"][k]
+        return self._result["exp_th_arr"][k]
 
     def get_other_non_exp_th(self, k):
         return self._result["nonexp_th_arr"][k]
@@ -42,7 +42,7 @@ class rFastCormicThresholdAnalysis(BaseAnalysis):
         pltr = rFastCormicThresholdPlotter(dpi=dpi, prefix=prefix)
         pltr.plot(x=self._result["data"][0],
                   y=self._result["data"][1],
-                  exp_th=self._result["_exp_th_arr"][k],
+                  exp_th=self._result["exp_th_arr"][k],
                   nonexp_th=self._result["nonexp_th_arr"][k],
                   right_curve=self._result["right_curve_arr"][k] if self._result["right_curve_arr"] is not None else None,
                   left_curve=self._result["left_curve_arr"][k] if self._result["left_curve_arr"] is not None else None,

@@ -95,5 +95,5 @@ def apply_RIPTiDe_sampling(model,
                                                      "sampling_obj_frac": sampling_obj_frac,
                                                      "do_sampling": do_sampling, "solver": solver,
                                                      "sampling_method": sampling_method})
-    analysis_result.add_result(sampling_result=sampling_result)
+    analysis_result.add_result(dict(sampling_result=sampling_result))
     return analysis_result

@@ -29,7 +29,7 @@ def test_TSNE(pFBA_result):
 
 
 def test_corr(pFBA_result):
-    corr_result = pFBA_result.corr("name")
+    corr_result = pFBA_result.corr("treatments")
     corr_result.plot()
 
     corr_result = pFBA_result.corr("reaction")

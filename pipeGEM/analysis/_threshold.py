@@ -7,7 +7,7 @@ from scipy.stats import gaussian_kde
 from scipy.optimize import curve_fit
 import numpy as np
 from pipeGEM.utils import ObjectFactory
-from pipeGEM.analysis import rFastCormicThresholdAnalysis, PercentileThresholdAnalysis, LocalThresholdAnalysis, timing
+from pipeGEM.analysis import rFASTCORMICSThresholdAnalysis, PercentileThresholdAnalysis, LocalThresholdAnalysis, timing
 
 
 class ThresholdFinders(ObjectFactory):
@@ -177,7 +177,7 @@ class DistributionBased(ThresholdFinder):
         return params_arr, c1, c2
 
 
-class rFastCormicsThreshold(DistributionBased):
+class rFASTCORMICSThreshold(DistributionBased):
 
     def __init__(self):
         super().__init__()
@@ -212,7 +212,7 @@ class rFastCormicsThreshold(DistributionBased):
         else:
             params_arr, c1, c2 = self._bimodal_fit(x, y, max_x=max_x, min_x=min_x, k=k_best)
 
-        result = rFastCormicThresholdAnalysis(log={"use_first_guess": return_heuristic,
+        result = rFASTCORMICSThresholdAnalysis(log={"use_first_guess": return_heuristic,
                                                    "cut_off": cut_off,
                                                    'hard_x_lims': hard_x_lims,
                                                    "k_best": k_best})
@@ -340,6 +340,6 @@ class LocalThreshold(RankBased):
 
 
 threshold_finders = ThresholdFinders()
-threshold_finders.register("rFASTCORMICS", rFastCormicsThreshold)
+threshold_finders.register("rFASTCORMICS", rFASTCORMICSThreshold)
 threshold_finders.register("percentile", PercentileThreshold)  # which is also called global threshold in some papers
 threshold_finders.register("local", LocalThreshold)  # LocalT1 and LocalT2

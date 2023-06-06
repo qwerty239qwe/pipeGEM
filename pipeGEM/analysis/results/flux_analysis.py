@@ -155,16 +155,17 @@ class FBA_Analysis(FluxAnalysis):
         pass
 
     def corr(self,
-             by="name"):
-        if by not in self._result["flux_df"]:
+             by="name",
+             **kwargs):
+        if by not in self._result["flux_df"] and by != "reaction":
             raise NotAggregatedError("This analysis result contains only 1 model's fluxes, "
                                      "please use Group.do_flux_analysis to get a proper result for dim reduction")
 
         flux_df = self._result["flux_df"].pivot_table(index="Reaction", columns=by, values="fluxes", aggfunc="mean")
         if by == "reaction":
             flux_df = flux_df.T
-        corr_result = flux_df.fillna(0).corr().fillna(0.)
-        result = CorrelationAnalysis(log={"by": by})
+        corr_result = flux_df.fillna(0).corr(**kwargs).fillna(0.)
+        result = CorrelationAnalysis(log={"by": by, **kwargs})
         result.add_result(dict(correlation_result=corr_result))
         return result
 

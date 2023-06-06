@@ -49,7 +49,9 @@ def apply_MBA(model,
     result = MBA_Analysis(log={"tolerance": tolerance,
                                "epsilon": epsilon,
                                "random_state": random_state})
-    result.add_result(model = model, removed_rxns=removed_rxns, threshold_analysis=None)
+    result.add_result(dict(result_model = model,
+                           removed_rxn_ids=removed_rxns,
+                           threshold_analysis=None))
 
     return result
 
