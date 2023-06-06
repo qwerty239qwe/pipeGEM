@@ -63,10 +63,10 @@ class BaseAnalysis:
         self._result_folder_name = "result"
 
     def __repr__(self):
-        return self.format_str
+        return self.format_str()
 
     def __str__(self):
-        return self.format_str
+        return self.format_str()
 
     def format_str(self) -> str:
         showed_str = dedent(f"""{self.__class__.__name__} at {hex(id(self))} \n
