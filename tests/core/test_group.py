@@ -87,6 +87,8 @@ def test_group_set_items(group, ecoli_core):
 def test_aggregate_models(group):
     ag_grp_dic = group.aggregate_models("treatment")
     assert isinstance(ag_grp_dic, dict)
+    assert len(ag_grp_dic["a"]) == 1
+    assert len(ag_grp_dic["b"]) == 2
 
 
 def test_compare_jaccard(group):
@@ -110,16 +112,14 @@ def test_compare_num(ecoli_core):
                      "ecoli_g2": {"e21": m1, "e22": m1}},
               name_tag="G2")
     num_comp = g.compare(models=["e11", "e21", "e22"], method="num")
-    print(num_comp.result)
-    print(num_comp.name_order)
+    print(num_comp.comp_df)
     num_comp.plot(dpi=150)
 
 
 def test_compare_num_model_lvl(group):
     num_comp = group.compare(method="num", group_by=None)
-    print(num_comp.result)
-    print(num_comp.name_order)
-    num_comp.plot(dpi=150, name_order=[gi.name_tag for gi in group])
+    print(num_comp.comp_df)
+    num_comp.plot(dpi=150, group="model", name_order=[gi.name_tag for gi in group])
 
 
 def test_compare_PCA(group):

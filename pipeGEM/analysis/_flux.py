@@ -88,10 +88,12 @@ class FVA_Analyzer(FluxAnalyzer):
         result = FVA_Analysis(log={"solver": self.solver_name,
                                    **kwargs, **self._log})
 
-        result.add_result({"flux_df": flux_variability_analysis(self.model,
-                                                     loopless=is_loopless,
-                                                     fraction_of_optimum=fraction_of_optimum,
-                                                     **kwargs)})
+        result.add_result({"flux_df": flux_variability_analysis(
+            self.model,
+            loopless=is_loopless,
+            fraction_of_optimum=fraction_of_optimum,
+            **kwargs)
+        })
         return result
 
 

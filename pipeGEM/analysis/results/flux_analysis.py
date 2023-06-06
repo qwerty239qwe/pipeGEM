@@ -65,7 +65,7 @@ class FluxAnalysis(BaseAnalysis):
                 one_df = a.result["flux_df"].reset_index().rename(columns={"index": "Reaction"}) \
                     if "Reaction" not in a.result["flux_df"].columns else a.result["flux_df"]
                 dfs.append(one_df)
-            new.add_result(pd.concat(dfs, axis=0).reset_index(drop=True))
+            new.add_result(dict(flux_df=pd.concat(dfs, axis=0).reset_index(drop=True)))
         else:
             dfs = []
             for a in analyses:
@@ -74,7 +74,7 @@ class FluxAnalysis(BaseAnalysis):
             new_df = pd.concat(dfs, axis=1)
             new_df = getattr(new_df, method)(axis=1).to_frame()
             new_df.columns = ["fluxes"]
-            new.add_result(new_df)
+            new.add_result(dict(flux_df=new_df))
         return new
 
     def plot(self, **kwargs):
@@ -218,8 +218,8 @@ class SamplingAnalysis(FluxAnalysis):
     def aggregate(cls, analyses, method, log, **kwargs):
         new = cls(log=log)
         if method == "concat":
-            new.add_result(pd.concat([i.flux_df for i in analyses],
-                                     axis=0))
+            new.add_result(dict(flux_df=pd.concat([i.flux_df for i in analyses],
+                                                  axis=0)))
         else:
             raise ValueError()
         return new

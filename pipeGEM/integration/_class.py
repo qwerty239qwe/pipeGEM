@@ -91,7 +91,7 @@ class RIPTiDe(GeneDataIntegrator):
         pr_result = apply_RIPTiDe_pruning(model=model,
                                           rxn_expr_score=data.rxn_scores,
                                           **kwargs)
-        sp_result = apply_RIPTiDe_sampling(model=pr_result.model,
+        sp_result = apply_RIPTiDe_sampling(model=pr_result.result_model,
                                            rxn_expr_score=data.rxn_scores,
                                            **kwargs)
         return sp_result

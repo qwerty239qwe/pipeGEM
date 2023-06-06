@@ -5,52 +5,39 @@ from ._base import *
 
 class EFluxAnalysis(BaseAnalysis):
     def __init__(self, log):
+        """
+        An object containing EFlux result.
+        This should contain results including:
+            rxn_bounds: dict[str, tuple[float, float]]
+            rxn_scores: dict[str, float]
+            flux_result: pd.DataFrame, optional
+        Parameters
+        ----------
+        log: dict
+            A dict storing parameters used to perform this analysis
+        """
         super().__init__(log)
-        self._rxn_bounds = None
-        self._rxn_scores = None
-        self._fluxes = None
-
-    @property
-    def rxn_bounds(self):
-        return self._rxn_bounds
-
-    @property
-    def flux_result(self):
-        return self._fluxes
-
-    def add_result(self, rxn_bounds, rxn_scores, fluxes=None):
-        self._rxn_bounds = rxn_bounds
-        self._rxn_scores = rxn_scores
-        self._fluxes = fluxes
 
 
 class GIMMEAnalysis(BaseAnalysis):
+
     def __init__(self, log):
+        """
+        An object containing GIMME result.
+        This should contain results including:
+            rxn_coefficents: dict[str, float]
+            rxn_scores: dict[str, float]
+            flux_result: pd.DataFrame, optional
+            result_model: pd.Model or cobra.Model, optional
+        Parameters
+        ----------
+        log: dict
+            A dict storing parameters used to perform this analysis
+        """
         super().__init__(log)
-        self._rxn_coefficents = None
-        self._rxn_scores = None
-        self._fluxes = None
-        self._model = None
-
-    @property
-    def result_model(self):
-        return self._model
-
-    @property
-    def rxn_coefficents(self):
-        return self._rxn_coefficents
-
-    @property
-    def flux_result(self):
-        return self._fluxes
-
-    def add_result(self, rxn_coefficents, rxn_scores, fluxes=None, model=None):
-        self._rxn_coefficents = rxn_coefficents
-        self._rxn_scores = rxn_scores
-        self._fluxes = fluxes if fluxes is not None else self._fluxes
-        self._model = model
 
 
+# Not finished
 class SPOTAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
@@ -74,19 +61,18 @@ class SPOTAnalysis(BaseAnalysis):
 
 class RIPTiDePruningAnalysis(BaseAnalysis):
     def  __init__(self, log):
+        """
+        An object containing RIPTiDe pruning part result.
+        This should contain results including:
+            obj_dict: dict[str, float]
+            flux_result: pd.DataFrame, optional
+            result_model: pd.Model or cobra.Model, optional
+        Parameters
+        ----------
+        log: dict
+            A dict storing parameters used to perform this analysis
+        """
         super().__init__(log)
-        self._model = None
-        self._removed_rxns = None
-        self._obj_dict = None
-
-    @property
-    def result_model(self):
-        return self._model
-
-    def add_result(self, model, removed_rxns, obj_dict):
-        self._model = model
-        self._removed_rxns = removed_rxns
-        self._obj_dict = obj_dict
 
 
 class RIPTiDeSamplingAnalysis(BaseAnalysis):
@@ -137,34 +123,18 @@ class FASTCOREAnalysis(BaseAnalysis):
 class rFastCormicAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
-        self._model = None
-        self._rxn_ids = None
-        self._removed_rxn_ids = None
-        self._core_rxns = None
-        self._noncore_rxns = None
-        self._nonP_rxns = None
-        self._threshold_analysis = None
-
-    @property
-    def threshold_analysis(self):
-        return self._threshold_analysis
 
     @property
     def result_model(self):
-        return self._model
+        return self.fastcore_result.result_model
 
-    def add_result(self, fastcore_result: FASTCOREAnalysis,
-                   core_rxns,
-                   noncore_rxns,
-                   nonP_rxns,
-                   threshold_analysis):
-        self._model = fastcore_result.result_model
-        self._rxn_ids = fastcore_result.rxn_ids
-        self._removed_rxn_ids = fastcore_result.removed_rxn_ids
-        self._core_rxns = core_rxns
-        self._noncore_rxns = noncore_rxns
-        self._nonP_rxns = nonP_rxns
-        self._threshold_analysis = threshold_analysis
+    @property
+    def kept_rxn_ids(self):
+        return self.fastcore_result.kept_rxn_ids
+
+    @property
+    def removed_rxn_ids(self):
+        return self.fastcore_result.removed_rxn_ids
 
 
 class CORDA_Analysis(BaseAnalysis):

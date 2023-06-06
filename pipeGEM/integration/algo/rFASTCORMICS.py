@@ -53,11 +53,11 @@ def apply_rFASTCORMICS(model,
             if r.id in old_exchange_bounds:
                 pr_result.result_model.reactions.get_by_id(r.id).bounds = old_exchange_bounds[r.id]
 
-        pr_result_obj.add_result(fastcore_result=pr_result,
-                                 core_rxns=core_rxns,
-                                 noncore_rxns=non_core_rxns,
-                                 nonP_rxns=unpenalized_rxns,
-                                 threshold_analysis=th_result)
+        pr_result_obj.add_result(dict(fastcore_result=pr_result,
+                                      core_rxns=core_rxns,
+                                      noncore_rxns=non_core_rxns,
+                                      nonP_rxns=unpenalized_rxns,
+                                      threshold_analysis=th_result))
     elif method == "twostep":
         core_rxns = (set([r for r, c in rxn_scores.items() if c > exp_th]) - set(protected_rxns)) & rxn_in_model
 
@@ -80,10 +80,10 @@ def apply_rFASTCORMICS(model,
                                    model=model,
                                    epsilon=threshold,
                                    return_model=False)
-        pr_result_obj.add_result(fastcore_result=pr_result,
-                                 core_rxns=core_rxns,
-                                 noncore_rxns=non_core_rxns,
-                                 nonP_rxns=unpenalized_rxns,
-                                 threshold_analysis=th_result)
+        pr_result_obj.add_result(dict(fastcore_result=pr_result,
+                                      core_rxns=core_rxns,
+                                      noncore_rxns=non_core_rxns,
+                                      nonP_rxns=unpenalized_rxns,
+                                      threshold_analysis=th_result))
 
     return pr_result_obj

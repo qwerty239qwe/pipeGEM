@@ -64,7 +64,7 @@ class Model(GEMComposite):
     def __getattr__(self, item):
         if item not in self.__dict__:
             return getattr(self._model, item)
-        return getattr(self, item)
+        return self.__dict__[item]
 
     def rename(self, name_tag=None):
         if name_tag is not None:
@@ -85,15 +85,15 @@ class Model(GEMComposite):
 
     @property
     def reaction_ids(self):
-        return [r.id for r in self.reactions]
+        return [r.id for r in self._model.reactions]
 
     @property
     def gene_ids(self):
-        return [g.id for g in self.genes]
+        return [g.id for g in self._model.genes]
 
     @property
     def metabolite_ids(self):
-        return [m.id for m in self.metabolites]
+        return [m.id for m in self._model.metabolites]
 
     @property
     def cobra_model(self):

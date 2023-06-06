@@ -66,7 +66,7 @@ class Group(GEMComposite):
         if isinstance(item, str):
             return self._group[item]
         elif isinstance(item, list) or isinstance(item, np.ndarray):
-            return self.__class__([self._group[i] for i in item], **{attrn: {modn: attr for modn, attr in v.items()
+            return self.__class__(group=[self._group[i] for i in item], **{attrn: {modn: attr for modn, attr in v.items()
                                                                              if modn in item}
                                                                      for attrn, v in
                                                                      self._get_converted_grp_annot().items()})
@@ -164,7 +164,6 @@ class Group(GEMComposite):
             return {"model": [m for m in self._group.keys()]}
 
         model_annot = self._handle_annotation(self._group, replacing_annot=self._group_annotation)
-        print(model_annot)
         gb = model_annot.groupby(group_by).apply(lambda x: list(x.index))
         return {i: row for i, row in gb.items()}
 
@@ -174,7 +173,8 @@ class Group(GEMComposite):
 
         model_annot = self._handle_annotation(self._group, replacing_annot=self._group_annotation)
         gb = model_annot.groupby(group_by).apply(lambda x: list(x.index))  # {'gp1': [mod_name_1, mod_name_2,...], ...}
-        return {gp_name: self[mod_names].rename(gp_name) for gp_name, mod_names in gb.items()}
+        return {gp_name: self[mod_names].rename(gp_name)
+                for gp_name, mod_names in gb.items()}
 
     def get_rxn_info(self,
                      models,
@@ -194,7 +194,8 @@ class Group(GEMComposite):
         if inplace:
             self._name_tag = name_tag
             return
-        return self.__class__(self._group, name_tag=name_tag)
+        print(f"create a new group containing {self._group}")
+        return self.__class__(group=self._group, name_tag=name_tag)
 
     def do_flux_analysis(self,
                          method,
@@ -307,7 +308,7 @@ class Group(GEMComposite):
                 if isinstance(comp, cobra.Model):
                     groups[name] = Model(model=comp, name_tag=name)
                     self._group_annotation[name] = {}
-                elif isinstance(comp, self.__class__):
+                elif isinstance(comp, Model):
                     groups[name] = comp
                     self._group_annotation[name] = {}
                     if name != comp.name_tag:
@@ -329,7 +330,6 @@ class Group(GEMComposite):
             raise ValueError("Group doesn't support object type: ", type(group_dict))
 
         self._ck_annotations(group=groups, new_annot=kwargs)
-
         return groups
 
     def get_info(self,
@@ -401,9 +401,7 @@ class Group(GEMComposite):
 
         new_comp_df["number"] = new_comp_df["number"].astype(dtype=int)
         result = ComponentNumberAnalysis(log={"components": components, 'group_by': group_by})
-        result.add_result(new_comp_df, name_order=name_order
-                                                  if name_order != "default" else None,
-                          group="model" if group_by is None else group_by)
+        result.add_result({"comp_df": new_comp_df})
         return result
 
     def _compare_component_PCA_helper(self, comp_id_dic, model, comp_name, name):
@@ -438,7 +436,7 @@ class Group(GEMComposite):
                                                                     **kwargs)
         result = PCA_Analysis(log={"group_annotation": self.annotation if group_by is None else
                                     self.annotation.groupby(group_by).apply(lambda x: list(x.index)).to_frame(),
-                                   "group_name_tag": self.name_tag})
+                                   "group_name_tag": self.name_tag, "method": "PCA"})
         result.add_result({"PC": pca_fitted_df, "exp_var": pca_expvar_df, "components": pca_comp_df})
         return result
 

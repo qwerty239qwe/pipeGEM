@@ -35,8 +35,8 @@ class ComponentNumberAnalysis(ComparisonAnalysis):
              **kwargs):
         pltr = ComponentNumberPlotter(dpi=dpi, prefix=prefix)
         if name_order == "default":
-            name_order = sorted(self._result[group].unique())
-        pltr.plot(result=self._result,
+            name_order = sorted(self._result["comp_df"][group].unique())
+        pltr.plot(result=self._result["comp_df"],
                   name_order=name_order,
                   group=group,
                   *args,

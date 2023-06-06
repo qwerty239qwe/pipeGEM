@@ -11,7 +11,7 @@ class ConsistencyAnalysis(BaseAnalysis):
 class FastCCAnalysis(ConsistencyAnalysis):
     def __init__(self, log):
         """
-        An object containing task analysis result.
+        An object containing FASTCC result.
         This should contain results including:
             consistent_model: pg.Model or cobra.Model
                 A model without inconsistent reactions.

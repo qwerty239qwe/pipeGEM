@@ -65,7 +65,8 @@ def apply_GIMME(model: cobra.Model,
                      fraction_of_optimum=obj_frac) # some are probably removed
 
     result = GIMMEAnalysis(log={"name": model.name, "high_exp": high_exp, "obj_frac": obj_frac})
-    result.add_result(obj_dict, rxn_expr_score,
-                      fluxes=flux_df if return_fluxes else None,
-                      model=new_model)
+    result.add_result(dict(rxn_coefficents=obj_dict,
+                           rxn_scores=rxn_expr_score,
+                           flux_result=flux_df if return_fluxes else None,
+                           result_model=new_model))
     return result

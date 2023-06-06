@@ -39,7 +39,9 @@ def apply_RIPTiDe_pruning(model,
     output_model.remove_reactions(rxn_to_remove, remove_orphans=True)
     result = RIPTiDePruningAnalysis(log={"name": model.name, "max_gw": max_gw, "obj_frac": obj_frac,
                                          "threshold": threshold})
-    result.add_result(model= output_model, removed_rxns=rxn_to_remove, obj_dict=obj_dict)
+    result.add_result(dict(result_model= output_model,
+                           removed_rxn_ids=rxn_to_remove,
+                           obj_dict=obj_dict))
     return result
 
 

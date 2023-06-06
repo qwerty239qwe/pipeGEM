@@ -88,5 +88,7 @@ def apply_EFlux(model: cobra.Model,
     flux_df = sol.to_frame()
 
     result = EFluxAnalysis(log={"name": model.name, "max_ub": max_ub, "min_lb": min_lb, "ignored_rxns": ignore})
-    result.add_result(rxn_bounds=r_bounds_dict, rxn_scores=rxn_expr_score, fluxes=flux_df if return_fluxes else None)
+    result.add_result(dict(rxn_bounds=r_bounds_dict,
+                           rxn_scores=rxn_expr_score,
+                           flux_result=flux_df if return_fluxes else None))
     return result
