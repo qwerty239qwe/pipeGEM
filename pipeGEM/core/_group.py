@@ -212,10 +212,10 @@ class Group(GEMComposite):
             else:
                 result = c.do_flux_analysis(method=method, solver=solver, **kwargs)
                 if group_by is None:
-                    result.add_name(c.name_tag, col_name="model")
+                    result.add_categorical(c.name_tag, col_name="model")
                 else:
-                    result.add_name(self._group_annotation[c.name_tag][group_by],
-                                    col_name=group_by)
+                    result.add_categorical(self._group_annotation[c.name_tag][group_by],
+                                           col_name=group_by)
             results.append(result)
         gp_annot = pd.DataFrame({group_by: self.annotation[group_by].unique()},
                                 index=self.annotation[group_by].unique()) if group_by is not None else self.annotation

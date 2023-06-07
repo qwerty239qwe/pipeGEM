@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from typing import Optional, Union
+from typing import Optional, Union, List
 from ._base import *
 from pipeGEM.plotting import FBAPlotter, FVAPlotter, SamplingPlotter, HeatmapPlotter
 from pipeGEM.analysis._dim_reduction import prepare_PCA_dfs, prepare_embedding_dfs
@@ -17,15 +17,15 @@ class FluxAnalysis(BaseAnalysis):
     def __init__(self, log):
         super(FluxAnalysis, self).__init__(log)
 
-    def add_name(self,
-                 name: str,
-                 col_name: str = "name") -> None:
+    def add_categorical(self,
+                        value: str,
+                        col_name: str = "name") -> None:
         """
         Add a categorical column to flux_df in the result
 
         Parameters
         ----------
-        name: str
+        value: str
             The values filled in the categorical column
         col_name: str
             The columns name of the categorical column
@@ -34,11 +34,16 @@ class FluxAnalysis(BaseAnalysis):
         -------
         None
         """
-        self._result["flux_df"][col_name] = name
+        self._result["flux_df"][col_name] = value
         self._result["flux_df"][col_name] = pd.Categorical(self._result["flux_df"][col_name])
+        self._log.update({"categorical": [{col_name: value}]})
 
     @classmethod
-    def aggregate(cls, analyses, method, log, **kwargs):
+    def aggregate(cls,
+                  analyses: List["FluxAnalysis"],
+                  method: str,
+                  log: Optional[dict] = None,
+                  **kwargs):
         """
         Returns an aggregated dataframe,
         if concat method is used, return a df with 'name' column representing the model name
@@ -50,31 +55,36 @@ class FluxAnalysis(BaseAnalysis):
         method: str
             A string represents the aggregation method
             Possible choices are: concat, sum, mean, and median
-        log: dict
-            A dict
-        kwargs
-
+        log: dict, optional
+            A dict contains new analysis results' information
+        kwargs: dict
+            Additional keyword arguments
         Returns
         -------
+        aggregated_flux_analysis: FluxAnalysis
 
         """
-        new = cls(log=log)
+        log = log if log is None else {}
+        cat_log = []
         if method == "concat":
             dfs = []
             for a in analyses:
+                cat_log.extend(a.log["categorical"])
                 one_df = a.result["flux_df"].reset_index().rename(columns={"index": "Reaction"}) \
                     if "Reaction" not in a.result["flux_df"].columns else a.result["flux_df"]
                 dfs.append(one_df)
-            new.add_result(dict(flux_df=pd.concat(dfs, axis=0).reset_index(drop=True)))
+            new_df = pd.concat(dfs, axis=0).reset_index(drop=True)
         else:
             dfs = []
             for a in analyses:
+                cat_log.extend(a.log["categorical"])
                 one_df = a.result["flux_df"]["fluxes"]
                 dfs.append(one_df)
             new_df = pd.concat(dfs, axis=1)
             new_df = getattr(new_df, method)(axis=1).to_frame()
             new_df.columns = ["fluxes"]
-            new.add_result(dict(flux_df=new_df))
+        new = cls(log={"categorical": cat_log, **log})
+        new.add_result(dict(flux_df=new_df))
         return new
 
     def plot(self, **kwargs):
@@ -151,21 +161,27 @@ class FBA_Analysis(FluxAnalysis):
             result.add_result({"embeddings": emb_df})
             return result
 
-    def hclust(self):
-        pass
-
     def corr(self,
-             by="name",
+             rxn_corr=False,
+             group_by="name",
              **kwargs):
-        if by not in self._result["flux_df"] and by != "reaction":
+        if group_by not in self._result["flux_df"]:
+            raise KeyError(f"{group_by} is not in the categorical features. \n"
+                           f"Possible features are {list(self.log['categorical'].keys())}")
+
+        if self._result["flux_df"][group_by].unique().shape[0] == 1:
             raise NotAggregatedError("This analysis result contains only 1 model's fluxes, "
                                      "please use Group.do_flux_analysis to get a proper result for dim reduction")
 
-        flux_df = self._result["flux_df"].pivot_table(index="Reaction", columns=by, values="fluxes", aggfunc="mean")
-        if by == "reaction":
+        flux_df = self._result["flux_df"].pivot_table(index="Reaction",
+                                                      columns=group_by,
+                                                      values="fluxes",
+                                                      aggfunc="mean")
+        if rxn_corr:
             flux_df = flux_df.T
         corr_result = flux_df.fillna(0).corr(**kwargs).fillna(0.)
-        result = CorrelationAnalysis(log={"by": by, **kwargs})
+        result = CorrelationAnalysis(log={"by": group_by,
+                                          **kwargs})
         result.add_result(dict(correlation_result=corr_result))
         return result
 
@@ -175,16 +191,38 @@ class FVA_Analysis(FluxAnalysis):
         super().__init__(log)
 
     @classmethod
-    def aggregate(cls, analyses, method, log, **kwargs):
+    def aggregate(cls,
+                  analyses: List["FVA_Analysis"],
+                  method: str,
+                  log: Optional[dict] = None,
+                  **kwargs):
+        """
+        Returns an aggregated FVA_Analysis,
+        if concat method is used, return a df with 'name' column representing the model name
+
+        Parameters
+        ----------
+        analyses: list of FVA_Analysis
+            FVA_Analysis objects to be aggregated
+        method: str
+            A string represents the aggregation method
+            Possible choices are: concat, sum, mean, and median
+        log: dict, optional
+            A dict contains new analysis results' information
+        kwargs: dict
+            Additional keyword arguments
+        Returns
+        -------
+        aggregated_flux_analysis: FluxAnalysis
+
+        """
         new = cls(log=log)
         if method == "concat":
             dfs = []
             for a in analyses:
                 one_df = a.result["flux_df"].reset_index().rename(columns={"index": "Reaction"})
-                one_df["name"] = a.log["name"]
                 dfs.append(one_df)
             new_df = pd.concat(dfs, axis=0)
-            new_df["name"] = pd.Categorical(new_df["name"])
         else:
             min_dfs, max_dfs = [], []
             for a in analyses:
@@ -193,7 +231,8 @@ class FVA_Analysis(FluxAnalysis):
                 min_dfs.append(min_df)
                 max_dfs.append(max_df)
             new_min_df, new_max_df = pd.concat(min_dfs, axis=1), pd.concat(max_dfs, axis=1)
-            new_min_df, new_max_df = getattr(new_min_df, method)(axis=1).to_frame(), getattr(new_max_df, method)(axis=1).to_frame()
+            new_min_df, new_max_df = getattr(new_min_df, method)(axis=1).to_frame(), \
+                getattr(new_max_df, method)(axis=1).to_frame()
             new_df = {"minimum": new_min_df, "maximum": new_max_df}
         new.add_result({"flux_df": new_df})
         return new

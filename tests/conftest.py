@@ -5,6 +5,7 @@ from pipeGEM.utils import load_model
 from pipeGEM.data.fetching import load_remote_model
 from pipeGEM.utils import random_perturb
 from pipeGEM import Group
+from pipeGEM.utils import random_perturb
 
 
 @pytest.fixture(scope="session")
@@ -46,3 +47,16 @@ def group(ecoli_core):
                                  "m22": random_perturb(ecoli_core, on_structure=False, constr_ratio=0.7, random_state=4)},
                     "ecoli_g3": {"m3": ecoli_core}}, name_tag="G2",
                     treatment={"m111": "a", "m112": "b", "m12": "b"})
+
+
+@pytest.fixture(scope="session")
+def pFBA_result(ecoli_core):
+    m1 = ecoli_core
+    g2 = Group({"ecoli_g1": {"e11": m1, "e12": random_perturb(m1.copy())},
+                "ecoli_g2": {"e21": random_perturb(m1.copy()), "e22": m1}},
+               name_tag="G2",
+               treatments={"e11": "A", "e12": "B", "e21": "B", "e22": "A"})
+    pFBA_result = g2.do_flux_analysis(method="FBA",
+                                      solver="glpk",
+                                      group_by="treatments")
+    yield pFBA_result
