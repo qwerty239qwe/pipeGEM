@@ -7,7 +7,7 @@ from scipy.stats import gaussian_kde
 from scipy.optimize import curve_fit
 import numpy as np
 from pipeGEM.utils import ObjectFactory
-from pipeGEM.analysis import rFASTCORMICSThresholdAnalysis, PercentileThresholdAnalysis, LocalThresholdAnalysis, timing
+from pipeGEM.analysis.results.thresholds import rFASTCORMICSThresholdAnalysis, PercentileThresholdAnalysis, LocalThresholdAnalysis, timing
 
 
 class ThresholdFinders(ObjectFactory):
