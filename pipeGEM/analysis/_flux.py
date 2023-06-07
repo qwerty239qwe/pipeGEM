@@ -63,7 +63,7 @@ class pFBA_Analyzer(FBA_Analyzer):
                          solver=solver,
                          log=log)
 
-    def analysis_func(self, fraction_of_optimum=1.0, **kwargs):
+    def analyze(self, fraction_of_optimum=1.0, **kwargs):
         result = FBA_Analysis(log={"solver": self.solver_name,
                                    **kwargs, **self._log})
 
@@ -81,7 +81,7 @@ class FVA_Analyzer(FluxAnalyzer):
         super().__init__(model=model,
                          solver=solver)
 
-    def analysis_func(self,
+    def analyze(self,
                       is_loopless=True,
                       fraction_of_optimum=0,
                       **kwargs):
@@ -103,10 +103,10 @@ class SamplingAnalyzer(FluxAnalyzer):
         super().__init__(model=model,
                          solver=solver)
 
-    def analysis_func(self,
-                      obj_lb_ratio=0.75,
-                      n=5000,
-                      **kwargs):
+    def analyze(self,
+                obj_lb_ratio=0.75,
+                n=5000,
+                **kwargs):
         result = SamplingAnalysis(log={"solver": self.solver_name,
                                        **kwargs, **self._log})
         with self.model as model:

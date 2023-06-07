@@ -18,7 +18,7 @@ class PCA_Analysis(BaseAnalysis):
             groups = {i: row for i, row in gb.items()}
 
         pltr = DimReductionPlotter(dpi, prefix)
-        pltr.plot(result_df=self._result,
+        pltr.plot(result_dic=self._result,
                   groups=groups,
                   method=self._log["method"],
                   **kwargs)
