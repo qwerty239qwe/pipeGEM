@@ -32,8 +32,8 @@
     saved_path = "./functionality_test"
     [functionality_test.params]
         tasks_file_name = "tasks_for_human1"
-        model_compartment_parenthesis = "[{}]"
     [functionality_test.test_tasks]
+        model_compartment_parenthesis = "[{}]"
         method="pFBA"
         method_kws=nan
         solver="gurobi"

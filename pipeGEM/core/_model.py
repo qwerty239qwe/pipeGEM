@@ -128,6 +128,9 @@ class Model(GEMComposite):
     def aggregated_gene_data(self):
         return GeneData.aggregate(self._gene_data, prop="data")
 
+    def aggregate_gene_data(self):
+        agg = GeneData.aggregate()
+
     def copy(self,
              copy_gene_data=False,
              copy_medium_data=False,
@@ -252,7 +255,10 @@ class Model(GEMComposite):
     def add_tasks(self, name, tasks):
         self._tasks[name] = tasks
 
-    def test_tasks(self, name, model_compartment_parenthesis="[{}]", **kwargs):
+    def test_tasks(self,
+                   name,
+                   model_compartment_parenthesis="[{}]",
+                   **kwargs):
         tester = TaskHandler(model=self._model,
                              tasks_path_or_container=self._tasks[name],
                              model_compartment_parenthesis=model_compartment_parenthesis)

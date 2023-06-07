@@ -198,9 +198,12 @@ class GeneData(BaseData):
             self.gene_data = (data_and_ths["data"] - data_and_ths[group]).to_dict()
 
     @classmethod
-    def aggregate(cls, data, method="concat", prop="data", absent_expression=0) -> DataAggregation:
+    def aggregate(cls,
+                  data,
+                  method="concat",
+                  prop="data",
+                  absent_expression=0) -> DataAggregation:
         assert prop in ["data", "score"], "prop should be either data or score"
-        #assert all([isinstance(v, dict) for k, v in data.items()]) or all([isinstance(v, GeneData) for k, v in data.items()])
 
         obj_prop = {"data": "gene_data", "score": "rxn_scores"}
 
@@ -212,8 +215,10 @@ class GeneData(BaseData):
                               for name, gene_data in data.items()], axis=1).fillna(absent_expression)
         if method != "concat":
             mg_d = getattr(mg_d, method)(axis=1).to_frame()
-        result = DataAggregation(log={"method": method, "prop": prop,
-                                      "absent_expression": absent_expression, "group": _data_parse_group_models(data)})
+        result = DataAggregation(log={"method": method,
+                                      "prop": prop,
+                                      "absent_expression": absent_expression,
+                                      "group": _data_parse_group_models(data)})
         result.add_result(dict(agg_data=mg_d))
         return result
 

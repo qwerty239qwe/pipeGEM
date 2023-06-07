@@ -10,6 +10,7 @@ from pipeGEM import Model, load_model
 from pipeGEM.utils import parse_toml_file
 from pipeGEM.data.data import GeneData, MediumData
 from pipeGEM.analysis import consistency_testers
+from pipeGEM.analysis.tasks import TaskContainer, TaskHandler
 
 
 def load_gene_data(gene_data_conf):
@@ -56,7 +57,14 @@ def model_preprocess(model_conf):
     cons_result.save(model_conf["consistency"]["saved_path"])
     model = cons_result.consistent_model
 
-
+    # metabolic task testing
+    ft_params = model_conf["functionality_test"]["params"]
+    tt_params = model_conf["functionality_test"]["test_tasks"]
+    tasks = TaskContainer.load(ft_params["tasks_file_name"])
+    model.add_tasks("default", tasks=tasks)
+    task_result = model.test_tasks(name="default",
+                                   **tt_params)
+    task_result.save(model_conf["functionality_test"]["saved_path"])
 
 
 def main():

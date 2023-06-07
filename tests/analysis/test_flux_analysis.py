@@ -28,6 +28,11 @@ def test_TSNE(pFBA_result):
     tsne.plot(dpi=150, color_by="treatments")
 
 
+def test_UMAP(pFBA_result):
+    tsne = pFBA_result.dim_reduction(method="UMAP", n_components=2)
+    tsne.plot(dpi=150, color_by="treatments")
+
+
 def test_corr(pFBA_result):
     corr_result = pFBA_result.corr("treatments")
     corr_result.plot()

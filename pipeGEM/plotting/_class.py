@@ -225,18 +225,18 @@ class DimReductionPlotter(BasePlotter):
 
     def plot_func(self,
                   method,
-                  flux_df,
+                  result_dic,
                   groups,
                   *args,
                   **kwargs):
 
         if method == "PCA":
-            return plot_PCA(flux_df,
+            return plot_PCA(data=result_dic,
                             groups=groups,
                             *args,
                             **kwargs)
         else:
-            return plot_embedding(flux_df,
+            return plot_embedding(embedding_df=result_dic["embeddings"],
                                   groups=groups,
                                   reducer=method,
                                   *args,

@@ -4,6 +4,7 @@ from ._base import *
 from .corr import CorrelationAnalysis
 from .dim_reduction import PCA_Analysis, EmbeddingAnalysis
 from pipeGEM.analysis._dim_reduction import prepare_PCA_dfs, prepare_embedding_dfs
+from pipeGEM.analysis._threshold import threshold_finders
 
 
 class DataAggregation(BaseAnalysis):
@@ -12,6 +13,10 @@ class DataAggregation(BaseAnalysis):
 
     def __getitem__(self, item):
         return self._result["agg_data"][item]
+
+    def find_local_threshold(self, **kwargs):
+        tf = threshold_finders.create("local")
+        return tf.find_threshold(self._result["agg_data"], **kwargs)
 
     def corr(self,
              by="sample",
@@ -41,5 +46,5 @@ class DataAggregation(BaseAnalysis):
                                            **kwargs)
             result = EmbeddingAnalysis(log={"method": method,
                                             **kwargs, **self.log})
-            result.add_result(emb_df)
+            result.add_result({"embeddings": emb_df})
             return result

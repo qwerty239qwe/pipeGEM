@@ -188,7 +188,7 @@ class rFASTCORMICSThreshold(DistributionBased):
                        cut_off: float = -np.inf,
                        return_heuristic: bool = False,
                        hard_x_lims: tuple = (0.05, 0.95),
-                       k_best: int = 3):
+                       k_best: int = 3) -> rFASTCORMICSThresholdAnalysis:
         assert hard_x_lims[0] < hard_x_lims[1]
 
         if isinstance(data, pd.Series):
@@ -243,8 +243,8 @@ class PercentileThreshold(RankBased):
 
     def find_threshold(self,
                        data,  # 1d array
-                       p,
-                       **kwargs):
+                       p: Union[int, float],
+                       **kwargs) -> PercentileThresholdAnalysis:
         assert 0 <= p <= 100
         if isinstance(data, pd.Series):
             arr = data.values
