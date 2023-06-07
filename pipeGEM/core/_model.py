@@ -15,7 +15,7 @@ from pipeGEM.utils import save_model, check_rxn_scales
 from pipeGEM.data import GeneData, MediumData
 from pipeGEM.integration import integrator_factory
 from pipeGEM.analysis import flux_analyzers, consistency_testers, TaskAnalysis, ko_analyzers
-from pipeGEM.analysis.tasks import TaskHandler
+from pipeGEM.analysis.tasks import TaskHandler, TaskContainer
 
 
 class Model(GEMComposite):
@@ -82,23 +82,23 @@ class Model(GEMComposite):
         return 1
 
     @property
-    def reaction_ids(self):
+    def reaction_ids(self) -> List[str]:
         return [r.id for r in self._model.reactions]
 
     @property
-    def gene_ids(self):
+    def gene_ids(self) -> List[str]:
         return [g.id for g in self._model.genes]
 
     @property
-    def metabolite_ids(self):
+    def metabolite_ids(self) -> List[str]:
         return [m.id for m in self._model.metabolites]
 
     @property
-    def cobra_model(self):
+    def cobra_model(self) -> cobra.Model:
         return self._model
 
     @property
-    def subsystems(self):
+    def subsystems(self) -> Dict[str, List[str]]:
         subs = {}
         for r in self.reactions:
             if r.subsystem in subs:
@@ -113,8 +113,16 @@ class Model(GEMComposite):
                             index=[r.id for r in self._model.reactions])
 
     @property
-    def gene_data(self):
+    def gene_data(self) -> Dict[str, GeneData]:
         return self._gene_data
+
+    @property
+    def medium_data(self) -> Dict[str, MediumData]:
+        return self._medium_data
+
+    @property
+    def tasks(self) -> Dict[str, TaskContainer]:
+        return self._tasks
 
     @property
     def aggregated_gene_data(self):
@@ -308,7 +316,7 @@ class Model(GEMComposite):
     def get_RAS(self, data_name, method="mean"):
         return self._gene_data[data_name].calc_rxn_score_stat([r.id for r in self._model.reactions])
 
-    def save_model(self, file_name):
+    def save_model(self, file_name: str) -> None:
         path = Path(file_name)
         save_model(self._model, str(path))
 

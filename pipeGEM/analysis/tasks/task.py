@@ -15,6 +15,30 @@ from ._var import TASKS_FILE_PATH
 
 
 class Task:
+    """
+    Single metabolic task.
+
+    Attributes
+    ----------
+    system : str
+        The name of system that this task is in.
+        Ex: Energy metabolism
+    subsystem : str
+        The name of subsystem that this task is in.
+        Ex: OXYDATIVE PHOSPHORYLATION
+    description : str
+        A brief description about this task
+    should_fail : bool
+        Does this task should fail to pass or not.
+    in_mets : List[Dict[str, Any]]
+        The constraints(lower_bound, upper_bound) of influx metabolites
+        Example :
+            {'glc_D': {'lb': 0, 'ub': 1000, 'compartment': 'c'}, 'ATP': {'lb': 0, 'ub': 1000, 'compartment': 'c'}}
+    out_mets : List[Dict[str, Any]]
+        The constraints(lower_bound, upper_bound) of outflux metabolites
+        Example :
+            {'glc_D': {'lb': 0, 'ub': 1000, 'compartment': 'c'}, 'ATP': {'lb': 0, 'ub': 1000, 'compartment': 'c'}}
+    """
     def __init__(self,
                  should_fail: bool,
                  in_mets: List[Dict[str, Any]],
@@ -32,30 +56,7 @@ class Task:
                  subsystem: str = None,
                  description: str = None,
                  annotation: str = None):
-        """
-        Single metabolic task.
 
-        Attributes
-        ----------
-        system : str
-            The name of system that this task is in.
-            Ex: Energy metabolism
-        subsystem : str
-            The name of subsystem that this task is in.
-            Ex: OXYDATIVE PHOSPHORYLATION
-        description : str
-            A brief description about this task
-        should_fail : bool
-            Does this task should fail to pass or not.
-        in_mets : List[Dict[str, Any]]
-            The constraints(lower_bound, upper_bound) of influx metabolites
-            Example :
-                {'glc_D': {'lb': 0, 'ub': 1000, 'compartment': 'c'}, 'ATP': {'lb': 0, 'ub': 1000, 'compartment': 'c'}}
-        out_mets : List[Dict[str, Any]]
-            The constraints(lower_bound, upper_bound) of outflux metabolites
-            Example :
-                {'glc_D': {'lb': 0, 'ub': 1000, 'compartment': 'c'}, 'ATP': {'lb': 0, 'ub': 1000, 'compartment': 'c'}}
-        """
         self.system = system
         self.subsystem = subsystem
         self.description = description
@@ -70,7 +71,7 @@ class Task:
         self.knockout_input_flag, self.knockout_output_flag = knockout_input_flag, knockout_output_flag
         self.ko_input_type, self.ko_output_type = ko_input_type, ko_output_type
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return {"system": self.system,
                 "subsystem": self.subsystem,
                 "in_mets": self.in_mets,

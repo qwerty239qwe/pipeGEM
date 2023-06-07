@@ -25,4 +25,4 @@ __all__ = ("flux_analyzers", "ProblemAnalyzer", "modified_pfba",
            "SamplingAnalysis", "INIT_Analysis", "CorrelationAnalysis",
            "ComponentComparisonAnalysis", "LocalThresholdAnalysis",
            "PercentileThresholdAnalysis", "rFASTCORMICSThresholdAnalysis",
-           "Single_KO_Analysis",)
+           "Single_KO_Analysis", "mCADRE_Analysis", "iMAT_Analysis")

@@ -6,17 +6,24 @@
 PipeGEM: building **Pipe**\ lines for **GEM** (genome-scale metabolic model) reconstruction
 =============================================================================================
 
+Contents
+-------------------
+
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
    quickstart
-   api/index
    tutorial/index
 
+API references
+---------------
+.. toctree::
+   :maxdepth: 2
+
+   api/index
 
 Indices and tables
-==================
+-------------------
 
 * :ref:`genindex`
 * :ref:`modindex`

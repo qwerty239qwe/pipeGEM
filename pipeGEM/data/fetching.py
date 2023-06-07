@@ -144,12 +144,19 @@ def fetch_brenda_data(account, pwd, organism, field):
     return results
 
 
-def load_HPA_data(data_path,
+def load_HPA_data(data_path: Union[str, Path],
                   gene_col: str,
                   df_query_kw: Dict[str, Union[str, List[str]]] = None,
-                  ):
+                  ) -> dict:
     """
     Load and add translate column HPA data from a directory
+
+    Parameters
+    ----------
+    data_path: str or pathlib.Path
+    gene_col: str
+    df_query_kw: dict[str, str or list of str]
+
     Returns
     -------
     """

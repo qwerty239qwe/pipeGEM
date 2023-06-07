@@ -17,6 +17,21 @@ from pipeGEM.utils import is_iter, calc_jaccard_index
 
 
 class Group(GEMComposite):
+    """
+    Main container for performing model comparison
+
+    Parameters
+    ----------
+    group: a list of pg.Model or a dict of dicts
+        The name_tag and models used to build the pg.Group object,
+        Possible inputs are:
+        [pg.Models],
+        {name_tag of model: cobra.Model},
+        {name_tag of subgroup: [pg.Models]}, and
+        {name_tag of subgroup: {name_tag of model: cobra.Model}}
+    name_tag: optional, str
+        The name of this object. If None, this group will be named 'Unnamed_group'
+    """
     _is_leaf = False
     agg_methods = ["concat", "mean", "sum", "min", "max", "weighted_mean", "absmin", "absmax"]
 
@@ -24,21 +39,7 @@ class Group(GEMComposite):
                  group,
                  name_tag: str = None,
                  **kwargs):
-        """
-        Main container for performing model comparison
 
-        Parameters
-        ----------
-        group: a list of pg.Model or a dict of dicts
-            The name_tag and models used to build the pg.Group object,
-            Possible inputs are:
-            [pg.Models],
-            {name_tag of model: cobra.Model},
-            {name_tag of subgroup: [pg.Models]}, and
-            {name_tag of subgroup: {name_tag of model: cobra.Model}}
-        name_tag: optional, str
-            The name of this object. If None, this group will be named 'Unnamed_group'
-        """
         super().__init__(name_tag=name_tag or "Unnamed_group")
         self._group_annotation = {}
         self._group = self._form_group(group, **kwargs)
