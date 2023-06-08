@@ -5,7 +5,7 @@ from pipeGEM.data.synthesis import get_syn_gene_data
 from pipeGEM.core import Model
 from pipeGEM.core import Group
 from pipeGEM.data import GeneData
-from pipeGEM.analysis import DataAggregation, PercentileThresholdAnalysis
+from pipeGEM.analysis import DataAggregation, PercentileThresholdAnalysis, rFASTCORMICSThresholdAnalysis
 
 
 def test_add_data_model(ecoli_core, ecoli_core_data):
@@ -39,5 +39,14 @@ def test_find_percentile_threshold(ecoli_core_data):
     assert isinstance(p10, PercentileThresholdAnalysis)
     assert isinstance(p50, PercentileThresholdAnalysis)
     assert isinstance(p90, PercentileThresholdAnalysis)
-
     assert p10.exp_th <= p50.exp_th <= p90.exp_th
+
+
+def test_find_rFASTCORMICS_threshold(ecoli_core_data):
+    data_name = "sample_0"
+    gene_data = GeneData(data=ecoli_core_data[data_name],
+                         data_transform=lambda x: np.log2(x),
+                         absent_expression=-np.inf)
+    rth = gene_data.get_threshold(name="percentile", p=10)
+    assert isinstance(rth, rFASTCORMICSThresholdAnalysis)
+    assert rth.exp_th > rth.non_exp_th

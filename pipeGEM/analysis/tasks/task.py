@@ -146,8 +146,8 @@ class Task:
                 all_fine = False
         return all_fine
 
-    def setup_support_flux_exp(self,
-                               model,
+    @staticmethod
+    def setup_support_flux_exp(model,
                                rxn_fluxes):
         obj_dic = {}
 
@@ -226,7 +226,7 @@ def get_met_prod_task(met_id: str,
         The compartment of the metabolite
     Returns
     -------
-
+    task: Task
     """
     return Task(subsystem="",
                 should_fail=False,
@@ -401,7 +401,7 @@ class TaskHandler:
                 print(f"Task {ID} cannot support tasks' metabolites")
         return sol
 
-    def test_task_sinks(self, ID, task, model, fail_threshold, rxn_fluxes):
+    def test_task_sink_one_path(self, ID, task, model, fail_threshold, rxn_fluxes) -> dict:
         supp_sol = self._test_task_sinks_utils(ID, task, model, rxn_fluxes[0])
         supp_status = supp_sol.status if supp_sol is not None else "infeasible"
         if supp_status == "optimal":
@@ -411,6 +411,20 @@ class TaskHandler:
             status = "support rxns infeasible"
             result = {}
         return {"Sink Status": status, "Passed": status == "optimal", **result}
+
+    def test_task_sinks(self, ID, task, model, fail_threshold, rxn_fluxes) -> dict:
+        output_dic = {"Sink Status": [], "Passed": False}
+        for rxn_f in rxn_fluxes:
+            one_sink_result = self.test_task_sink_one_path(ID, task, model, fail_threshold,
+                                                           rxn_fluxes=rxn_f)
+            for k, v in one_sink_result.items():
+                if k == "Passed":
+                    output_dic[k] = (output_dic[k] or v)
+                elif k not in output_dic:
+                    output_dic[k] = [v]
+                else:
+                    output_dic[k].append(v)
+        return output_dic
 
     def test_tasks(self,
                    method="pFBA",
