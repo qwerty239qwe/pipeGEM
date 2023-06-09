@@ -1,0 +1,8 @@
+saved_path = ""
+[params]
+    name = "local"
+    group_file_name = ""
+    global_on_p = 90
+    global_off_p = 10
+    global_on_th = nan
+    global_off_th = nan

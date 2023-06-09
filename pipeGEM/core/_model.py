@@ -128,8 +128,8 @@ class Model(GEMComposite):
     def aggregated_gene_data(self):
         return GeneData.aggregate(self._gene_data, prop="data")
 
-    def aggregate_gene_data(self):
-        agg = GeneData.aggregate()
+    def aggregate_gene_data(self, **kwargs):
+        return GeneData.aggregate(data=self._gene_data, **kwargs)
 
     def copy(self,
              copy_gene_data=False,
@@ -168,7 +168,11 @@ class Model(GEMComposite):
 
         return new
 
-    def add_medium_data(self, name, data: Union[MediumData, pd.DataFrame], data_kwargs=None, **kwargs):
+    def add_medium_data(self,
+                        name,
+                        data: Union[MediumData, pd.DataFrame],
+                        data_kwargs=None,
+                        **kwargs):
         if isinstance(data, pd.DataFrame):
             data_kwargs = {} if data_kwargs is None else data_kwargs
             data = MediumData(data, **data_kwargs)
@@ -210,6 +214,7 @@ class Model(GEMComposite):
             when converting a pd.DataFrame or pd.Series into GeneData objects.
             The default value is None, which means no additional arguments are
             passed to the GeneData constructor.
+            Ignored when the input data is already a GeneData.
         **kwargs
             Additional keyword arguments to pass to the align method of the
             GeneData object(s) after they have been added to the internal
@@ -218,7 +223,7 @@ class Model(GEMComposite):
         Raises
         ------
         ValueError
-            If the data argument is not a pd.DataFrame, pd.Series, or GeneData
+            If the data argument is not a pd.DataFrame, pd.Series, anndata.AnnData, or GeneData
             object.
 
         """
@@ -252,7 +257,9 @@ class Model(GEMComposite):
         self._gene_data.pop(name)
         self.add_gene_data(name, data, data_kwargs, **kwargs)
 
-    def add_tasks(self, name, tasks):
+    def add_tasks(self,
+                  name: str,
+                  tasks: TaskContainer):
         self._tasks[name] = tasks
 
     def test_tasks(self,
@@ -264,22 +271,39 @@ class Model(GEMComposite):
                              model_compartment_parenthesis=model_compartment_parenthesis)
         return tester.test_tasks(**kwargs)
 
-    def calc_ind_task_score(self, data_name, task_analysis: TaskAnalysis, all_na_indicator = -1, **kwargs):
+    def calc_ind_task_score(self,
+                            data_name: str,
+                            task_analysis: TaskAnalysis,
+                            all_na_indicator = -1,
+                            **kwargs):
 
         return {task_id: self._gene_data[data_name].calc_rxn_score_stat(rxn_ids=rxns,
                                                                         return_if_all_na=all_na_indicator,
                                                                         **kwargs)
                 for task_id, rxns in task_analysis.task_support_rxns.items()}
 
-    def get_activated_tasks(self, data_name, task_analysis: TaskAnalysis,
+    def get_activated_tasks(self,
+                            data_name,
+                            task_analysis: TaskAnalysis,
                             all_na_indicator=-1,
-                            score_threshold=5*np.log10(2), **kwargs):
-        ind_task_scores = self.calc_ind_task_score(data_name, task_analysis,
-                                                   all_na_indicator=all_na_indicator, **kwargs)
-        return [k for k, v in ind_task_scores.items() if v >= score_threshold or v == all_na_indicator]
+                            score_threshold=5*np.log10(2),
+                            **kwargs):
+        ind_task_scores = self.calc_ind_task_score(data_name,
+                                                   task_analysis,
+                                                   all_na_indicator=all_na_indicator,
+                                                   **kwargs)
+        return [k for k, v in ind_task_scores.items()
+                if v >= score_threshold or v == all_na_indicator]
 
-    def get_activated_task_sup_rxns(self, data_name, task_analysis: TaskAnalysis, score_threshold=5*np.log10(2), include_supp_rxns=True):
-        activated_tasks = self.get_activated_tasks(data_name, task_analysis, score_threshold)
+    def get_activated_task_sup_rxns(self,
+                                    data_name: str,
+                                    task_analysis: TaskAnalysis,
+                                    score_threshold: float = 5*np.log10(2),
+                                    include_supp_rxns: bool = True,
+                                    **kwargs):
+        activated_tasks = self.get_activated_tasks(data_name, task_analysis,
+                                                   score_threshold=score_threshold,
+                                                   **kwargs)
         return list(set(chain(*[task_analysis.get_task_support_rxns(task_id=task_id,
                                                                     include_supps=include_supp_rxns)
                                 for task_id in activated_tasks])))
@@ -289,8 +313,8 @@ class Model(GEMComposite):
         check_rxn_scales(mod=self._model, threshold=threshold)
 
     def check_consistency(self,
-                          method="FASTCC",
-                          tol=1e-6,
+                          method: str = "FASTCC",
+                          tol: float = 1e-6,
                           **kwargs):
         cons_tester = consistency_testers[method](model=self)
         test_result = cons_tester.analyze(tol=tol,
@@ -311,7 +335,11 @@ class Model(GEMComposite):
         analyzer = ko_analyzers.create(method, model=self, solver=solver, log={"name": self.name_tag})
         return analyzer.analyze(**kwargs)
 
-    def integrate_gene_data(self, data_name, integrator="GIMME", integrator_init_kwargs=None, **kwargs):
+    def integrate_gene_data(self,
+                            data_name,
+                            integrator="GIMME",
+                            integrator_init_kwargs=None,
+                            **kwargs):
         if isinstance(integrator, str):
             integrator_init_kwargs = {} if integrator_init_kwargs is None else integrator_init_kwargs
             integrator = integrator_factory.create(integrator, **integrator_init_kwargs)

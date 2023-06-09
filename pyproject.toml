@@ -55,4 +55,4 @@ doc = [
 Homepage = "https://github.com/qwerty239qwe/pipeGEM"
 
 [project.scripts]
-pipegem = "pipeGEM.cli._main:main"
+pipegem = "pipeGEM.cli:main"

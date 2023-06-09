@@ -81,7 +81,15 @@ To run existing or create a new pipeline, use the classes defined in pipeGEM.pip
 
 Command-line tool
 ------------------
+To generate template config files for pipelines
 
 .. code-block:: console
 
-    $ python -m pipeGEM -d path-to-data-config.toml
+    $ python -m pipeGEM -n template -o path-to-generate-configs
+
+
+To perform model testing on a template model
+
+.. code-block:: console
+
+    $ python -m pipeGEM -n model_processing

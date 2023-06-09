@@ -1,0 +1,19 @@
+[threshold_analysis]
+    type = "rFASTCORMICS"
+    input_file_path_pattern = "{data_name}"
+[rxn_score]
+    [rxn_score.align]
+        threshold = 0
+        absent_value = 0
+        missing_value = nan
+        and_operation = "min"
+        or_operation = "max"
+        plus_operation = "sum"
+[task_score]
+    input_file_path = ""
+    [task_score.get_supp_rxns]
+        include_supp_rxns = true
+        ignore_na = true
+        na_value = 0
+        return_if_all_na = -1
+        method = "mean"

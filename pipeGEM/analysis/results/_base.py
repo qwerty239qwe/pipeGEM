@@ -37,16 +37,15 @@ def _add_plot_doc(func, default_docs):
     def wrapped(*args, **kwargs):
         return func(*args, **kwargs)
 
-    func.__doc__ = dedent(
-        """
-        {descriptions}
-        
-        Parameters
-        -------
-        {parameters}
-        {added_params}
-        
-        """.format(**default_docs)
+    func.__doc__ = dedent("""
+    {descriptions}
+    
+    Parameters
+    -------
+    {parameters}
+    {added_params}
+    
+    """.format(**default_docs)
     )
     return wrapped
 
@@ -69,14 +68,14 @@ class BaseAnalysis:
         return self.format_str()
 
     def format_str(self) -> str:
-        showed_str = dedent(f"""{self.__class__.__name__} at {hex(id(self))} \n
-        -----------
-        Parameters:
-        {self._log}
-        -----------
-        Result keys:
-        {', '.join([i for i in self._result.keys()])}
-        """)
+        showed_str = dedent(f"""{self.__class__.__name__} at {hex(id(self))}
+    -----------
+    Parameters:
+    {self._log}
+    -----------
+    Result keys:
+    {', '.join([i for i in self._result.keys()])}
+    """)
         if self._running_time:
             showed_str += f"-----------\nRunning time: \n {self._running_time}"
         return showed_str

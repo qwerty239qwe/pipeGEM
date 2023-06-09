@@ -42,8 +42,26 @@ class GIMME(RemovableGeneDataIntegrator):
         super(GIMME, self).__init__()
 
     def integrate(self, model, data, **kwargs):
+        """
+        Integrate the given data with the model.
+
+        Parameters
+        ----------
+        model: cobra.Model or pipeGEM.Model
+            The model to be integrated with the data
+        data: GeneData
+            Gene data used to determine the objective function of GIMME
+        kwargs: dict
+            Keyword arguments passed to apply_GIMME
+
+        Returns
+        -------
+        result: GIMMEAnalysis
+        """
         self._model = model
-        return apply_GIMME(model=self._model, rxn_expr_score=data.rxn_scores, **kwargs)
+        return apply_GIMME(model=self._model,
+                           rxn_expr_score=data.rxn_scores,
+                           **kwargs)
 
 
 class EFlux(RemovableGeneDataIntegrator):
@@ -52,7 +70,9 @@ class EFlux(RemovableGeneDataIntegrator):
 
     def integrate(self, model, data, **kwargs):
         self._model = model
-        return apply_EFlux(model=self._model, rxn_expr_score=data.rxn_scores, **kwargs)
+        return apply_EFlux(model=self._model,
+                           rxn_expr_score=data.rxn_scores,
+                           **kwargs)
 
 
 class SPOT(RemovableGeneDataIntegrator):
@@ -80,7 +100,9 @@ class RIPTiDeSampling(RemovableGeneDataIntegrator):
 
     def integrate(self, model, data, **kwargs):
         self._model = model
-        return apply_RIPTiDe_sampling(model=self._model, rxn_expr_score=data.rxn_scores, **kwargs)
+        return apply_RIPTiDe_sampling(model=self._model,
+                                      rxn_expr_score=data.rxn_scores,
+                                      **kwargs)
 
 
 class RIPTiDe(GeneDataIntegrator):

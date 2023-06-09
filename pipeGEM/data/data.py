@@ -99,9 +99,9 @@ class GeneData(BaseData):
         kwargs:
             Keyword arguments used to create a RxnMapper object, including:
             threshold: float or int, default = 0
-                The absent_value will be assigned to the expression values below this threshold.
+                The absent_value will be assigned to the rxn_scores below this threshold.
             absent_value: float or int, default = 0
-                The value assigned to the genes with expression lower than the threshold.
+                The value assigned to the reactions with score lower than the threshold.
             missing_value: any, default = np.nan
                 The value assigned to the genes not included in the gene_data.
             and_operation: str, default = 'nanmin',
@@ -142,7 +142,6 @@ class GeneData(BaseData):
         Returns
         -------
         rxn_scores: dict[str, float]
-
 
         """
         if self.rxn_mapper is None:
