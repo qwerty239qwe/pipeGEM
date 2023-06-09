@@ -242,7 +242,10 @@ class TaskContainer:
                                 "upper_bound_str",
                                 "compartment_str"]
 
-    def __init__(self, tasks = None):
+    def __init__(self,
+                 tasks: dict = None):
+        if tasks is not None and not isinstance(tasks, dict):
+            raise TypeError("tasks must be a dict with strings as keys and Task as values")
         self.tasks = {} if tasks is None else tasks
 
     def __len__(self):
@@ -275,7 +278,8 @@ class TaskContainer:
         return self.__class__(tasks={name: task for name, task in self.tasks.items() if name in items})
 
     @classmethod
-    def load(cls, file_path=TASKS_FILE_PATH):
+    def load(cls,
+             file_path=TASKS_FILE_PATH):
         with open(file_path) as json_file:
             data = json.load(json_file)
             tasks = {ids: Task(**obj) for ids, obj in data.items()}
