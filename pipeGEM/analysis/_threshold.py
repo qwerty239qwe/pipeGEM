@@ -218,7 +218,8 @@ class rFASTCORMICSThreshold(DistributionBased):
                                                    "k_best": k_best})
         right_c = None if return_heuristic else np.array([self.gaussian_dist(x, *tuple(params_arr[k, 0:3])) for k in range(k_best)])
         left_c = None if return_heuristic else np.array([self.gaussian_dist(x, *tuple(params_arr[k, 3:6])) for k in range(k_best)])
-        result.add_result(dict(data=(x, y),
+        result.add_result(dict(x=x,
+                               y=y,
                                exp_th_arr=params_arr[:, 1],
                                nonexp_th_arr=params_arr[:, 4],
                                right_curve_arr=right_c,

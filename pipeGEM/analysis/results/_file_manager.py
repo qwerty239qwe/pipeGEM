@@ -25,9 +25,9 @@ class BaseFileManager:
         raise NotImplementedError()
 
 
-class CSVFileManager(BaseFileManager):
+class FrameFileManager(BaseFileManager):
     def __init__(self):
-        super(CSVFileManager, self).__init__(pd.DataFrame, default_suffix=".csv")
+        super(FrameFileManager, self).__init__(pd.DataFrame, default_suffix=".csv")
 
     def write(self, obj, file_name, **kwargs):
         if "suffix" in kwargs:
@@ -39,6 +39,22 @@ class CSVFileManager(BaseFileManager):
 
     def read(self, file_name, **kwargs):
         return pd.read_csv(file_name, **kwargs)
+
+
+class SeriesFileManager(BaseFileManager):
+    def __init__(self):
+        super(SeriesFileManager, self).__init__(pd.Series, default_suffix=".csv")
+
+    def write(self, obj: pd.Series, file_name, **kwargs):
+        if "suffix" in kwargs:
+            suffix = kwargs.pop("suffix")
+        else:
+            suffix = self.suffix
+
+        obj.to_frame().to_csv(Path(file_name).with_suffix(suffix), **kwargs)
+
+    def read(self, file_name, **kwargs):
+        return pd.read_csv(file_name, index_col=0, **kwargs).iloc[:, 0]
 
 
 class CobraModelFileManager(BaseFileManager):
@@ -67,12 +83,30 @@ class NDArrayStrFileManager(BaseFileManager):
             suffix = kwargs.pop("suffix")
         else:
             suffix = self.suffix
-        np.save_txt(Path(file_name).with_suffix(suffix),
-                    obj,
-                    **kwargs)
+        np.savetxt(Path(file_name).with_suffix(suffix),
+                   obj,
+                   **kwargs)
 
     def read(self, file_name, **kwargs):
         return np.loadtxt(file_name, **kwargs)
+
+
+class NDArrayFloatFileManager(BaseFileManager):
+    def __init__(self):
+        super(NDArrayFloatFileManager, self).__init__(np.ndarray,
+                                                      default_suffix=".npz")
+
+    def write(self, obj, file_name, **kwargs):
+        if "suffix" in kwargs:
+            suffix = kwargs.pop("suffix")
+        else:
+            suffix = self.suffix
+        np.savez(str(Path(file_name).with_suffix(suffix)),
+                 obj,
+                 **kwargs)
+
+    def read(self, file_name, **kwargs):
+        return np.load(file_name, **kwargs)
 
 
 class FileManagers(ObjectFactory):
@@ -81,6 +115,8 @@ class FileManagers(ObjectFactory):
 
 
 fmanagers = FileManagers()
-fmanagers.register(type(pd.DataFrame), CSVFileManager)
+fmanagers.register(type(pd.DataFrame), FrameFileManager)
+fmanagers.register(type(pd.Series), SeriesFileManager)
 fmanagers.register(type(cobra.Model), CobraModelFileManager)
 fmanagers.register("NDArrayStr", NDArrayStrFileManager)
+fmanagers.register("NDArrayFloat", NDArrayFloatFileManager)

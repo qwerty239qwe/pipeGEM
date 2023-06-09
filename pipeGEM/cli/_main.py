@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+from typing import Union, Dict
 
 import pandas as pd
 import anndata as ad
@@ -67,14 +68,26 @@ def model_preprocess(model_conf):
     task_result.save(model_conf["functionality_test"]["saved_path"])
 
 
+def find_threshold(gene_data: Union[GeneData, Dict[str, GeneData]],
+                   threshold_config):
+    th_name = threshold_config["params"]["name"]
+    if th_name != "local":
+        result = gene_data.get_threshold(**threshold_config["params"])
+    else:
+        assert isinstance(gene_data, dict)
+        agg_data = GeneData.aggregate(gene_data, prop="data")
+        result = agg_data.find_local_threshold(**threshold_config["params"])
+    result.save(threshold_config["saved_path"])
+
+
 def main():
     pass
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--gene_data",
+    parser.add_argument("-g", "--gene_data",
                         dest="gene_data_conf_path",
-                        metavar="config_file_path")
+                        metavar="gene_data_config_file_path")
 
     main()

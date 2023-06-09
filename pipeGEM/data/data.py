@@ -99,11 +99,11 @@ class GeneData(BaseData):
         kwargs:
             Keyword arguments used to create a RxnMapper object, including:
             threshold: float or int, default = 0
-                The absent_value will be assigned to the expression values below this threshold
+                The absent_value will be assigned to the expression values below this threshold.
             absent_value: float or int, default = 0
-                The value assigned to the low-expressed genes
+                The value assigned to the genes with expression lower than the threshold.
             missing_value: any, default = np.nan
-                The value assigned to the genes not included in the gene_data
+                The value assigned to the genes not included in the gene_data.
             and_operation: str, default = 'nanmin',
                 The operation name used to calculate the 'and' gene-reaction relationships.
 
@@ -132,8 +132,23 @@ class GeneData(BaseData):
 
     @property
     def rxn_scores(self) -> Dict[str, float]:
+        """
+        Reaction scores calculated by a RxnMapper.
+        A RxnMapper assigns a reaction score to each reaction in the aligned model based on its gene-reaction relationship.
+        By default, 'or' relationships will be converted into max() formula,
+        and 'and' relationships will be converted into min() formula to represent isozymes and protein subunits, respectively.
+        However, users can determine which formula to use to replace the relationships.
+
+        Returns
+        -------
+        rxn_scores: dict[str, float]
+
+
+        """
         if self.rxn_mapper is None:
-            raise AttributeError("The rxn mapper is not initialized. Please do .align(model) first.")
+            raise AttributeError("The rxn mapper is not initialized. "
+                                 "Please call .align(model) first "
+                                 "or add this GeneData to a pg.Model using Model.add_gene_data(this object)")
         return {k: self.data_transform(v) for k, v in self.rxn_mapper.rxn_scores.items()}
 
     def _digitize_data(self, ordered_thresholds):

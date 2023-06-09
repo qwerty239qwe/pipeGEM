@@ -4,6 +4,9 @@ Analysis and its Results
 
 .. currentmodule:: pipeGEM
 
+Most analysis results generated from various analysis functions are stored in result objects.
+These objects provide io (save() and load()) and visualization (usually named as plot()) methods, and basic description of the results.
+Some result objects allow users to do further analysis, which will produce additional result objects.
 
 =================================
 Consistency / Functionality tests

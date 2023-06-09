@@ -8,13 +8,6 @@ class rFASTCORMICSThresholdAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log=log)
 
-    def save(self, file_path, index=0):
-        result_dic = {"exp_th": self._result["exp_th_arr"][index],
-                      "non_exp_th": self._result["nonexp_th_arr"][index]}
-
-        with open(file_path, "w") as f:
-            json.dump(result_dic, f)
-
     @property
     def exp_th(self):
         return self._result["exp_th_arr"][0]
@@ -40,8 +33,8 @@ class rFASTCORMICSThresholdAnalysis(BaseAnalysis):
              *args,
              **kwargs):
         pltr = rFastCormicThresholdPlotter(dpi=dpi, prefix=prefix)
-        pltr.plot(x=self._result["data"][0],
-                  y=self._result["data"][1],
+        pltr.plot(x=self._result["x"],
+                  y=self._result["y"],
                   exp_th=self._result["exp_th_arr"][k],
                   nonexp_th=self._result["nonexp_th_arr"][k],
                   right_curve=self._result["right_curve_arr"][k] if self._result["right_curve_arr"] is not None else None,
