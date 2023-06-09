@@ -4,6 +4,52 @@ from scipy import stats
 import numpy as np
 import itertools
 from functools import reduce
+from .results import NormalityTestResult
+
+
+class AssumptionTester:
+    def __init__(self):
+        pass
+
+
+class NormalityTester(AssumptionTester):
+    def __init__(self):
+        super(NormalityTester, self).__init__()
+
+    @staticmethod
+    def test(data, method="shapiro", **kwargs):
+        assert method in ["shapiro", "kstest", "anderson"]
+
+        statistic, pvalue = getattr(stats, method)(data)
+        new_result = NormalityTestResult(log={"method": method})
+        new_result.add_result(dict(pvalue=pvalue,
+                                   statistic=statistic,
+                                   data=data,
+                                   **kwargs))  # annotations or factors
+        return new_result
+
+
+class VarHomogeneityTester(AssumptionTester):
+    def __init__(self):
+        super(VarHomogeneityTester, self).__init__()
+
+
+class MultipleComparisonTester:
+    def __init__(self):
+        pass
+
+
+class PostHocTester:
+    def __init__(self):
+        pass
+
+
+class HyperGeometricTester:
+    def __init__(self):
+        pass
+
+
+
 
 
 class MultipleComparison:
