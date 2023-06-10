@@ -24,70 +24,21 @@ class TaskAnalysis(BaseAnalysis):
         """
         super(TaskAnalysis, self).__init__(log)
 
-    @classmethod
-    def load(cls, file_name, **kwargs):
-
-        with open(file_name) as json_file:
-            data = json.load(json_file)
-            task_analysis = cls(log=data.pop("log"))
-            result_dic = {k: {task_id: task_results[k] for task_id, task_results in data.items()}
-                          for k in cls.result_df_default_colnames}
-
-            for task_id, task_results in data.items():
-                tr, trf, rs = task_results.get("task_support_rxns"), \
-                              task_results.get("task_support_rxn_fluxes"), \
-                              task_results.get("rxn_supps")
-                if tr is not None:
-                    task_analysis._task_support_rxns[task_id] = tr
-                if trf is not None:
-                    task_analysis._task_support_rxn_fluxes[task_id] = trf
-                if rs is not None:
-                    task_analysis._rxn_supps[task_id] = rs
-            result_dic.update({"task_support_rxns": task_analysis._task_support_rxns,
-                               "task_support_rxn_fluxes": task_analysis._task_support_rxn_fluxes,
-                               "rxn_supps": task_analysis._rxn_supps})
-
-            task_analysis._result_df = pd.DataFrame(result_dic)
-
-        return task_analysis
-
-    def save(self, file_name):
-        result_dic = {}
-        for c in self.result_df_default_colnames:
-            for k, v in self.result_df[c].to_dict().items():
-                if k not in result_dic:
-                    result_dic[k] = {}
-                if c != "Obj_rxns":
-                    result_dic[k][c] = v if not pd.isna(v) else None
-                else:
-                    result_dic[k][c] = [vi.id for vi in v]
-
-        for attr_name, attr in zip(["task_support_rxns", "task_support_rxn_fluxes", "rxn_supps"],
-                                   [self._task_support_rxns, self._task_support_rxn_fluxes, self._rxn_supps]):
-            for k, v in attr.items():
-                if not(isinstance(v, list) or isinstance(v, dict)) and pd.isna(v):
-                    result_dic[k][attr_name] = None
-                else:
-                    result_dic[k][attr_name] = v
-        result_dic["log"] = self._log
-        with open(file_name, "w") as f:
-            json.dump(result_dic, f)
-
     @property
     def model_score(self):
         return self._result["score"]
 
     @property
     def task_support_rxns(self) -> dict:
-        return dict(self._result_df["task_support_rxns"].items())
+        return dict(self._result["result_df"]["task_support_rxns"].items())
 
     @property
     def task_support_rxn_fluxes(self) -> dict:
-        return dict(self._result_df["task_support_rxn_fluxes"].items())
+        return dict(self._result["result_df"]["task_support_rxn_fluxes"].items())
 
     @property
     def rxn_supps(self) -> dict:
-        return dict(self._result_df["rxn_supps"].items())
+        return dict(self._result["result_df"]["rxn_supps"].items())
 
     @property
     def task_ids(self) -> list:

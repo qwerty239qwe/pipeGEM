@@ -1,5 +1,7 @@
 import json
 
+import pandas as pd
+
 from ._base import *
 from pipeGEM.plotting import rFastCormicThresholdPlotter, PercentileThresholdPlotter, LocalThresholdPlotter
 
@@ -7,23 +9,26 @@ from pipeGEM.plotting import rFastCormicThresholdPlotter, PercentileThresholdPlo
 class rFASTCORMICSThresholdAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log=log)
+        for attr in ["x", "y", "exp_th_arr",
+                     "nonexp_th_arr", "right_curve_arr", "left_curve_arr"]:
+            self._result_saving_params[attr] = {"fm_name": "NDArrayFloat"}
 
     @property
-    def exp_th(self):
+    def exp_th(self) -> float:
         return self._result["exp_th_arr"][0]
 
     @property
-    def non_exp_th(self):
+    def non_exp_th(self) -> float:
         return self._result["nonexp_th_arr"][0]
 
     @property
-    def init_threshold(self):
+    def init_threshold(self) -> (float, float):
         return self._result["init_exp"], self._result["init_nonexp"]
 
-    def get_other_exp_th(self, k):
+    def get_other_exp_th(self, k) -> float:
         return self._result["exp_th_arr"][k]
 
-    def get_other_non_exp_th(self, k):
+    def get_other_non_exp_th(self, k) -> float:
         return self._result["nonexp_th_arr"][k]
 
     def plot(self,
@@ -46,6 +51,7 @@ class rFASTCORMICSThresholdAnalysis(BaseAnalysis):
 class PercentileThresholdAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log=log)
+        self._result_saving_params["data"] = {"fm_name": "NDArrayFloat"}
 
     @property
     def exp_th(self):
@@ -68,15 +74,15 @@ class LocalThresholdAnalysis(BaseAnalysis):
         super().__init__(log=log)
 
     @property
-    def local_ths(self):
+    def local_ths(self) -> pd.Series:
         return self._result["local_ths"]
 
     @property
-    def global_off_th(self):
+    def global_off_th(self) -> pd.Series:
         return self._result["global_off_th"]
 
     @property
-    def global_on_th(self):
+    def global_on_th(self) -> pd.Series:
         return self._result["global_on_th"]
 
     def _get_group_dic(self):

@@ -280,6 +280,10 @@ class TaskContainer:
     @classmethod
     def load(cls,
              file_path=TASKS_FILE_PATH):
+        tasks_folder = Path(__file__).parent.parent.parent.parent / "tasks"
+        if (not Path(file_path).is_file()) and (tasks_folder / file_path).is_file():
+            file_path = (tasks_folder / file_path)
+
         with open(file_path) as json_file:
             data = json.load(json_file)
             tasks = {ids: Task(**obj) for ids, obj in data.items()}
@@ -392,7 +396,8 @@ class TaskHandler:
                 'Missing mets': not all_met_exist,
                 'Status': true_status,
                 'Obj_value': obj_val,
-                "Obj_rxns": obj_rxns, **test_results}
+                "Obj_rxns": [r.id for r in obj_rxns],
+                **test_results}
 
     @staticmethod
     def _test_task_sinks_utils(ID, task, model, rxn_fluxes):

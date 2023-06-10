@@ -1,11 +1,10 @@
 import pytest
 import cobra
 from pipeGEM.data.synthesis import get_syn_gene_data
-from pipeGEM.utils import load_model
 from pipeGEM.data.fetching import load_remote_model
-from pipeGEM.utils import random_perturb
 from pipeGEM import Group
-from pipeGEM.utils import random_perturb
+from pipeGEM.utils import random_perturb, load_model
+from pipeGEM.analysis.tasks import Task, TaskContainer
 
 
 @pytest.fixture(scope="session")
@@ -60,3 +59,19 @@ def pFBA_result(ecoli_core):
                                       solver="glpk",
                                       group_by="treatments")
     yield pFBA_result
+
+
+@pytest.fixture(scope="session")
+def ecoli_Tasks():
+    new_task = Task(should_fail=False,
+                    in_mets=[{"met_id": "glc__D", "compartment": "e", "lb": 0, "ub": 10},
+                             {"met_id": "o2", "compartment": "e", "lb": 0, "ub": 10},
+                             {"met_id": "h2o", "compartment": "e", "lb": 0, "ub": 10},
+                             {"met_id": "h", "compartment": "e", "lb": 0, "ub": 10}],
+                    out_mets=[{"met_id": "co2", "compartment": "e", "lb": 0, "ub": 10},
+                              {"met_id": "h2o", "compartment": "e", "lb": 0, "ub": 10},
+                              {"met_id": "atp", "compartment": "c", "lb": 1, "ub": 10},
+                              {"met_id": "h", "compartment": "e", "lb": 0, "ub": 10}],
+                    compartment_parenthesis="_{}"
+                    )
+    yield TaskContainer({"glu2atp": new_task})

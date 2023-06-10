@@ -13,7 +13,8 @@ from pipeGEM.analysis import TaskAnalysis
 
 pl_needed_config = {"integration": ["thresholds", "gene_data",
                                     "mapping", "model", "gene_data_integration"],
-                    "model_processing": ["model"]}
+                    "model_processing": ["model"],
+                    "get_threshold": ["thresholds"]}
 
 
 def generate_template_configs(dest_folder, pl_name):
@@ -25,6 +26,7 @@ def generate_template_configs(dest_folder, pl_name):
             conf = parse_toml_file((template_folder / fn).with_suffix(".toml"))
             save_toml_file((saved_conf_dir / fn).with_suffix(".toml"), conf)
         elif (template_folder / fn).is_dir():
+            (Path(dest_folder) / "configs" / fn).mkdir(parents=True)
             for dfn in (template_folder / fn).iterdir():
                 conf = parse_toml_file(dfn)
                 save_toml_file((saved_conf_dir / fn / dfn.stem).with_suffix(".toml"), conf)

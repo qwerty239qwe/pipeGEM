@@ -72,6 +72,7 @@ class BaseAnalysis:
         self._result_loading_params = {}
         self._fmanagers = fmanagers
         self._result_folder_name = "result"
+        self._s_val_tps = [str, float, int, ]
 
     def __repr__(self):
         return self.format_str()
@@ -114,6 +115,10 @@ class BaseAnalysis:
     def _load_results(self, parent_dir, result_types):
         result_dic = {}
         for fn in Path(parent_dir).iterdir():
+            if fn.name == "other_values.toml":
+                result_dic.update(parse_toml_file(fn))
+                continue
+
             file_manager = self._fmanagers[result_types[fn.stem]]()
             kws = {} if fn.stem not in self._result_loading_params else self._result_loading_params[fn.stem]
             result_dic[fn.stem] = file_manager.read(fn, **kws)
@@ -121,11 +126,16 @@ class BaseAnalysis:
 
     def _save_results(self, parent_dir, result_types):
         (parent_dir / self._result_folder_name).mkdir()
+        singular_values = {}
         for k, v in self._result.items():
+            if any([isinstance(v, tp) for tp in self._s_val_tps]):
+                singular_values[k] = v
+                continue
             file_manager = self._fmanagers[result_types[k]]()
             kws = {} if k not in self._result_saving_params else {k: v for k, v in self._result_saving_params[k].items()
                                                                   if k not in ["fm_name"]}
             file_manager.write(v, parent_dir / self._result_folder_name / k, **kws)
+        save_toml_file(parent_dir / self._result_folder_name / "other_values.toml", singular_values)
 
     def save(self,
              file_path):
