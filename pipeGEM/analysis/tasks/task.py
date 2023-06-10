@@ -378,7 +378,7 @@ class TaskHandler:
                 else:
                     result = analyzer.analyze(objective_sense="minimize",
                                               **(method_kws if method_kws is not None else {}))
-                test_result = self._get_test_result(result.result, dummy_rxns, fail_threshold)
+                test_result = self._get_test_result(result.flux_df, dummy_rxns, fail_threshold)
                 all_supp_rxns |= set(test_result["task_support_rxns"])
                 if n_pos_supps == len(all_supp_rxns):
                     break
