@@ -27,6 +27,7 @@
     saved_path = "./consistency_test"
     [consistency.params]
         tol = 1e-6
+        return_model = true
 [functionality_test]
     method = "default"
     saved_path = "./functionality_test"

@@ -2,7 +2,8 @@ from tqdm import tqdm
 import numpy as np
 
 import pipeGEM
-from pipeGEM.analysis import LP3, LP7, non_convex_LP7, non_convex_LP3, FastCCAnalysis
+from pipeGEM.analysis import timing, LP3, LP7, non_convex_LP7, non_convex_LP3, FVAConsistencyAnalysis, FastCCAnalysis
+from ._flux import FVA_Analyzer
 from pipeGEM.utils import ObjectFactory
 from pipeGEM.utils import get_rxn_set, flip_direction
 
@@ -24,11 +25,12 @@ class FASTCC(ConsistencyTester):
     def __init__(self, model):
         super().__init__(model)
 
+    @timing
     def analyze(self,
                 tol: float,
-                return_model: bool,
+                return_model: bool = True,
                 is_convex=True,
-                **kwargs):
+                **kwargs) -> FastCCAnalysis:
         if not is_convex:
             print("Using non-convex fastcc method")
         print(f"Flux tolerance used: {tol}")
@@ -94,5 +96,36 @@ class FASTCC(ConsistencyTester):
         return result
 
 
+class FVAConsistencyTester(ConsistencyTester):
+    def __init__(self, model):
+        super().__init__(model)
+
+    @timing
+    def analyze(self,
+                tol: float,
+                return_model: bool = True,
+                **kwargs) -> FVAConsistencyAnalysis:
+        analyzer = FVA_Analyzer(model=self.model,
+                                solver=self.model.solver)
+        fva_result = analyzer.analyze(**kwargs)
+        rxns_to_remove = fva_result.flux_df.query(f"minimum >= {-tol} and maximum <= {tol}").index.to_list()
+        consistent_model = None
+        if return_model:
+            consistent_model = self.model.copy()
+            consistent_model.remove_reactions(rxns_to_remove)
+            if isinstance(consistent_model, pipeGEM.Model):
+                consistent_model.rename(name_tag=f"consistent_{self.model.name_tag}")
+
+        result = FVAConsistencyAnalysis(log=dict(tol=tol,
+                                                 return_model=return_model,
+                                                 **kwargs))
+
+        result.add_result(dict(consistent_model=consistent_model,
+                               removed_rxn_ids=np.array(rxns_to_remove),
+                               kept_rxn_ids=np.array([r.id for r in consistent_model.reactions])))
+        return result
+
+
 consistency_testers = ConsistencyTesters()
 consistency_testers.register("FASTCC", FASTCC)
+consistency_testers.register("FVA", FVAConsistencyTester)

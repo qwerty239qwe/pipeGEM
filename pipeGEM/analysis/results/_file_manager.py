@@ -85,10 +85,11 @@ class NDArrayStrFileManager(BaseFileManager):
             suffix = self.suffix
         np.savetxt(Path(file_name).with_suffix(suffix),
                    obj,
+                   fmt='%s',
                    **kwargs)
 
     def read(self, file_name, **kwargs):
-        return np.loadtxt(file_name, **kwargs)
+        return np.loadtxt(file_name, dtype="str", **kwargs)
 
 
 class NDArrayFloatFileManager(BaseFileManager):
@@ -115,8 +116,8 @@ class FileManagers(ObjectFactory):
 
 
 fmanagers = FileManagers()
-fmanagers.register(type(pd.DataFrame), FrameFileManager)
-fmanagers.register(type(pd.Series), SeriesFileManager)
-fmanagers.register(type(cobra.Model), CobraModelFileManager)
+fmanagers.register("DataFrame", FrameFileManager)
+fmanagers.register("Series", SeriesFileManager)
+fmanagers.register("Model", CobraModelFileManager)
 fmanagers.register("NDArrayStr", NDArrayStrFileManager)
 fmanagers.register("NDArrayFloat", NDArrayFloatFileManager)

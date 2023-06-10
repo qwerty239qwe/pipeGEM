@@ -48,7 +48,7 @@ class Model(GEMComposite):
         self._annotations = kwargs
 
     def __enter__(self):
-        self._model.__enter__()
+        return self._model.__enter__()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._model.__exit__(exc_type, exc_val, exc_tb)

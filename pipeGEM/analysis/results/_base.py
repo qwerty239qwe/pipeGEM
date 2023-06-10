@@ -102,7 +102,7 @@ class BaseAnalysis:
     def _load_results(self, parent_dir, result_types):
         result_dic = {}
         for fn in Path(parent_dir).iterdir():
-            file_manager = self._fmanagers[result_types[fn.stem]].create()
+            file_manager = self._fmanagers[result_types[fn.stem]]()
             kws = {} if fn.stem not in self._result_loading_params else self._result_loading_params[fn.stem]
             result_dic[fn.stem] = file_manager.read(fn, **kws)
         self.add_result(result_dic)
@@ -111,9 +111,9 @@ class BaseAnalysis:
         (parent_dir / self._result_folder_name).mkdir()
         for k, v in self._result.items():
             if any([isinstance(v, sp_type) for sp_type in [list, dict, set, np.ndarray]]):
-                file_manager = self._fmanagers[self._result_saving_params[k]["fm_name"]].create()
+                file_manager = self._fmanagers[self._result_saving_params[k].pop("fm_name")]()
             else:
-                file_manager = self._fmanagers[str(type(v))].create()
+                file_manager = self._fmanagers[v.__class__.__name__]()
             kws = {} if k not in self._result_saving_params else self._result_saving_params[k]
             file_manager.write(v, parent_dir / self._result_folder_name / k, **kws)
 
@@ -124,7 +124,8 @@ class BaseAnalysis:
         print(f"Created a folder {file_path} to store the result")
         save_toml_file(saved_dir / "analysis_params.toml", {"running_time": self._running_time,
                                                             "log": self.log,
-                                                            "result_types": {k: str(type(v))
+                                                            "result_types": {k: v.__class__.__name__
+                                                                if k not in self._result_saving_params else self._result_saving_params[k]["fm_name"]
                                                                              for k, v in self._result.items()}})
         self._save_results(parent_dir=saved_dir)
 
@@ -138,6 +139,7 @@ class BaseAnalysis:
         new_analysis.add_running_time(all_configs["running_time"])
         new_analysis._load_results(parent_dir=file_path / new_analysis._result_folder_name,
                                    result_types=all_configs["result_types"])
+        return new_analysis
 
     def plot(self, **kwargs):
         raise NotImplementedError()
