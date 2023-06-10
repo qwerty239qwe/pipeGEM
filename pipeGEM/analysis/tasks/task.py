@@ -411,7 +411,7 @@ class TaskHandler:
         return sol
 
     def test_task_sink_one_path(self, ID, task, model, fail_threshold, rxn_fluxes) -> dict:
-        supp_sol = self._test_task_sinks_utils(ID, task, model, rxn_fluxes[0])
+        supp_sol = self._test_task_sinks_utils(ID, task, model, rxn_fluxes)
         supp_status = supp_sol.status if supp_sol is not None else "infeasible"
         if supp_status == "optimal":
             status = "optimal"
