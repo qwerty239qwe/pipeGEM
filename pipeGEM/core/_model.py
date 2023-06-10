@@ -11,7 +11,7 @@ import numpy as np
 from anndata import AnnData
 
 from pipeGEM.core._base import GEMComposite
-from pipeGEM.utils import save_model, check_rxn_scales
+from pipeGEM.utils import save_model, load_model, check_rxn_scales, save_toml_file, parse_toml_file
 from pipeGEM.data import GeneData, MediumData
 from pipeGEM.integration import integrator_factory
 from pipeGEM.analysis import flux_analyzers, consistency_testers, TaskAnalysis, ko_analyzers
@@ -350,9 +350,36 @@ class Model(GEMComposite):
     def get_RAS(self, data_name, method="mean"):
         return self._gene_data[data_name].calc_rxn_score_stat([r.id for r in self._model.reactions])
 
-    def save_model(self, file_name: str) -> None:
+    def save_model(self,
+                   file_name: str) -> None:
+        """
+        Save this model at the provided location.
+        This is just a workaround for now
+        since the io function for all the file types haven't been implemented.
+        Besides the model, this function stores annotations and name_tag as a toml file in the same folder of the model.
+
+        Parameters
+        ----------
+        file_name: str
+
+        Returns
+        -------
+
+        """
         path = Path(file_name)
         save_model(self._model, str(path))
+        additional = self.annotation
+        additional.update({"name_tag": self.name_tag})
+        save_toml_file(file_name=Path(path.stem).with_suffix(".toml"),
+                       dic=additional)
+
+    @classmethod
+    def load_model(cls, file_name):
+        model_pth = Path(file_name)
+        add_ = parse_toml_file(Path(model_pth.stem).with_suffix(".toml"))
+        model = load_model(file_name)
+        name = add_.pop("name_tag")
+        return cls(name_tag=name, model=model, **add_)
 
     def separate_merged_rxns(self):
         to_be_restored, to_be_pruned = [], []
@@ -381,3 +408,4 @@ class Model(GEMComposite):
 
     def get_merged_rxn(self, rxn_id):
         return self._merged_rxn_lu_table[rxn_id]
+

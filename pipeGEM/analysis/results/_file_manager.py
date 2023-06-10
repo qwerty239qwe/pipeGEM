@@ -1,6 +1,6 @@
 import numpy as np
 
-from pipeGEM.utils import ObjectFactory, save_model, load_model
+from pipeGEM.utils import ObjectFactory, save_model, load_model, load_pg_model
 import pandas as pd
 import cobra
 from pathlib import Path
@@ -73,6 +73,22 @@ class CobraModelFileManager(BaseFileManager):
         return load_model(model_file_path=file_name)
 
 
+class PGModelFileManager(BaseFileManager):
+    def __init__(self):
+        super(PGModelFileManager, self).__init__("pipeGEM.Model",
+                                                 default_suffix=".json")
+
+    def write(self, obj, file_name, **kwargs):
+        if "suffix" in kwargs:
+            suffix = kwargs.pop("suffix")
+        else:
+            suffix = self.suffix
+        obj.save_model(file_name=Path(file_name).with_suffix(suffix))
+
+    def read(self, file_name, **kwargs):
+        return load_pg_model(file_name=file_name)
+
+
 class NDArrayStrFileManager(BaseFileManager):
     def __init__(self):
         super(NDArrayStrFileManager, self).__init__(np.ndarray,
@@ -116,8 +132,9 @@ class FileManagers(ObjectFactory):
 
 
 fmanagers = FileManagers()
-fmanagers.register("DataFrame", FrameFileManager)
-fmanagers.register("Series", SeriesFileManager)
-fmanagers.register("Model", CobraModelFileManager)
-fmanagers.register("NDArrayStr", NDArrayStrFileManager)
-fmanagers.register("NDArrayFloat", NDArrayFloatFileManager)
+fmanagers.register("pandas.DataFrame", FrameFileManager)
+fmanagers.register("pandas.Series", SeriesFileManager)
+fmanagers.register("cobra.Model", CobraModelFileManager)
+fmanagers.register("pipeGEM.Model", PGModelFileManager)
+fmanagers.register("numpy.NDArrayStr", NDArrayStrFileManager)
+fmanagers.register("numpy.NDArrayFloat", NDArrayFloatFileManager)

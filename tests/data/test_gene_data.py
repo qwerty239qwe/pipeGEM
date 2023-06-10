@@ -47,6 +47,7 @@ def test_find_rFASTCORMICS_threshold(ecoli_core_data):
     gene_data = GeneData(data=ecoli_core_data[data_name],
                          data_transform=lambda x: np.log2(x),
                          absent_expression=-np.inf)
-    rth = gene_data.get_threshold(name="percentile", p=10)
+    rth = gene_data.get_threshold(name="rFASTCORMICS")
     assert isinstance(rth, rFASTCORMICSThresholdAnalysis)
     assert rth.exp_th > rth.non_exp_th
+    rth.save("./rFASTCORMICS")

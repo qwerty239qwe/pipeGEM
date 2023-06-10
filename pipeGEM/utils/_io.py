@@ -21,7 +21,7 @@ except ImportError:
 
 
 __all__ = ("model_to_excel", "model_to_mat", "load_test_model", "save_model", "load_model",
-           "parse_toml_file", "save_toml_file")
+           "parse_toml_file", "save_toml_file", "load_pg_model")
 
 
 def model_to_excel(model, file_name):
@@ -177,6 +177,15 @@ def load_model(model_file_path: str) -> cobra.Model:
         return cobra.io.load_yaml_model(fn_path)
     else:
         raise ValueError(f"Invalid file extension: {fn_path.suffix}")
+
+
+def load_pg_model(file_name):
+    import pipeGEM
+    model_pth = Path(file_name)
+    add_ = parse_toml_file(Path(model_pth.stem).with_suffix(".toml"))
+    model = load_model(file_name)
+    name = add_.pop("name_tag")
+    return pipeGEM.Model(name_tag=name, model=model, **add_)
 
 
 def sheet_to_comp(model, excel_file_name, raise_err=False):

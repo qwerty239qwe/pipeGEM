@@ -50,6 +50,18 @@ def _add_plot_doc(func, default_docs):
     return wrapped
 
 
+def _get_module(v, **sp_module_names):
+    if '__module__' in v.__dir__():
+        return v.__module__.split(".")[0]
+    if "ndarray" == v.__class__.__name__:
+        return "numpy"
+    for k, v in sp_module_names.items():
+        if k == v.__class__.__name__:
+            return v
+
+    return "python"
+
+
 class BaseAnalysis:
     def __init__(self, log):
         self._log = log  # analysis record (parameters used to reproduce the same result)
@@ -107,14 +119,12 @@ class BaseAnalysis:
             result_dic[fn.stem] = file_manager.read(fn, **kws)
         self.add_result(result_dic)
 
-    def _save_results(self, parent_dir):
+    def _save_results(self, parent_dir, result_types):
         (parent_dir / self._result_folder_name).mkdir()
         for k, v in self._result.items():
-            if any([isinstance(v, sp_type) for sp_type in [list, dict, set, np.ndarray]]):
-                file_manager = self._fmanagers[self._result_saving_params[k].pop("fm_name")]()
-            else:
-                file_manager = self._fmanagers[v.__class__.__name__]()
-            kws = {} if k not in self._result_saving_params else self._result_saving_params[k]
+            file_manager = self._fmanagers[result_types[k]]()
+            kws = {} if k not in self._result_saving_params else {k: v for k, v in self._result_saving_params[k].items()
+                                                                  if k not in ["fm_name"]}
             file_manager.write(v, parent_dir / self._result_folder_name / k, **kws)
 
     def save(self,
@@ -122,12 +132,20 @@ class BaseAnalysis:
         saved_dir = Path(file_path)
         saved_dir.mkdir(parents=True)
         print(f"Created a folder {file_path} to store the result")
+        result_types = {}
+        for k, v in self._result.items():
+            module_sp_kw = self._result_saving_params[k]["module_name"] if (
+                    k in self._result_saving_params and "module_name" in self._result_saving_params[k]) else {}
+            module_name = _get_module(v, **module_sp_kw)
+            if k in self._result_saving_params and "fm_name" in self._result_saving_params[k]:
+                result_types[k] = f"{module_name}.{self._result_saving_params[k]['fm_name']}"
+            else:
+                result_types[k] = f"{module_name}.{v.__class__.__name__}"
+
         save_toml_file(saved_dir / "analysis_params.toml", {"running_time": self._running_time,
                                                             "log": self.log,
-                                                            "result_types": {k: v.__class__.__name__
-                                                                if k not in self._result_saving_params else self._result_saving_params[k]["fm_name"]
-                                                                             for k, v in self._result.items()}})
-        self._save_results(parent_dir=saved_dir)
+                                                            "result_types": result_types})
+        self._save_results(parent_dir=saved_dir, result_types=result_types)
 
     @classmethod
     def load(cls,
