@@ -54,10 +54,10 @@ class TaskAnalysis(BaseAnalysis):
     def get_task_support_rxns(self,
                               task_id,
                               include_supps=True):
-        return self.task_support_rxns[task_id][0] + (self.rxn_supps[task_id]
+        return self.task_support_rxns[task_id][0] + (self.rxn_supps[task_id][0]
                                                      if include_supps and
                                                         task_id in self.rxn_supps and
-                                                        isinstance(self.rxn_supps[task_id], list)
+                                                        isinstance(self.rxn_supps[task_id][0], list)
                                                      else [])
 
     def get_all_possible_sups(self, task_id):

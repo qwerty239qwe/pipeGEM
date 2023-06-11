@@ -146,8 +146,9 @@ def _preprocess_int_configs(integration_conf,
                             protected_rxns):
     integration_conf = {**integration_conf}
     saved_path = integration_conf.pop("saved_path")
-
-    if integration_conf["integrator_name"] == "GIMME":
+    int_name = integration_conf.pop("integrator_name")
+    _ = integration_conf.pop("precompute")
+    if int_name == "GIMME":
         if integration_conf["high_exp"] == "default":
             integration_conf["high_exp"] = th_result.exp_th if not isinstance(th_result, LocalThresholdAnalysis) else 0
 

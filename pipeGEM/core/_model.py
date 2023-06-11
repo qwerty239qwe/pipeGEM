@@ -288,12 +288,13 @@ class Model(GEMComposite):
                             all_na_indicator=-1,
                             score_threshold=5*np.log10(2),
                             **kwargs):
+        passed_task = task_analysis.result_df.query("Passed").index.to_list()
         ind_task_scores = self.calc_ind_task_score(data_name,
                                                    task_analysis,
                                                    all_na_indicator=all_na_indicator,
                                                    **kwargs)
         return [k for k, v in ind_task_scores.items()
-                if v >= score_threshold or v == all_na_indicator]
+                if (v >= score_threshold or v == all_na_indicator) and (k in passed_task)]
 
     def get_activated_task_sup_rxns(self,
                                     data_name: str,

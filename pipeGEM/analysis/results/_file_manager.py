@@ -1,6 +1,6 @@
 import numpy as np
 
-from pipeGEM.utils import ObjectFactory, save_model, load_model, load_pg_model
+from pipeGEM.utils import ObjectFactory, save_model, load_model, load_pg_model, save_toml_file, parse_toml_file
 import pandas as pd
 import cobra
 from pathlib import Path
@@ -128,6 +128,23 @@ class NDArrayFloatFileManager(BaseFileManager):
         return arr
 
 
+class DictFileManager(BaseFileManager):
+    def __init__(self):
+        super(DictFileManager, self).__init__(dict,
+                                              default_suffix=".toml")
+
+    def write(self, obj, file_name, **kwargs):
+        if "suffix" in kwargs:
+            suffix = kwargs.pop("suffix")
+        else:
+            suffix = self.suffix
+        save_toml_file(str(Path(file_name).with_suffix(suffix)),
+                       obj)
+
+    def read(self, file_name, **kwargs):
+        return parse_toml_file(file_name)
+
+
 class FileManagers(ObjectFactory):
     def __init__(self):
         super().__init__()
@@ -140,3 +157,4 @@ fmanagers.register("cobra.Model", CobraModelFileManager)
 fmanagers.register("pipeGEM.Model", PGModelFileManager)
 fmanagers.register("numpy.NDArrayStr", NDArrayStrFileManager)
 fmanagers.register("numpy.NDArrayFloat", NDArrayFloatFileManager)
+fmanagers.register("python.dict", NDArrayFloatFileManager)
