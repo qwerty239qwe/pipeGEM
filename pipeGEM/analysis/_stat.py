@@ -36,6 +36,25 @@ class VarHomogeneityTester(AssumptionTester):
 
 class MultipleComparisonTester:
     def __init__(self):
+        self._assumption_testers = {"normality": NormalityTester(),
+                                    "var_homogeneity": VarHomogeneityTester()}
+        self._alpha_list = [0.05, 0.01, 0.001, 0.0001]
+
+    def test_assumptions(self,
+                         data,
+                         test_normality=True,
+                         test_var_homogeneity=True,
+                         normality_kws=None,
+                         var_hom_kws=None):
+        if test_normality:
+            if normality_kws is None:
+                normality_kws = {}
+            norm_result = self._assumption_testers["normality"].test(data=data, **normality_kws)
+
+
+    def test(self,
+             data,
+             non_parametric=True):
         pass
 
 
