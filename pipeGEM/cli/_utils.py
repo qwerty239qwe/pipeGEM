@@ -144,7 +144,7 @@ def _integration_get_thres(gene_data, threshold_config, integration_conf):
 def _preprocess_int_configs(integration_conf,
                             th_result,
                             protected_rxns):
-    integration_conf = {**integration_conf}
+    integration_conf = {k: v for k, v in integration_conf.items()}
     saved_path = integration_conf.pop("saved_path")
     int_name = integration_conf.pop("integrator_name")
     _ = integration_conf.pop("precompute")
@@ -174,9 +174,9 @@ def run_integration_pipeline(gene_data_conf,
                                           gene_data=g_data,
                                           model=model,
                                           mapping_config=mapping_conf)
-        integration_conf, saved_path = _preprocess_int_configs(integration_conf=integration_conf,
-                                                               th_result=th_result[g_name] if isinstance(th_result, dict) else th_result,
-                                                               protected_rxns=task_supp_rxns[g_name])
+        int_c, saved_path = _preprocess_int_configs(integration_conf=integration_conf,
+                                                    th_result=th_result[g_name] if isinstance(th_result, dict) else th_result,
+                                                    protected_rxns=task_supp_rxns[g_name])
         int_result = model.integrate_gene_data(data_name=g_name,
-                                               **integration_conf)
+                                               **int_c)
         int_result.save(Path(saved_path) / g_name)
