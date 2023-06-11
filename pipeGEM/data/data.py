@@ -62,6 +62,8 @@ class GeneData(BaseData):
         self.convert_to_str = convert_to_str
         discrete_transform = self._parse_discrete_transform(discrete_transform, ordered_thresholds)
         self.data_transform = (lambda x: x) if data_transform is None else data_transform
+        if isinstance(self.data_transform, str):
+            self.data_transform = getattr(np, self.data_transform)
 
         if isinstance(data, pd.Series):
             data = data.copy().apply(lambda x: discrete_transform(x)) if discrete_transform is not None else data.copy()

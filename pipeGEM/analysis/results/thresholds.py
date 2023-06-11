@@ -74,8 +74,8 @@ class LocalThresholdAnalysis(BaseAnalysis):
         super().__init__(log=log)
 
     @property
-    def local_ths(self) -> pd.Series:
-        return self._result["local_ths"]
+    def exp_ths(self) -> pd.Series:
+        return self._result["exp_ths"]
 
     @property
     def global_off_th(self) -> pd.Series:
@@ -100,7 +100,7 @@ class LocalThresholdAnalysis(BaseAnalysis):
         pltr = LocalThresholdPlotter(dpi=dpi, prefix=prefix)
         pltr.plot(data=self._result["data"],
                   groups=groups,
-                  local_th=self._result["local_ths"],
+                  local_th=self._result["exp_ths"],
                   global_on_th=self._result["global_on_th"],
                   global_off_th=self._result["global_off_th"],
                   group_dict=self._get_group_dic(),

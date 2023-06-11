@@ -8,13 +8,13 @@ from pipeGEM.utils import parse_toml_file, save_toml_file
 from pipeGEM.data.data import GeneData, MediumData
 from pipeGEM.analysis import consistency_testers
 from pipeGEM.analysis.tasks import TaskContainer
-from pipeGEM.analysis import TaskAnalysis
+from pipeGEM.analysis import TaskAnalysis, LocalThresholdAnalysis, rFASTCORMICSThresholdAnalysis
 
 
 pl_needed_config = {"integration": ["thresholds", "gene_data",
                                     "mapping", "model", "gene_data_integration"],
                     "model_processing": ["model"],
-                    "get_threshold": ["thresholds"]}
+                    "get_threshold": ["thresholds", "gene_data"]}
 
 
 def generate_template_configs(dest_folder, pl_name):
@@ -72,12 +72,16 @@ def find_threshold(gene_data: Union[GeneData, Dict[str, GeneData]],
                    threshold_config):
     th_name = threshold_config["params"]["name"]
     if th_name != "local":
-        result = gene_data.get_threshold(**threshold_config["params"])
+        result = {}
+        for g_name, data in gene_data.items():
+            th = data.get_threshold(**threshold_config["params"])
+            th.save(Path(threshold_config["saved_path"]) / g_name)
+            result[g_name] = th
     else:
         assert isinstance(gene_data, dict)
         agg_data = GeneData.aggregate(gene_data, prop="data")
         result = agg_data.find_local_threshold(**threshold_config["params"])
-    result.save(threshold_config["saved_path"])
+        result.save(threshold_config["saved_path"])
     return result
 
 
@@ -89,28 +93,83 @@ def map_data(gene_data,
     th_type = mapping_config["threshold_analysis"]["type"]
     threshold_analysis = load_threshold_analysis(th_file_name, th_type)
     exp_th = 0 if th_type == "local" else threshold_analysis.exp_th
-
     model.add_gene_data(name_or_prefix=data_name,
                         data=gene_data,
                         **mapping_config["rxn_score"]["align"])
+    if th_type == "local":
+        model.gene_data[data_name].assign_local_threshold(threshold_analysis)
     task_analysis = TaskAnalysis.load(mapping_config["task_score"]["input_file_path"])
     task_supp_rxns = model.get_activated_task_sup_rxns(data_name=data_name,
                                                        task_analysis=task_analysis,
                                                        score_threshold=exp_th,
                                                        **mapping_config["task_score"]["get_supp_rxns"])
-    return gene_data.rxn_scores, task_supp_rxns
+    return task_supp_rxns
 
 
-def integrate_gene_data(model,
-                        data_name,
-                        th_analysis,
-                        task_supp_rxns,
-                        integration_configs: dict):
-    integrator_name = integration_configs.pop("integrator_name")
-    protected_rxns = integration_configs.pop("protected_rxns", [])
-    result = model.integrate_gene_data(data_name=data_name,
-                                       integrator=integrator_name,
-                                       protected_rxns=protected_rxns + task_supp_rxns,
-                                       **integration_configs)
-    result.save()
-    return result
+def _integration_get_model_and_task(model_conf, integration_conf):
+    model, task_result = None, None
+    if integration_conf["precompute"]["model"]["cobra_model_path"] is not None:
+        prec_mod_params = integration_conf["precompute"]["model"]
+        model = Model(model=load_model(prec_mod_params["cobra_model_path"]),
+                      name_tag=prec_mod_params["model_name_tag"])
+    if integration_conf["precompute"]["tasks"]["task_result_path"] is not None:
+        prec_tasks_path = integration_conf["precompute"]["tasks"]["task_result_path"]
+        task_result = TaskAnalysis.load(file_path=prec_tasks_path)
+    if model is None and task_result is None:
+        model, task_result = preprocess_model(model_conf=model_conf)
+    return model, task_result
+
+
+def _integration_get_thres(gene_data, threshold_config, integration_conf):
+    th_path = integration_conf["precompute"]["threshold"]["threshold_result_path"]
+    th_type = integration_conf["precompute"]["threshold"]["type"]
+    if th_path is not None:
+        if th_type == "local":
+            return LocalThresholdAnalysis.load(th_path)
+        elif th_type == "rFASTCORMICS":
+            th_dic = {}
+            for th_dir in Path(th_path).iterdir():
+                th_dic[th_dir.stem] = rFASTCORMICSThresholdAnalysis.load(str(th_dir))
+            return th_dic
+    return find_threshold(gene_data=gene_data,
+                          threshold_config=threshold_config)
+
+
+def _preprocess_int_configs(integration_conf,
+                            th_result,
+                            protected_rxns):
+    integration_conf = {**integration_conf}
+    saved_path = integration_conf.pop("saved_path")
+
+    if integration_conf["integrator_name"] == "GIMME":
+        if integration_conf["high_exp"] == "default":
+            integration_conf["high_exp"] = th_result.exp_th if not isinstance(th_result, LocalThresholdAnalysis) else 0
+
+    integration_conf["protected_rxns"] = integration_conf.get("protected_rxns", []) + protected_rxns
+    return integration_conf, saved_path
+
+
+def run_integration_pipeline(gene_data_conf,
+                             model_conf,
+                             threshold_conf,
+                             mapping_conf,
+                             integration_conf,
+                             **kwargs):
+    gene_data_dic = load_gene_data(gene_data_conf=gene_data_conf)
+    model, task_result = _integration_get_model_and_task(model_conf=model_conf,
+                                                         integration_conf=integration_conf)
+    th_result = _integration_get_thres(gene_data=gene_data_dic,
+                                       threshold_config=threshold_conf,
+                                       integration_conf=integration_conf)
+    task_supp_rxns = {}
+    for g_name, g_data in gene_data_dic.items():
+        task_supp_rxns[g_name] = map_data(data_name=g_name,
+                                          gene_data=g_data,
+                                          model=model,
+                                          mapping_config=mapping_conf)
+        integration_conf, saved_path = _preprocess_int_configs(integration_conf=integration_conf,
+                                                               th_result=th_result[g_name] if isinstance(th_result, dict) else th_result,
+                                                               protected_rxns=task_supp_rxns[g_name])
+        int_result = model.integrate_gene_data(data_name=g_name,
+                                               **integration_conf)
+        int_result.save(Path(saved_path) / g_name)

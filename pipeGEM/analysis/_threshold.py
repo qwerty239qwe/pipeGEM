@@ -332,7 +332,7 @@ class LocalThreshold(RankBased):
                                                     axis=1) < global_off_dic[grp]], grp] = glob_off_th_grp
 
         result = LocalThresholdAnalysis(log={"p": p})
-        result.add_result(dict(local_ths=exp_ths,
+        result.add_result(dict(exp_ths=exp_ths,
                                global_on_th=pd.Series(global_on_dic),
                                global_off_th=pd.Series(global_off_dic),
                                data=pd.DataFrame(data=arr, index=genes, columns=samples),
