@@ -1,6 +1,7 @@
 from ._base import *
 import json
 import pandas as pd
+from ast import literal_eval
 
 
 class TaskAnalysis(BaseAnalysis):
@@ -8,6 +9,7 @@ class TaskAnalysis(BaseAnalysis):
                                   'Missing mets', 'Status',
                                   'Obj_value', 'Obj_rxns',
                                   'Sink Status']
+
 
     def __init__(self, log):
         """
@@ -23,6 +25,11 @@ class TaskAnalysis(BaseAnalysis):
             A dict storing parameters used to perform this analysis
         """
         super(TaskAnalysis, self).__init__(log)
+        self._result_loading_params = {"result_df": dict(converters = {'Obj_rxns': lambda x: literal_eval(x) if pd.notna(x) and x != "" else x,
+                                                                       'task_support_rxns': lambda x: literal_eval(x) if pd.notna(x) and x != "" else x,
+                                                                       'task_support_rxn_fluxes': lambda x: literal_eval(x) if pd.notna(x) and x != "" else x,
+                                                                       'Sink Status': lambda x: literal_eval(x) if pd.notna(x) and x != "" else x,
+                                                                       'rxn_supps': lambda x: literal_eval(x) if pd.notna(x) and x != "" else x})}
 
     @property
     def model_score(self):

@@ -123,7 +123,9 @@ class NDArrayFloatFileManager(BaseFileManager):
                  **kwargs)
 
     def read(self, file_name, **kwargs):
-        return np.load(file_name, **kwargs)
+        with np.load(file_name, **kwargs) as data:
+            arr = data["arr_0"]
+        return arr
 
 
 class FileManagers(ObjectFactory):

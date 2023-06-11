@@ -1,6 +1,8 @@
 from typing import Union, Dict
 from pathlib import Path
 
+import numpy as np
+
 from ._io import load_medium, load_threshold_analysis, load_gene_data
 
 from pipeGEM import Model, load_model
@@ -89,13 +91,17 @@ def map_data(gene_data,
              data_name,
              model,
              mapping_config):
-    th_file_name = mapping_config["threshold_analysis"]["input_file_path"].format(data_name=data_name)
+    th_file_name = mapping_config["threshold_analysis"]["input_file_path_pattern"].format(data_name=data_name)
     th_type = mapping_config["threshold_analysis"]["type"]
     threshold_analysis = load_threshold_analysis(th_file_name, th_type)
     exp_th = 0 if th_type == "local" else threshold_analysis.exp_th
+    align_kws = mapping_config["rxn_score"]["align"]
+    for k, v in align_kws.items():
+        if v is None:
+            align_kws[k] = np.nan
     model.add_gene_data(name_or_prefix=data_name,
                         data=gene_data,
-                        **mapping_config["rxn_score"]["align"])
+                        **align_kws)
     if th_type == "local":
         model.gene_data[data_name].assign_local_threshold(threshold_analysis)
     task_analysis = TaskAnalysis.load(mapping_config["task_score"]["input_file_path"])
@@ -128,8 +134,8 @@ def _integration_get_thres(gene_data, threshold_config, integration_conf):
             return LocalThresholdAnalysis.load(th_path)
         elif th_type == "rFASTCORMICS":
             th_dic = {}
-            for th_dir in Path(th_path).iterdir():
-                th_dic[th_dir.stem] = rFASTCORMICSThresholdAnalysis.load(str(th_dir))
+            for data_name in gene_data:
+                th_dic[data_name] = rFASTCORMICSThresholdAnalysis.load(Path(th_path) / data_name)
             return th_dic
     return find_threshold(gene_data=gene_data,
                           threshold_config=threshold_config)
