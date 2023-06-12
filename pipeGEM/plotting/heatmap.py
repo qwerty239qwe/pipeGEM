@@ -8,11 +8,81 @@ import seaborn as sns
 from ._utils import save_fig, _get_subsystem_ticks
 
 
+def _parse_one_axis_colors(groups,
+                           color_palette: Union[List[str], str, Dict[str, str]] = "deep",
+                           palette_replacement = "Spectral",
+                           color_order: Dict[str, List[str]] = None
+                           ):
+    color_order = [] if color_order is None else color_order
+    g_vals = {rcol: sorted(groups[rcol].unique()) if rcol not in color_order else color_order[rcol]
+              for rcol in groups.columns}
+    color_maps = {}
+    if isinstance(color_palette, str):
+
+        for rcol, rval in g_vals.items():
+            palette_ = sns.color_palette(color_palette
+                                         if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[color_palette]
+                                         else palette_replacement)
+            color_maps[rcol] = dict(zip(rval, palette_[:len(rval)]))
+
+    elif isinstance(color_palette, list):
+        assert all([isinstance(c, str) for c in color_palette]), "Elements in the color_palette should be strings"
+        assert len(color_palette) == len(groups.columns)
+        for cp, (rcol, rval) in zip(color_palette, g_vals.items()):
+            palette_ = sns.color_palette(cp
+                                         if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[cp]
+                                         else palette_replacement)
+            color_maps[rcol] = dict(zip(rval, palette_[:len(rval)]))
+    elif isinstance(color_palette, dict):
+        assert all([isinstance(c, str) for c in color_palette]), "Keys in the color_palette should be strings"
+        assert all([isinstance(c, str) for c in color_palette.values()]), "Values in the color_palette should be strings"
+        assert len(color_palette) == len(groups.columns)
+        for rcol, rval in g_vals.items():
+            palette_ = sns.color_palette(color_palette[rcol]
+                                         if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[color_palette[rcol]]
+                                         else palette_replacement)
+            color_maps[rcol] = dict(zip(rval, palette_[:len(rval)]))
+
+    colors = groups.copy()
+    for rcol in colors.columns:
+        colors[rcol] = colors[rcol].map(color_maps[rcol])
+
+    return colors
+
+
+def _parse_colors(row_groups: pd.DataFrame = None,
+                  row_color_palette: Union[List[str], str, Dict[str, str]] = "deep",
+                  row_color_order: Optional[Dict[str, List[str]]] = None,
+                  col_groups: pd.DataFrame = None,
+                  col_color_palette: Union[List[str], str, Dict[str, str]] = "deep",
+                  col_color_order: Optional[Dict[str, List[str]]] = None,
+                  palette_replacement = "Spectral",):
+    row_colors, col_colors = None, None
+    if row_groups is not None:
+        row_colors = _parse_one_axis_colors(row_groups,
+                                            color_palette = row_color_palette,
+                                            palette_replacement = palette_replacement,
+                                            color_order=row_color_order)
+    if col_groups is not None:
+        col_colors = _parse_one_axis_colors(col_groups,
+                                            color_palette=col_color_palette,
+                                            palette_replacement=palette_replacement,
+                                            color_order=col_color_order)
+    return row_colors, col_colors
+
+
 def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
                  scale: int = 1,
                  cbar_label: str = '',
                  cbar_kw: Dict[str, Any] = None,
                  fig_title: Optional[str] = None,
+                 row_groups: pd.DataFrame = None,
+                 row_color_palette: Union[List[str], str, Dict[str, str]] = "deep",
+                 row_color_order: Optional[Dict[str, List[str]]] = None,
+                 col_groups: pd.DataFrame = None,
+                 col_color_palette: Union[List[str], str, Dict[str, str]] = "deep",
+                 col_color_order: Optional[Dict[str, List[str]]] = None,
+                 palette_replacement="Spectral",
                  **kwargs) -> Dict[str, plt.Figure]:
     """
     Plot a heatmap of the input data and (optional) save it.
@@ -40,9 +110,19 @@ def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
     if cbar_kw is None:
         cbar_kw = {}
     cbar_kw.update({"label": cbar_label})
+    row_colors, col_colors = _parse_colors(row_groups=row_groups,
+                                           row_color_palette=row_color_palette,
+                                           row_color_order=row_color_order,
+                                           col_groups=col_groups,
+                                           col_color_palette=col_color_palette,
+                                           col_color_order=col_color_order,
+                                           palette_replacement=palette_replacement)
+
     cluster_grid = sns.clustermap(data,
                                   figsize=(data.shape[0] * scale, data.shape[1] * scale),
                                   cbar_kws=cbar_kw,
+                                  row_colors=row_colors,
+                                  col_colors=col_colors,
                                   **kwargs
                                   )
     if fig_title is not None:
@@ -50,34 +130,6 @@ def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
     plotting_kws = {"g": cluster_grid.figure}
     return plotting_kws
 
-
-def plot_clustermap(data: Union[pd.DataFrame, np.ndarray],
-                    scale: int = 1,
-                    row_color_dict=None,
-                    row_color_order=None,
-                    col_color_dict=None,
-                    col_color_order=None,
-                    cbar_label: str = '',
-                    cbar_kw: Dict[str, Any] = None,
-                    row_palette: str = "muted",
-                    col_palette: str = "muted",
-                    annotate: bool = True,
-                    fig_title: str = None,
-                    ):
-    if cbar_kw is None:
-        cbar_kw = {}
-    cbar_kw.update({"label": cbar_label})
-    grid_kws = {"width_ratios": (.9, .05), "wspace": .3}
-    fig, (ax, cbar_ax) = plt.subplots(1, 2, figsize=(data.shape[0] * scale, data.shape[1] * scale),
-                                      gridspec_kw=grid_kws)
-
-    if row_color_dict is not None:
-        row_colors = sns.color_palette(row_palette)
-
-
-    ax.set_title(fig_title)
-    plotting_kws = {"g": fig}
-    return plotting_kws
 
 def _modify_clustermap_for_subsys(g, ticks_pos, subsystems):
     g.ax_heatmap.yaxis.set_ticks(ticks_pos)

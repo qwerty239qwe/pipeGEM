@@ -1,0 +1,3 @@
+models_input_path = ""
+model_type = "pg"  # pg or cobra are supported
+factor_file = ""

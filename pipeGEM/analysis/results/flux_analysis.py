@@ -36,7 +36,10 @@ class FluxAnalysis(BaseAnalysis):
         """
         self._result["flux_df"][col_name] = value
         self._result["flux_df"][col_name] = pd.Categorical(self._result["flux_df"][col_name])
-        self._log.update({"categorical": [{col_name: value}]})
+        if "categorical" in self._log:
+            self._log["categorical"].add(col_name)
+        else:
+            self._log["categorical"] = set(col_name)
 
     @classmethod
     def aggregate(cls,
@@ -58,18 +61,18 @@ class FluxAnalysis(BaseAnalysis):
         log: dict, optional
             A dict contains new analysis results' information
         kwargs: dict
-            Additional keyword arguments
+            Additional keyword arguments added to the result dict
         Returns
         -------
         aggregated_flux_analysis: FluxAnalysis
 
         """
-        log = log if log is None else {}
-        cat_log = []
+        log = log if log is not None else {}
+        cat_log = set()
         if method == "concat":
             dfs = []
             for a in analyses:
-                cat_log.extend(a.log["categorical"])
+                cat_log |= a.log["categorical"]
                 one_df = a.result["flux_df"].reset_index().rename(columns={"index": "Reaction"}) \
                     if "Reaction" not in a.result["flux_df"].columns else a.result["flux_df"]
                 dfs.append(one_df)
@@ -77,14 +80,14 @@ class FluxAnalysis(BaseAnalysis):
         else:
             dfs = []
             for a in analyses:
-                cat_log.extend(a.log["categorical"])
+                cat_log |= a.log["categorical"]
                 one_df = a.result["flux_df"]["fluxes"]
                 dfs.append(one_df)
             new_df = pd.concat(dfs, axis=1)
             new_df = getattr(new_df, method)(axis=1).to_frame()
             new_df.columns = ["fluxes"]
         new = cls(log={"categorical": cat_log, **log})
-        new.add_result(dict(flux_df=new_df))
+        new.add_result({**kwargs, **dict(flux_df=new_df)})
         return new
 
     def plot(self, **kwargs):
@@ -133,14 +136,13 @@ class FBA_Analysis(FluxAnalysis):
                       method="PCA",
                       **kwargs
                       ) -> Union[PCA_Analysis, EmbeddingAnalysis]:
-        if "group" not in self.log:
+        if "categorical" not in self.log:
             raise NotAggregatedError("This analysis result only contains fluxes of a model, "
                                      "please use Group.do_flux_analysis to get a proper result for dim reduction")
         flux_df = self._result["flux_df"].pivot_table(index="Reaction",
                                                       columns=self.log["group_by"],
                                                       values="fluxes",
                                                       aggfunc="mean").fillna(0).T
-
         dim_log = {**kwargs, **self.log} if self.log["group_by"] == "model" else \
             {"group": {self.log["group_by"]: flux_df.index},
              **kwargs, **{k: v for k, v in self.log.items() if k != "group"}}
@@ -151,14 +153,16 @@ class FBA_Analysis(FluxAnalysis):
             result = PCA_Analysis(log=dim_log)
             result.add_result({"PC": final_df,
                                "exp_var": exp_var_df,
-                               "components": component_df})
+                               "components": component_df,
+                               "group_annotation": self.result["group_annotation"]})
             return result
         else:
             emb_df = prepare_embedding_dfs(flux_df.T,
                                            reducer=method,
                                            **kwargs)
             result = EmbeddingAnalysis(log=dim_log)
-            result.add_result({"embeddings": emb_df})
+            result.add_result({"embeddings": emb_df,
+                               "group_annotation": self.result["group_annotation"]})
             return result
 
     def corr(self,

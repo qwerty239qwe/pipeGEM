@@ -12,9 +12,9 @@ class PCA_Analysis(BaseAnalysis):
              prefix="Dim_reduction_",
              **kwargs):
         if color_by is None:
-            groups = {m: [m] for m in self.log["group_annotation"].index.to_list()}
+            groups = {m: [m] for m in self.result["group_annotation"].index.to_list()}
         else:
-            gb = self.log["group_annotation"].groupby(color_by).apply(lambda x: list(x.index))
+            gb = self.result["group_annotation"].groupby(color_by).apply(lambda x: list(x.index))
             groups = {i: row for i, row in gb.items()}
 
         pltr = DimReductionPlotter(dpi, prefix)

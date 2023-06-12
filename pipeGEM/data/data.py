@@ -218,9 +218,9 @@ class GeneData(BaseData):
                   data,
                   method="concat",
                   prop="data",
-                  absent_expression=0) -> DataAggregation:
+                  absent_expression=0,
+                  group_annotation=None) -> DataAggregation:
         assert prop in ["data", "score"], "prop should be either data or score"
-
         obj_prop = {"data": "gene_data", "score": "rxn_scores"}
 
         if all([isinstance(v, dict) for k, v in data.items()]):
@@ -235,7 +235,8 @@ class GeneData(BaseData):
                                       "prop": prop,
                                       "absent_expression": absent_expression,
                                       "group": _data_parse_group_models(data)})
-        result.add_result(dict(agg_data=mg_d))
+        result.add_result(dict(agg_data=mg_d,
+                               group_annotation=group_annotation))
         return result
 
 

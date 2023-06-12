@@ -38,7 +38,10 @@ class DataAggregation(BaseAnalysis):
             final_df, exp_var_df, component_df = prepare_PCA_dfs(self._result["agg_data"],
                                                                  **kwargs)
             result = PCA_Analysis(log={"method": "PCA", **kwargs, **self.log})
-            result.add_result({"PC": final_df, "exp_var": exp_var_df, "components": component_df})
+            result.add_result({"PC": final_df,
+                               "exp_var": exp_var_df,
+                               "components": component_df,
+                               "group_annotation": self._result["group_annotation"]})
             return result
         else:
             emb_df = prepare_embedding_dfs(self._result["agg_data"],
@@ -46,5 +49,6 @@ class DataAggregation(BaseAnalysis):
                                            **kwargs)
             result = EmbeddingAnalysis(log={"method": method,
                                             **kwargs, **self.log})
-            result.add_result({"embeddings": emb_df})
+            result.add_result({"embeddings": emb_df,
+                               "group_annotation": self._result["group_annotation"]})
             return result

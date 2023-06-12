@@ -38,11 +38,12 @@ class Group(GEMComposite):
     def __init__(self,
                  group,
                  name_tag: str = None,
+                 factors: pd.DataFrame = None,
                  **kwargs):
 
         super().__init__(name_tag=name_tag or "Unnamed_group")
         self._group_annotation = {}
-        self._group = self._form_group(group, **kwargs)
+        self._group = self._form_group(group, factors, **kwargs)
 
     def __repr__(self):
         return self.__str__()
@@ -199,11 +200,32 @@ class Group(GEMComposite):
         return self.__class__(group=self._group, name_tag=name_tag)
 
     def do_flux_analysis(self,
-                         method,
-                         aggregate_method="concat",
-                         solver="gurobi",
-                         group_by=None,
+                         method: str,
+                         aggregate_method: str = "concat",
+                         solver: str = "gurobi",
+                         group_by: str = None,
                          **kwargs):
+        """
+        Do flux analysis on the models contained in this group.
+
+        Parameters
+        ----------
+        method: str
+            Analysis performed on the models.
+        aggregate_method: str
+            Aggregation method performed on the flux result.
+        solver: str
+            Solver used to do the analysis.
+        group_by: str
+            Used to determine the groups for the aggregate_method.
+        kwargs: dict
+            Keyword arguments used in the model.do_flux_analysis()
+
+        Returns
+        -------
+        flux_result: FluxAnalysis
+
+        """
         results = []
         for name, c in self._group.items():
             if c.__class__ == self.__class__:
@@ -220,13 +242,14 @@ class Group(GEMComposite):
         gp_annot = pd.DataFrame({group_by: self.annotation[group_by].unique()},
                                 index=self.annotation[group_by].unique()) if group_by is not None else self.annotation
 
-        return results[0].__class__.aggregate(results, method=aggregate_method,
-                                              log={"name": self.name_tag,
-                                                   "group_by": group_by if group_by is not None else "model",
-                                                   "group": self._get_group_model(group_by),
-                                                   "group_annotation": gp_annot,
-                                                   "rxn_annotation": self.get_rxn_info(models="all",
-                                                                                       attrs=["subsystem"])})
+        agg_result = results[0].__class__.aggregate(results, method=aggregate_method,
+                                                    log={"name": self.name_tag,
+                                                         "group_by": group_by if group_by is not None else "model",
+                                                         "group": self._get_group_model(group_by)},
+                                                    group_annotation=gp_annot,
+                                                    rxn_annotation=self.get_rxn_info(models="all", attrs=["subsystem"]))
+
+        return agg_result
 
     @staticmethod
     def _check_rxn_id(comp: GEMComposite, index, subsystems):
@@ -274,7 +297,18 @@ class Group(GEMComposite):
                 raise ValueError(f"At least two models have non-unique name. "
                                  "Please consider rename the input models or drop the models with the same names.")
 
-    def _ck_annotations(self, group, new_annot, store_in_model=False):
+    def _ck_annotations(self, group, new_annot, factor_df=None, store_in_model=False):
+        if factor_df is not None:
+            factors = factor_df.to_dict(orient='dict')
+            if not all([mn in group for mn in factors]):
+                raise KeyError("Some names in the factors are not in the model group")
+            for key, annot_dic in factors.items():
+                for mod_name, val in annot_dic.items():
+                    if store_in_model:
+                        group[mod_name].add_annotation(key=key, value=val)
+                    else:
+                        self._group_annotation[mod_name][key] = val
+
         for key, annot_dic in new_annot.items():
             if all([isinstance(mod_names, list) or isinstance(mod_names, np.ndarray)
                     for val, mod_names in annot_dic.items()]):
@@ -297,7 +331,7 @@ class Group(GEMComposite):
                     else:
                         self._group_annotation[mod_name][key] = val
 
-    def _form_group(self, group_dict, **kwargs) -> dict:
+    def _form_group(self, group_dict, factors=None, store_in_model=False, **kwargs) -> dict:
         groups = {}
         if isinstance(group_dict, list) or isinstance(group_dict, np.ndarray):
             self._form_group_chk_list(group_dict)
@@ -330,7 +364,10 @@ class Group(GEMComposite):
         else:
             raise ValueError("Group doesn't support object type: ", type(group_dict))
 
-        self._ck_annotations(group=groups, new_annot=kwargs)
+        self._ck_annotations(group=groups,
+                             new_annot=kwargs,
+                             factor_df=factors,
+                             store_in_model=store_in_model)
         return groups
 
     def get_info(self,
@@ -385,8 +422,7 @@ class Group(GEMComposite):
     def _compare_component_num(self,
                                models,
                                group_by=None,
-                               components="all",
-                               name_order: Union[str, list]="default"):
+                               components="all"):
 
         components = ['genes', 'reactions', 'metabolites'] if components == "all" else components
         c_to_f = {"genes": "n_genes", "reactions": "n_rxns", "metabolites": "n_mets"}
@@ -417,7 +453,7 @@ class Group(GEMComposite):
                                components="all",
                                n_components=2,
                                incremental=False,
-                               **kwargs):
+                               **kwargs) -> PCA_Analysis:
         components = ['gene_ids', 'reaction_ids', 'metabolite_ids'] if components == "all" else components
         comp_id_dic, comp_dfs, group_info = {}, {}, {}
         group_list = [g for g in models] if group_by is None else \
@@ -435,10 +471,13 @@ class Group(GEMComposite):
                                                                     n_components=n_components,
                                                                     incremental=incremental,
                                                                     **kwargs)
-        result = PCA_Analysis(log={"group_annotation": self.annotation if group_by is None else
-                                    self.annotation.groupby(group_by).apply(lambda x: list(x.index)).to_frame(),
-                                   "group_name_tag": self.name_tag, "method": "PCA"})
-        result.add_result({"PC": pca_fitted_df, "exp_var": pca_expvar_df, "components": pca_comp_df})
+        result = PCA_Analysis(log={"group_name_tag": self.name_tag,
+                                   "method": "PCA"})
+        result.add_result({"PC": pca_fitted_df,
+                           "exp_var": pca_expvar_df,
+                           "components": pca_comp_df,
+                           "group_annotation": self.annotation if group_by is None else
+                                self.annotation.groupby(group_by).apply(lambda x: list(x.index)).to_frame()})
         return result
 
     def compare(self,

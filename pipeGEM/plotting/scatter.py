@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -111,7 +112,7 @@ def plot_PCA(data: Dict[str, pd.DataFrame],
 def plot_embedding(embedding_df: pd.DataFrame,
                    groups: dict = None,
                    title: str = None,
-                   palette: str = "muted",
+                   palette: str = "deep",
                    plot_2D: bool = True,
                    reducer: str = "UMAP",
                    figsize: tuple = (7, 7),
@@ -153,7 +154,11 @@ def plot_embedding(embedding_df: pd.DataFrame,
     for k in ["file_name", "dpi", "prefix"]:
         if k in kwargs:
             del kwargs[k]
-    colors = sns.color_palette(palette)
+    colors = sns.color_palette(palette, n_colors=sns.palettes.QUAL_PALETTE_SIZES[palette])
+    if len(colors) < len(groups):
+        warnings.warn(f"{palette} contains less colors ({sns.palettes.QUAL_PALETTE_SIZES[palette]})"
+                      f" than the number of groups ({len(groups)}). Palette has been changed to Spectral.")
+        colors = sns.color_palette("Spectral", n_colors=len(colors))
     fig, ax = plt.subplots(figsize=figsize)
     if sheet_file_name is not None:
         embedding_df.to_csv(sheet_file_name)
@@ -184,7 +189,7 @@ def plot_2D_PCA_score(pca_df,
                       groups = None,
                       features: dict = None,
                       colors=None,
-                      palette="muted",
+                      palette="deep",
                       continuous=False,
                       fig_title=None,
                       **kwargs):
@@ -215,9 +220,11 @@ def plot_2D_PCA_score(pca_df,
     plotting_kws : dict
         A dictionary of keyword arguments to be passed to the plotting function.
     """
-
-    colors = sns.color_palette(palette,
-                               as_cmap=continuous) if colors is None else colors
+    colors = sns.color_palette(palette, n_colors=sns.palettes.QUAL_PALETTE_SIZES[palette])
+    if len(colors) < len(groups):
+        warnings.warn(f"{palette} contains less colors ({sns.palettes.QUAL_PALETTE_SIZES[palette]})"
+                      f" than the number of groups ({len(groups)}). Palette has been changed to Spectral.")
+        colors = sns.color_palette("Spectral", n_colors=len(colors))
     fig, ax = plt.subplots(figsize=(7, 7))
     if features is None:
         for i, (group_name, model_names) in enumerate(groups.items()):
@@ -248,7 +255,7 @@ def plot_2D_PCA_score(pca_df,
 
 def plot_3D_PCA_score(pca_df: pd.DataFrame,
                       groups: dict,
-                      palette: str = "muted",
+                      palette: str = "deep",
                       fig_title: str = None,
                       **kwargs) -> dict:
     """
@@ -274,7 +281,12 @@ def plot_3D_PCA_score(pca_df: pd.DataFrame,
         A dictionary containing the plot parameters.
 
     """
-    colors = sns.color_palette(palette)
+    colors = sns.color_palette(palette, n_colors=sns.palettes.QUAL_PALETTE_SIZES[palette])
+    if len(colors) < len(groups):
+        warnings.warn(f"{palette} contains less colors ({sns.palettes.QUAL_PALETTE_SIZES[palette]})"
+                      f" than the number of groups ({len(groups)}). Palette has been changed to Spectral.")
+        colors = sns.color_palette("Spectral", n_colors=len(colors))
+
     fig = plt.figure(figsize=(7, 7))
     ax = fig.add_subplot(111, projection="3d")
     for i, (group_name, model_names) in enumerate(groups.items()):
@@ -299,7 +311,7 @@ def plot_3D_PCA_score(pca_df: pd.DataFrame,
 
 
 def plot_PCA_screeplot(exp_var_df: pd.DataFrame,
-                       palette: str = "muted",
+                       palette: str = "deep",
                        fig_title: str = None,
                        **kwargs) -> dict:
     """

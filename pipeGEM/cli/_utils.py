@@ -2,10 +2,11 @@ from typing import Union, Dict
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from ._io import load_medium, load_threshold_analysis, load_gene_data
 
-from pipeGEM import Model, load_model
+from pipeGEM import Model, load_model, Group
 from pipeGEM.utils import parse_toml_file, save_toml_file
 from pipeGEM.data.data import GeneData, MediumData
 from pipeGEM.analysis import consistency_testers
@@ -180,3 +181,38 @@ def run_integration_pipeline(gene_data_conf,
         int_result = model.integrate_gene_data(data_name=g_name,
                                                **int_c)
         int_result.save(Path(saved_path) / g_name)
+
+
+def _compare_number(grp,
+                    group_by):
+    grp.compare(group_by=group_by,
+                )
+
+
+
+def do_model_comparison(comparison_configs):
+    input_path = Path(comparison_configs["model_input_path"])
+    model_dic = {}
+    for model in input_path.iterdir():
+        if Path(comparison_configs["model_type"]) == "pg":
+            model_dic[model.stem] = Model.load_model(model)
+        elif Path(comparison_configs["model_type"]) == "cobra":
+            model_dic[model.stem] = load_model(str(model))
+        else:
+            raise ValueError(comparison_configs["model_type"], "must be either pg or cobra.")
+
+    factors = None
+    if Path(comparison_configs["factor_file"]).is_file():
+        factors = pd.read_csv(comparison_configs["factor_file"],
+                              index_col=0)
+    grp = Group(model_dic, name_tag="group", factors=factors)
+    print(grp.get_info())
+    #  number of comp
+    grp.compare(method="num",
+                group_by=None,)
+
+    #  jaccard
+    grp.compare()
+
+    # pca
+    grp.compare()
