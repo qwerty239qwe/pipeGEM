@@ -1,3 +1,4 @@
+import pandas as pd
 from tqdm import tqdm
 import numpy as np
 
@@ -8,6 +9,21 @@ from pipeGEM.utils import ObjectFactory
 from pipeGEM.utils import get_rxn_set, flip_direction
 
 
+class FluxLogger:
+    def __init__(self):
+        self._dfs = []
+        self._iter = 0
+
+    def tic(self):
+        self._iter += 1
+
+    def add(self, name, flux_series):
+        self._dfs.append(flux_series.to_frame(f"{name}_{self._iter}"))
+
+    def to_frame(self):
+        return pd.concat(self._dfs, axis=1)
+
+
 class ConsistencyTesters(ObjectFactory):
     def __init__(self):
         super().__init__()
@@ -16,6 +32,7 @@ class ConsistencyTesters(ObjectFactory):
 class ConsistencyTester:
     def __init__(self, model):
         self.model = model
+        self._flux_recorder = FluxLogger()
 
     def analyze(self, **kwargs):
         raise NotImplementedError("")
@@ -46,21 +63,24 @@ class FASTCC(ConsistencyTester):
             if len(backward_rxns) > 0:
                 print(f"Found and flipped {len(backward_rxns)} reactions")
                 flip_direction(model, backward_rxns)
-            A = np.array(LP7(J, model, tol, use_abs=True))  # rxns to keeps
+            A = np.array(LP7(J, model, tol, use_abs=True, flux_logger=self._flux_recorder))  # rxns to keeps
             # print("A: ", len(A))
             J = np.setdiff1d(all_rxns, np.union1d(np.union1d(A, J), no_expressed))  # rev rxns to check
             # print("J: ", len(J))
             singleton, flipped = False, False
             with tqdm(total=len(J)) as pbar:
                 while len(J) != 0:
+                    self._flux_recorder.tic()
                     if singleton:
                         Ji = np.array([J[0]])
-                        new_supps = np.array(LP3(Ji, model, tol)) if is_convex else np.array(
-                            non_convex_LP3(Ji, model, tol))
+                        new_supps = np.array(LP3(Ji, model, tol,
+                                                 flux_logger=self._flux_recorder)) if is_convex else np.array(
+                            non_convex_LP3(Ji, model, tol, flux_logger=self._flux_recorder))
                     else:
                         Ji = J.copy()
-                        new_supps = np.array(LP7(Ji, model, tol)) if is_convex else np.array(
-                            non_convex_LP7(Ji, model, tol))
+                        new_supps = np.array(LP7(Ji, model, tol,
+                                                 flux_logger=self._flux_recorder)) if is_convex else np.array(
+                            non_convex_LP7(Ji, model, tol, flux_logger=self._flux_recorder))
                     A = np.union1d(A, new_supps)
                     before_n = len(J)
                     J = np.setdiff1d(J, A)
@@ -91,7 +111,8 @@ class FASTCC(ConsistencyTester):
         result = FastCCAnalysis(log={"is_convex": is_convex, "tol": tol})
         result.add_result(dict(consistent_model=consistent_model,
                                removed_rxn_ids=rxns_to_remove,
-                               kept_rxn_ids=A))
+                               kept_rxn_ids=A,
+                               flux_record=self._flux_recorder.to_frame()))
 
         return result
 

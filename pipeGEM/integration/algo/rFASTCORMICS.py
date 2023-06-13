@@ -14,7 +14,8 @@ def apply_rFASTCORMICS(model,
                        unpenalized_subsystem = "Transport.*",
                        use_heuristic_th: bool = False,
                        method: str = "onestep",
-                       threshold: float = 1e-6):
+                       threshold: float = 1e-6,
+                       FASTCORE_raise_error: bool = False):
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
     threshold_dic = parse_predefined_threshold(predefined_threshold,
                                                gene_data=gene_data,
@@ -23,8 +24,8 @@ def apply_rFASTCORMICS(model,
 
     if consistent_checking_method is not None:
         consistency_tester = consistency_testers[consistent_checking_method](model=model)
-        consistency_tester.analyze(tol=threshold)
-        model = consistency_tester.consistent_model
+        cons_result = consistency_tester.analyze(tol=threshold)
+        model = cons_result.consistent_model
 
     rxn_in_model = set([r.id for r in model.reactions])
     protected_rxns = protected_rxns if protected_rxns is not None else []
@@ -48,7 +49,8 @@ def apply_rFASTCORMICS(model,
                                    nonP=unpenalized_rxns,
                                    model=model,
                                    epsilon=threshold,
-                                   return_model=True)
+                                   return_model=True,
+                                   raise_err=FASTCORE_raise_error)
         for r in pr_result.result_model.exchanges:
             if r.id in old_exchange_bounds:
                 pr_result.result_model.reactions.get_by_id(r.id).bounds = old_exchange_bounds[r.id]

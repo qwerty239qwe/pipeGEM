@@ -1,0 +1,19 @@
+integrator_name = "rFASTCORMICS"
+saved_path = ""
+protected_rxns = []
+consistent_checking_method = "FASTCC"
+unpenalized_subsystem = "Transport.*"
+use_heuristic_th = false
+method = "onestep"
+threshold = 1e-6
+
+
+[precompute]
+    [precompute.model]
+        cobra_model_path = nan
+        model_name_tag = "human1"
+    [precompute.tasks]
+        task_result_path = nan
+    [precompute.threshold]
+        threshold_result_path = nan
+        type = "rFASTCORMICS"

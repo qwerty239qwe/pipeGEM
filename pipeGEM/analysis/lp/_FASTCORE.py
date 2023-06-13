@@ -10,7 +10,8 @@ from optlang.symbolics import Zero
 
 def LP3(J: Union[set, np.ndarray, List[str]],
         model: cobra.Model,
-        epsilon: float) -> list:
+        epsilon: float,
+        flux_logger=None) -> list:
     """
 
     Parameters
@@ -31,10 +32,14 @@ def LP3(J: Union[set, np.ndarray, List[str]],
         else:
             model.objective = model.reactions.get_by_id(J)
         fm = model.optimize(objective_sense="maximize").to_frame()["fluxes"].abs()
+        if flux_logger is not None:
+            flux_logger.add(name="LP3", flux_series=fm)
+
     return fm[fm > 0.99*epsilon].index.to_list()
 
 
-def non_convex_LP3(J, model, epsilon) -> list:
+def non_convex_LP3(J, model, epsilon,
+                   flux_logger=None) -> list:
     # check both directions
     if isinstance(J, set) or isinstance(J, np.ndarray) or isinstance(J, list):
         assert len(J) == 1
@@ -57,7 +62,8 @@ def non_convex_LP3(J, model, epsilon) -> list:
                 # print(fm.loc[obj_rxn.id], obj_rxn.id)
                 if fm.loc[obj_rxn.id] < epsilon:
                     fm = pd.Series([0 for _ in model.reactions])
-
+    if flux_logger is not None:
+        flux_logger.add(name="nc_LP3", flux_series=fm)
     return fm[fm > 0.99*epsilon].index.to_list()
 
 
@@ -65,7 +71,8 @@ def non_convex_LP3(J, model, epsilon) -> list:
 #     return np.minimum(abs(v)/epsilon, np.ones(v.shape)).dot(rho)
 
 
-def non_convex_LP7(J, model: cobra.Model, epsilon: float, use_abs=True) -> list:
+def non_convex_LP7(J, model: cobra.Model, epsilon: float, use_abs=True,
+                   flux_logger=None) -> list:
     max_iter = 20
     with model:
         prob = model.problem
@@ -107,7 +114,8 @@ def non_convex_LP7(J, model: cobra.Model, epsilon: float, use_abs=True) -> list:
         fm = sol.to_frame()["fluxes"].abs()
     else:
         fm = sol.to_frame()["fluxes"]
-
+    if flux_logger is not None:
+        flux_logger.add(name="nc_LP7", flux_series=fm)
     return fm[fm > 0.99*epsilon].index.to_list()
 
 
@@ -116,8 +124,9 @@ def LP7(J,
         epsilon: float,
         use_abs=True,
         rxn_scale_eps=None,
-        tol_coef=1e-2,
-        return_min_v=False) -> list:
+        tol_coef=0.99,
+        return_min_v=False,
+        flux_logger=None) -> list:
     """
     LP7 tries to maximize the number of feasible fluxes in J whose value is at least epsilon (Nikos Vlassis, et al. 2013)
 
@@ -170,6 +179,9 @@ def LP7(J,
         fm = sol.to_frame()["fluxes"].abs()
     else:
         fm = sol.to_frame()["fluxes"]
+
+    if flux_logger is not None:
+        flux_logger.add(name="LP7", flux_series=fm)
     if rxn_scale_eps is None:
         if return_min_v:
             return fm[fm > tol_coef*epsilon].index.to_list(), fm
@@ -184,8 +196,9 @@ def LP9(K: np.ndarray,
         epsilon,
         min_v_ser,
         scaling_factor = 1,
-        tol_coef=1e-2,
-        rxn_scale_eps=None) -> list:
+        tol_coef=0.99,
+        rxn_scale_eps=None,
+        flux_logger=None) -> list:
     """
     LP9 minimizes the L1 norm of fluxes in the penalty set P, subject to a minimum flux constraint on the set K.
     (Nikos Vlassis, et al. 2013)
@@ -254,6 +267,8 @@ def LP9(K: np.ndarray,
             print("infeasible result: K = ", K)
             return []
         fm = sol.to_frame()["fluxes"].abs()
+    if flux_logger is not None:
+        flux_logger.add(name="LP9", flux_series=fm)
     if rxn_scale_eps is None:
         return fm[fm > tol_coef * min(epsilon, min_v_ser.min())].index.to_list()  # supp
     return fm[fm > rxn_scale_eps[fm.index]].index.to_list()

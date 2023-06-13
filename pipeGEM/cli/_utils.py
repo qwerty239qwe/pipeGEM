@@ -148,10 +148,13 @@ def _preprocess_int_configs(integration_conf,
     integration_conf = {k: v for k, v in integration_conf.items()}
     saved_path = integration_conf.pop("saved_path")
     int_name = integration_conf.pop("integrator_name")
+    integration_conf["integrator"] = int_name
     _ = integration_conf.pop("precompute")
     if int_name == "GIMME":
         if integration_conf["high_exp"] == "default":
             integration_conf["high_exp"] = th_result.exp_th if not isinstance(th_result, LocalThresholdAnalysis) else 0
+    elif int_name == "rFASTCORMICS":
+        integration_conf["predefined_threshold"] = th_result
 
     integration_conf["protected_rxns"] = integration_conf.get("protected_rxns", []) + protected_rxns
     return integration_conf, saved_path
