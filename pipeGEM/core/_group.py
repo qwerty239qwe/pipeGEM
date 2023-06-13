@@ -300,8 +300,9 @@ class Group(GEMComposite):
     def _ck_annotations(self, group, new_annot, factor_df=None, store_in_model=False):
         if factor_df is not None:
             factors = factor_df.to_dict(orient='dict')
-            if not all([mn in group for mn in factors]):
-                raise KeyError("Some names in the factors are not in the model group")
+            if not all([mn in group for key, mg in factors.items() for mn in mg]):
+                raise KeyError("Some names in the factors are not in the model group",
+                               f"{[mn for key, mg in factors.items() for mn in mg if mn not in group]}")
             for key, annot_dic in factors.items():
                 for mod_name, val in annot_dic.items():
                     if store_in_model:
@@ -314,7 +315,8 @@ class Group(GEMComposite):
                     for val, mod_names in annot_dic.items()]):
                 for val, mod_names in annot_dic.items():
                     if not all([mn in group for mn in mod_names]):
-                        raise KeyError("Some names in the new annotation dict are not in the model group")
+                        raise KeyError("Some names in the new annotation dict are not in the model group",
+                                       f"{[mn for mn in annot_dic if mn not in group]}")
 
                 for val, mod_names in annot_dic.items():
                     for mod_name in mod_names:
@@ -324,7 +326,8 @@ class Group(GEMComposite):
                             self._group_annotation[mod_name][key] = val
             else:
                 if not all([mn in group for mn in annot_dic]):
-                    raise KeyError("Some names in the new annotation dict are not in the model group")
+                    raise KeyError("Some names in the new annotation dict are not in the model group:",
+                                   f"{[mn for mn in annot_dic if mn not in group]}")
                 for mod_name, val in annot_dic.items():
                     if store_in_model:
                         group[mod_name].add_annotation(key=key, value=val)

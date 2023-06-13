@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from ._io import load_medium, load_threshold_analysis, load_gene_data
 
@@ -198,12 +199,12 @@ def _compare_number(grp,
 
 
 def do_model_comparison(comparison_configs):
-    input_path = Path(comparison_configs["model_input_path"])
+    input_path = Path(comparison_configs["models_input_path"])
     model_dic = {}
     for model in input_path.iterdir():
-        if Path(comparison_configs["model_type"]) == "pg":
+        if comparison_configs["model_type"] == "pg":
             model_dic[model.stem] = Model.load_model(model)
-        elif Path(comparison_configs["model_type"]) == "cobra":
+        elif comparison_configs["model_type"] == "cobra":
             model_dic[model.stem] = load_model(str(model))
         else:
             raise ValueError(comparison_configs["model_type"], "must be either pg or cobra.")
@@ -212,16 +213,20 @@ def do_model_comparison(comparison_configs):
     if Path(comparison_configs["factor_file"]).is_file():
         factors = pd.read_csv(comparison_configs["factor_file"],
                               index_col=0)
+        print("Factor data loaded, top rows are:")
+        print(factors.head())
     grp = Group(model_dic, name_tag="group", factors=factors)
     print(grp.get_info())
     Path(comparison_configs["output_dir"]).mkdir(parents=True)
     root = Path(comparison_configs["output_dir"])
     #  number of comp
     num_comp = grp.compare(method="num",
-                           group_by=None,)
+                           group_by=comparison_configs["compare_num"]["group"],)
     num_comp.plot(file_name=root/comparison_configs["compare_num"]["output_file_name"],
                   group=comparison_configs["compare_num"]["group"],
                   dpi=comparison_configs["compare_num"]["dpi"])
+    plt.show(block=False)
+    plt.close('all')
 
     #  jaccard
     num_comp = grp.compare(method="jaccard",
@@ -230,10 +235,15 @@ def do_model_comparison(comparison_configs):
                   row_color_by=comparison_configs["compare_jaccard"]["row_color_by"],
                   col_color_by=comparison_configs["compare_jaccard"]["col_color_by"],
                   dpi=comparison_configs["compare_jaccard"]["dpi"])
+    plt.show(block=False)
+    plt.close('all')
 
     # pca
     num_comp = grp.compare(method="PCA",
                            group_by=None, )
     num_comp.plot(file_name=root/comparison_configs["compare_PCA"]["output_file_name"],
                   dpi=comparison_configs["compare_PCA"]["dpi"],
-                  color_by=comparison_configs["compare_PCA"]["color_by"])
+                  color_by=comparison_configs["compare_PCA"]["color_by"],
+                  prefix="")
+    plt.show(block=False)
+    plt.close('all')

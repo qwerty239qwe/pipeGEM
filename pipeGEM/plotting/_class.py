@@ -224,9 +224,13 @@ class ComponentComparisonPlotter(BasePlotter):
 
         if row_groups is not None:
             row_groups = row_groups[row_color_by]
+            if isinstance(row_groups, pd.Series):
+                row_groups = row_groups.to_frame(row_color_by)
 
         if col_groups is not None:
             col_groups = col_groups[col_color_by]
+            if isinstance(col_groups, pd.Series):
+                col_groups = col_groups.to_frame(col_color_by)
 
         return plot_heatmap(data=result,
                             xticklabels=xticklabels,
