@@ -18,6 +18,8 @@ class ComponentComparisonAnalysis(ComparisonAnalysis):
              **kwargs):
         pltr = ComponentComparisonPlotter(dpi=dpi, prefix=prefix)
         pltr.plot(result=self._result["comparison_df"],
+                  row_groups=self._result["group_annotation"],
+                  col_groups=self._result["group_annotation"],
                   *args,
                   **kwargs)
 

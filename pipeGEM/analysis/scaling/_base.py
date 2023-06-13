@@ -73,8 +73,11 @@ class ModelScaler:
         self.get_rescale_factor(new_mod, n_iter)
         rxn_index = {self.r_ind(r): r.id for r in new_mod.reactions}
         met_index = {self.m_ind(m): m for m in new_mod.metabolites}
+
+        met_scaling_factor = {}
+        rxn_scaling_factor = {}
         for i, m in met_index.items():
-            m.id = f"{m.id}_x{self.mets_scale_diags[i]:.3f}"
+            met_scaling_factor[m.id] = self.mets_scale_diags[i]
 
         for i, r_id in rxn_index.items():
             involved_met_ids = np.where(self._diff_A[:, i] != 0)[0]  # met index
@@ -84,9 +87,12 @@ class ModelScaler:
             })
             new_mod.reactions.get_by_id(r_id).lower_bound *= self.cons_scale_diags[i]
             new_mod.reactions.get_by_id(r_id).upper_bound *= self.cons_scale_diags[i]
+            rxn_scaling_factor[r_id] = self.cons_scale_diags[i]
         result = ModelScalingResult(log=dict(n_iter=n_iter,
                                              method=self.__class__.__name__))
         result.add_result(dict(rescaled_model=new_mod,
                                diff_A=self._diff_A,
-                               rescaled_A=self._rescaled_A))
+                               rescaled_A=self._rescaled_A,
+                               met_scaling_factor=met_scaling_factor,
+                               rxn_scaling_factor=rxn_scaling_factor))
         return result

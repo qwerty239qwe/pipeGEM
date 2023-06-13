@@ -5,7 +5,7 @@ from typing import Union, Dict
 from ._io import load_medium, load_threshold_analysis, load_gene_data
 from ._doc import get_help_doc
 from ._utils import preprocess_model, find_threshold, map_data, \
-    read_configs, generate_template_configs, run_integration_pipeline
+    read_configs, generate_template_configs, run_integration_pipeline, do_model_comparison
 
 from pipeGEM.utils import parse_toml_file
 
@@ -29,7 +29,7 @@ def main(pl_name, **configs):
     if pl_name == "do_flux_analysis":
         pass
     if pl_name == "do_model_comparison":
-        pass
+        do_model_comparison(comparison_configs=configs.get("comparison_conf"))
     if pl_name == "do_pathway_analysis":
         pass
 
@@ -43,27 +43,27 @@ if __name__ == "__main__":
 
     parser.add_argument("-g", "--gene_data",
                         dest="gene_data_conf_path",
-                        metavar="gene_data_config_file_path",
+                        metavar="config_file_path",
                         default=None)
 
     parser.add_argument("-t", "--model_testing",
                         dest="model_testing_conf_path",
-                        metavar="model_testing_config_file_path",
+                        metavar="config_file_path",
                         default=None)
 
     parser.add_argument("-r", "--threshold",
                         dest="threshold_conf_path",
-                        metavar="threshold_config_file_path",
+                        metavar="config_file_path",
                         default=None)
 
     parser.add_argument("-m", "--mapping",
                         dest="mapping_conf_path",
-                        metavar="mapping_config_file_path",
+                        metavar="config_file_path",
                         default=None)
 
     parser.add_argument("-i", "--integration",
                         dest="integration_conf_path",
-                        metavar="integration_config_file_path",
+                        metavar="config_file_path",
                         default=None)
 
     parser.add_argument("-o", "--output",
@@ -76,12 +76,18 @@ if __name__ == "__main__":
                         metavar="pipeline-name",
                         default=None)
 
+    parser.add_argument("-c", "--comparison",
+                        dest="comparison_conf_path",
+                        metavar="config_file_path",
+                        default=None)
+
     args = parser.parse_args()
     config_dic = read_configs({"gene_data_conf": args.gene_data_conf_path,
                                "model_conf": args.model_testing_conf_path,
                                "threshold_conf": args.threshold_conf_path,
                                "mapping_conf": args.mapping_conf_path,
-                               "integration_conf": args.integration_conf_path})
+                               "integration_conf": args.integration_conf_path,
+                               "comparison_conf": args.comparison_conf_path})
     config_dic.update({"output_path": args.output_path,
                        "pipeline": args.pipeline})
     main(pl_name=args.pl_name, **config_dic)

@@ -203,19 +203,44 @@ class ComponentComparisonPlotter(BasePlotter):
 
     def plot_func(self,
                   result,
+                  row_color_by=None,
+                  col_color_by=None,
                   xticklabels=True,
                   yticklabels=True,
                   scale=1,
                   cbar_label='Jaccard Index',
                   cmap='magma',
+                  row_groups: pd.DataFrame | None = None,
+                  row_color_palette: list[str] | str | dict[str, str] = "deep",
+                  row_color_order: dict[str, list[str]] | None = None,
+                  col_groups: pd.DataFrame | None = None,
+                  col_color_palette: list[str] | str | dict[str, str] = "deep",
+                  col_color_order: dict[str, list[str]] | None = None,
+                  palette_replacement: str = "Spectral",
                   *args,
                   **kwargs):
+        row_color_by = row_color_by if row_color_by is not None else []
+        col_color_by = col_color_by if col_color_by is not None else []
+
+        if row_groups is not None:
+            row_groups = row_groups[row_color_by]
+
+        if col_groups is not None:
+            col_groups = col_groups[col_color_by]
+
         return plot_heatmap(data=result,
                             xticklabels=xticklabels,
                             yticklabels=yticklabels,
                             scale=scale,
                             cbar_label=cbar_label,
                             cmap=cmap,
+                            row_groups=row_groups,
+                            col_groups=col_groups,
+                            row_color_palette=row_color_palette,
+                            row_color_order=row_color_order,
+                            col_color_palette=col_color_palette,
+                            col_color_order=col_color_order,
+                            palette_replacement=palette_replacement,
                             **kwargs)
 
 

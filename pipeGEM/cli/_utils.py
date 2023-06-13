@@ -54,11 +54,16 @@ def preprocess_model(model_conf):
         model.apply_medium(name=model_conf["medium_data"]["name"],
                            **model_conf["medium_data"]["apply_params"])
 
+    rescaled_result = model.check_model_scale(method="geometric_mean", n_iter=50)
+
     # consistency
-    cons_tester = consistency_testers[model_conf["consistency"]["method"]](model)
+    cons_tester = consistency_testers[model_conf["consistency"]["method"]](rescaled_result.rescaled_model)
     cons_result = cons_tester.analyze(**model_conf["consistency"]["params"])
+
+    model.remove_reactions(cons_result.removed_rxn_ids)
+    cons_result.add_result(dict(consistent_model=model))
     cons_result.save(model_conf["consistency"]["saved_path"])
-    model = cons_result.consistent_model
+    # model = cons_result.consistent_model
 
     # metabolic task testing
     ft_params = model_conf["functionality_test"]["params"]
@@ -192,7 +197,6 @@ def _compare_number(grp,
                 )
 
 
-
 def do_model_comparison(comparison_configs):
     input_path = Path(comparison_configs["model_input_path"])
     model_dic = {}
@@ -210,12 +214,26 @@ def do_model_comparison(comparison_configs):
                               index_col=0)
     grp = Group(model_dic, name_tag="group", factors=factors)
     print(grp.get_info())
+    Path(comparison_configs["output_dir"]).mkdir(parents=True)
+    root = Path(comparison_configs["output_dir"])
     #  number of comp
-    grp.compare(method="num",
-                group_by=None,)
+    num_comp = grp.compare(method="num",
+                           group_by=None,)
+    num_comp.plot(file_name=root/comparison_configs["compare_num"]["output_file_name"],
+                  group=comparison_configs["compare_num"]["group"],
+                  dpi=comparison_configs["compare_num"]["dpi"])
 
     #  jaccard
-    grp.compare()
+    num_comp = grp.compare(method="jaccard",
+                           group_by=None, )
+    num_comp.plot(file_name=root/comparison_configs["compare_jaccard"]["output_file_name"],
+                  row_color_by=comparison_configs["compare_jaccard"]["row_color_by"],
+                  col_color_by=comparison_configs["compare_jaccard"]["col_color_by"],
+                  dpi=comparison_configs["compare_jaccard"]["dpi"])
 
     # pca
-    grp.compare()
+    num_comp = grp.compare(method="PCA",
+                           group_by=None, )
+    num_comp.plot(file_name=root/comparison_configs["compare_PCA"]["output_file_name"],
+                  dpi=comparison_configs["compare_PCA"]["dpi"],
+                  color_by=comparison_configs["compare_PCA"]["color_by"])

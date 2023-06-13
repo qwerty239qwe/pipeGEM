@@ -1,3 +1,17 @@
 models_input_path = ""
 model_type = "pg"  # pg or cobra are supported
 factor_file = ""
+output_dir = ""
+[compare_num]
+    output_file_name = ".png"
+    group = "group_name"
+    dpi = 450
+[compare_PCA]
+    output_file_name = ".png"
+    color_by = "group_name"
+    dpi = 450
+[compare_jaccard]
+    output_file_name = ".png"
+    row_color_by = "group_name"
+    col_color_by = "group_name"
+    dpi = 450

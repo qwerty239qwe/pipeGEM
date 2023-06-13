@@ -395,8 +395,8 @@ class Group(GEMComposite):
                                        included_attrs=features,
                                        replacing_annot=self._group_annotation)
 
-    @staticmethod
-    def _compare_components_jaccard(models,
+    def _compare_components_jaccard(self,
+                                    models,
                                     group_by=None,
                                     components="all"):
         group_list = [g for g in models] if group_by is None else \
@@ -416,7 +416,10 @@ class Group(GEMComposite):
         comp_arr = pd.DataFrame(comp_arr, index=group_names, columns=group_names)
         result = ComponentComparisonAnalysis(log={"components": components,
                                                   "group_by": group_by})
-        result.add_result({"comparison_df": comp_arr})
+        result.add_result({"comparison_df": comp_arr,
+                           "group_annotation": self.annotation if group_by is None else
+                           self.annotation.groupby(group_by).apply(lambda x: list(x.index)).to_frame()
+                           })
         return result
 
     def _compare_component_num(self,

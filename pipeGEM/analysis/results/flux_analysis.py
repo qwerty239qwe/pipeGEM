@@ -169,9 +169,9 @@ class FBA_Analysis(FluxAnalysis):
              rxn_corr=False,
              group_by="name",
              **kwargs):
-        if group_by not in self._result["flux_df"]:
+        if group_by not in self._result["flux_df"].columns:
             raise KeyError(f"{group_by} is not in the categorical features. \n"
-                           f"Possible features are {list(self.log['categorical'].keys())}")
+                           f"Possible features are {list(self.log['categorical'])}")
 
         if self._result["flux_df"][group_by].unique().shape[0] == 1:
             raise NotAggregatedError("This analysis result contains only 1 model's fluxes, "

@@ -102,7 +102,8 @@ def test_compare_jaccard_gb(group):
 
 
 def test_compare_jaccard_gb_with_nan(group):
-    sim_comp = group.compare(method="jaccard", group_by="treatment")
+    sim_comp = group.compare(method="jaccard",
+                             group_by="treatment")
     sim_comp.plot(dpi=150)
 
 
@@ -119,7 +120,8 @@ def test_compare_num(ecoli_core):
 def test_compare_num_model_lvl(group):
     num_comp = group.compare(method="num", group_by=None)
     print(num_comp.comp_df)
-    num_comp.plot(dpi=150, group="model", name_order=[gi.name_tag for gi in group])
+    num_comp.plot(dpi=150, group="model",
+                  name_order=[gi.name_tag for gi in group])
 
 
 def test_compare_PCA(group):
@@ -130,6 +132,7 @@ def test_compare_PCA(group):
     assert num_comp.result["PC"].shape == (n_pc, len(group))
     num_comp.plot(dpi=150)
     num_comp.plot(dpi=150, color_by=None)
+    num_comp.plot(dpi=150, color_by="treatment")
 
 
 def test_compare_PCA_2(group):
@@ -142,6 +145,7 @@ def test_compare_PCA_2(group):
 def test_get_rxn_info(group):
     rxn_info = group.get_rxn_info(models="all", attrs=["subsystem"])
     print(rxn_info)
+
 
 # TODO: test_add_tasks
 
