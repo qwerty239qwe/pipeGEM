@@ -10,6 +10,8 @@ from pipeGEM.analysis._mapping import *
 from pipeGEM.analysis._ko import *
 from pipeGEM.analysis.lp import *
 from pipeGEM.analysis._consistency import *
+from pipeGEM.analysis.scaling import *
+
 
 __all__ = ("flux_analyzers", "ProblemAnalyzer", "modified_pfba",
            "add_mod_pfba", "add_norm_constraint",
@@ -25,4 +27,8 @@ __all__ = ("flux_analyzers", "ProblemAnalyzer", "modified_pfba",
            "SamplingAnalysis", "INIT_Analysis", "CorrelationAnalysis",
            "ComponentComparisonAnalysis", "LocalThresholdAnalysis",
            "PercentileThresholdAnalysis", "rFASTCORMICSThresholdAnalysis",
-           "Single_KO_Analysis", "mCADRE_Analysis", "iMAT_Analysis")
+           "Single_KO_Analysis", "mCADRE_Analysis", "iMAT_Analysis",
+           "ModelScalingResult",
+           "model_scaler_collection", "L1NormScaler", "L2NormScaler",
+           "deBuchetScalerP2", "deBuchetScalerP1",
+           "ArithmeticScaler", "GeoMeanScaler")

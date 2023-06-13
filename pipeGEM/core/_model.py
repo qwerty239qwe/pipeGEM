@@ -12,6 +12,7 @@ from anndata import AnnData
 
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.utils import save_model, load_model, check_rxn_scales, save_toml_file, parse_toml_file
+from pipeGEM.analysis import model_scaler_collection
 from pipeGEM.data import GeneData, MediumData
 from pipeGEM.integration import integrator_factory
 from pipeGEM.analysis import flux_analyzers, consistency_testers, TaskAnalysis, ko_analyzers
@@ -312,6 +313,12 @@ class Model(GEMComposite):
     def check_rxn_scales(self,
                          threshold=1e4):
         check_rxn_scales(mod=self._model, threshold=threshold)
+
+    def check_model_scale(self,
+                          method="geometric_mean",
+                          n_iter=10):
+        rescaler = model_scaler_collection[method]()
+        return rescaler.rescale_model(model=self, n_iter=n_iter)
 
     def check_consistency(self,
                           method: str = "FASTCC",
