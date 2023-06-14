@@ -198,7 +198,9 @@ class rFASTCORMICSThreshold(DistributionBased):
         else:
             arr = data
 
+        print(f"cutting off {len(arr[arr <= cut_off])} data since their expression values are below {cut_off}")
         arr = arr[arr > cut_off]
+        print(f"data's range: [{arr.min()}, {arr.max()}]")
         min_x, max_x = np.percentile(arr, hard_x_lims[0] * 100), np.percentile(arr, hard_x_lims[1] * 100)
         kde_f = gaussian_kde(arr)
         x = np.linspace(arr.min(), arr.max(), 10000)

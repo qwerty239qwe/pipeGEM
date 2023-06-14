@@ -83,6 +83,7 @@ def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
                  col_color_palette: Union[List[str], str, Dict[str, str]] = "deep",
                  col_color_order: Optional[Dict[str, List[str]]] = None,
                  palette_replacement="Spectral",
+                 figsize=(10, 10),
                  **kwargs) -> Dict[str, plt.Figure]:
     """
     Plot a heatmap of the input data and (optional) save it.
@@ -119,7 +120,7 @@ def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
                                            palette_replacement=palette_replacement)
 
     cluster_grid = sns.clustermap(data,
-                                  figsize=(data.shape[0] * scale, data.shape[1] * scale),
+                                  figsize=figsize,
                                   cbar_kws=cbar_kw,
                                   row_colors=row_colors,
                                   col_colors=col_colors,

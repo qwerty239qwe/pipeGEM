@@ -259,7 +259,6 @@ def _traverse_dic_add_doc(dic, table_or_doc):
     return table_or_doc
 
 
-
 def save_toml_file(file_name, dic):
     doc = _traverse_dic_add_doc(dic, None)
     with open(file_name, "w+") as f:

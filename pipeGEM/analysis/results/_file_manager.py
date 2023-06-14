@@ -145,6 +145,24 @@ class DictFileManager(BaseFileManager):
         return parse_toml_file(file_name)
 
 
+class SetFileManager(BaseFileManager):
+    def __init__(self):
+        super(SetFileManager, self).__init__(dict,
+                                              default_suffix=".toml")
+
+    def write(self, obj, file_name, **kwargs):
+        if "suffix" in kwargs:
+            suffix = kwargs.pop("suffix")
+        else:
+            suffix = self.suffix
+
+        save_toml_file(str(Path(file_name).with_suffix(suffix)),
+                       {"set": list(obj)})
+
+    def read(self, file_name, **kwargs):
+        return set(parse_toml_file(file_name)["set"])
+
+
 class FileManagers(ObjectFactory):
     def __init__(self):
         super().__init__()
@@ -158,3 +176,4 @@ fmanagers.register("pipeGEM.Model", PGModelFileManager)
 fmanagers.register("numpy.NDArrayStr", NDArrayStrFileManager)
 fmanagers.register("numpy.NDArrayFloat", NDArrayFloatFileManager)
 fmanagers.register("python.dict", DictFileManager)
+fmanagers.register("python.set", SetFileManager)

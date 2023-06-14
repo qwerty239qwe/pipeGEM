@@ -195,6 +195,7 @@ class GeneData(BaseData):
 
     def get_threshold(self, name, transform=True, **kwargs):
         tf = threshold_finders.create(name)
+        print("transform:", transform)
         return tf.find_threshold({gn: self.data_transform(gv) if transform else gv
                                   for gn, gv in self.gene_data.items()}, **kwargs)
 

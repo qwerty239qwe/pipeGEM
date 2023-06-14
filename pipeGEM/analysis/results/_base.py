@@ -119,6 +119,10 @@ class BaseAnalysis:
                 result_dic.update(parse_toml_file(fn))
                 continue
 
+            if result_types[fn.stem] == "Analysis":
+                result_dic[fn.stem] = BaseAnalysis.load(str(fn))
+                continue
+
             file_manager = self._fmanagers[result_types[fn.stem]]()
             kws = {} if fn.stem not in self._result_loading_params else self._result_loading_params[fn.stem]
             result_dic[fn.stem] = file_manager.read(fn, **kws)
@@ -131,6 +135,11 @@ class BaseAnalysis:
             if any([isinstance(v, tp) for tp in self._s_val_tps]):
                 singular_values[k] = v
                 continue
+
+            if result_types[k] == "Analysis":
+                v.save(parent_dir / self._result_folder_name / k)
+                continue
+
             file_manager = self._fmanagers[result_types[k]]()
             kws = {} if k not in self._result_saving_params else {k: v for k, v in self._result_saving_params[k].items()
                                                                   if k not in ["fm_name"]}
@@ -149,6 +158,8 @@ class BaseAnalysis:
             module_name = _get_module(v, **module_sp_kw)
             if k in self._result_saving_params and "fm_name" in self._result_saving_params[k]:
                 result_types[k] = f"{module_name}.{self._result_saving_params[k]['fm_name']}"
+            elif isinstance(v, BaseAnalysis):
+                result_types[k] = "Analysis"
             else:
                 result_types[k] = f"{module_name}.{v.__class__.__name__}"
 

@@ -80,17 +80,30 @@ def preprocess_model(model_conf):
 def find_threshold(gene_data: Union[GeneData, Dict[str, GeneData]],
                    threshold_config):
     th_name = threshold_config["params"]["name"]
+    if "plot" in threshold_config and "output_path" in threshold_config["plot"]:
+        plot_op_path = Path(threshold_config["plot"]["output_path"])
+        if not plot_op_path.is_dir():
+            plot_op_path.mkdir(parents=True, exist_ok=True)
+    else:
+        plot_op_path = None
+
     if th_name != "local":
         result = {}
         for g_name, data in gene_data.items():
             th = data.get_threshold(**threshold_config["params"])
             th.save(Path(threshold_config["saved_path"]) / g_name)
             result[g_name] = th
+
+            th.plot(file_name=(plot_op_path / g_name).with_suffix(".png"),
+                    dpi=450)
     else:
         assert isinstance(gene_data, dict)
         agg_data = GeneData.aggregate(gene_data, prop="data")
         result = agg_data.find_local_threshold(**threshold_config["params"])
         result.save(threshold_config["saved_path"])
+        result.plot(file_name=(plot_op_path / "local").with_suffix(".png"),
+                    dpi=450)
+
     return result
 
 

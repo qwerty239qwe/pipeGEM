@@ -123,8 +123,9 @@ class FASTCOREAnalysis(BaseAnalysis):
     """
 
     def __init__(self, log):
-
         super().__init__(log)
+        self._result_saving_params["removed_rxn_ids"] = {"fm_name": "NDArrayStr"}
+        self._result_saving_params["kept_rxn_ids"] = {"fm_name": "NDArrayStr"}
 
 
 class rFASTCORMICSAnalysis(BaseAnalysis):
@@ -154,8 +155,6 @@ class rFASTCORMICSAnalysis(BaseAnalysis):
     """
 
     def __init__(self, log):
-
-
         super().__init__(log)
 
     @property

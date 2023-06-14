@@ -81,9 +81,12 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
                                 singleJ = None
                         else:
                             flipped, singleton = False, True
-                            if singleJ is None and len(np.setdiff1d(J, irr_rxns)) != 0:
-                                Jrev = np.array([np.setdiff1d(J, irr_rxns)[0]])
-                                singleJ = Jrev
+                            if singleJ is None:
+                                if len(np.setdiff1d(J, irr_rxns)) != 0:
+                                    Jrev = np.array([np.setdiff1d(J, irr_rxns)[0]])
+                                    singleJ = Jrev
+                                elif len(np.intersect1d(J, irr_rxns)) != 0:  # this is for raise_err = False
+                                    singleJ = np.array([np.intersect1d(J, irr_rxns)[0]])
                     else:
                         flip_direction(model, Jrev)
                         flipped = True
