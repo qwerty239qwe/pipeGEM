@@ -192,8 +192,7 @@ class CORDA_Analysis(BaseAnalysis):
 
 class MBA_Analysis(BaseAnalysis):
     """
-    An object containing MBA result.
-    This should contain results including:
+    This object contains:
         result_model: pg.Model or cobra.Model
             A model containing the most core reactions and the least non-core reactions.
         threshold_analysis: rFASTCORMICSThresholdAnalysis

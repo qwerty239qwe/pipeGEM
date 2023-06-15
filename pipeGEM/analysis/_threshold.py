@@ -258,7 +258,11 @@ class PercentileThreshold(RankBased):
             arr = data
         arr = arr[np.isfinite(arr)]
         result = PercentileThresholdAnalysis(log={"p": p})
-        exp_th = np.percentile(arr, q=p)
+        if isinstance(p, list) or isinstance(p, np.ndarray):
+            exp_ths = [np.percentile(arr, q=pi) for pi in p]
+            exp_th = pd.Series({f"p={pi}": exp_ths for pi in p})
+        else:
+            exp_th = np.percentile(arr, q=p)
         result.add_result(dict(data=arr, exp_th=exp_th))
         return result
 

@@ -1,5 +1,4 @@
-import json
-
+from typing import Union
 import pandas as pd
 
 from ._base import *
@@ -54,7 +53,7 @@ class PercentileThresholdAnalysis(BaseAnalysis):
         self._result_saving_params["data"] = {"fm_name": "NDArrayFloat"}
 
     @property
-    def exp_th(self):
+    def exp_th(self) -> Union[float, pd.Series]:
         return self._result["exp_th"]
 
     def plot(self,
