@@ -86,8 +86,8 @@ class LocalThresholdAnalysis(BaseAnalysis):
         return self._result["global_on_th"]
 
     def _get_group_dic(self):
-        groups = self._groups.unique()
-        return {g: self._result["groups"][self._result["groups"] == g].to_list()
+        groups = self._result["groups"].unique()
+        return {g: self._result["groups"][self._result["groups"] == g].index.to_list()
                 for g in groups}
 
     def plot(self,
@@ -99,9 +99,10 @@ class LocalThresholdAnalysis(BaseAnalysis):
              **kwargs):
         pltr = LocalThresholdPlotter(dpi=dpi, prefix=prefix)
         pltr.plot(data=self._result["data"],
+                  genes=genes,
                   groups=groups,
                   local_th=self._result["exp_ths"],
                   global_on_th=self._result["global_on_th"],
                   global_off_th=self._result["global_off_th"],
-                  group_dict=self._get_group_dic(),
+                  group_dic=self._get_group_dic(),
                   )

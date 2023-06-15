@@ -5,3 +5,5 @@ saved_path = ""
     return_heuristic = false
     hard_x_lims = [0.05, 0.95]
     k_best = 3
+[plot]
+    output_path = nan

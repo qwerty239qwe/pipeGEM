@@ -48,8 +48,10 @@ class BasePlotter:
             file_name, file_path = Path(prefix + str(file_name)), Path("./")
 
         if g is None:
+            plt.close()
             plt.savefig(file_path / file_name, dpi=dpi, bbox_inches='tight')
         else:
+            plt.close(g)
             g.savefig(file_path / file_name, dpi=dpi, bbox_inches='tight')
 
     def plot(self, *args, **kwargs):
@@ -74,7 +76,8 @@ class BasePlotter:
             if plotting_kws["file_name"] is not None:
                 print("saving ", plotting_kws["file_name"])
                 self._save_fig(**plotting_kws)
-            plt.show()
+            else:
+                plt.show()
         return info_kws
 
     def plot_func(self, *args, **kwargs):

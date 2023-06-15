@@ -14,9 +14,17 @@ class DataAggregation(BaseAnalysis):
     def __getitem__(self, item):
         return self._result["agg_data"][item]
 
-    def find_local_threshold(self, **kwargs):
+    def find_local_threshold(self, group_name=None, **kwargs):
         tf = threshold_finders.create("local")
-        return tf.find_threshold(self._result["agg_data"], **kwargs)
+        if group_name is not None:
+            try:
+                groups = self._result["group_annotation"].loc[:, group_name]
+            except KeyError:
+                raise KeyError(f"group_name: {group_name} is not in the group_annotation, possible choices are"
+                      f"{self._result['group_annotation'].columns.to_list()}")
+        else:
+            groups = None
+        return tf.find_threshold(self._result["agg_data"], groups=groups, **kwargs)
 
     def corr(self,
              by="sample",

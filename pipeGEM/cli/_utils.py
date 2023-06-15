@@ -93,16 +93,17 @@ def find_threshold(gene_data: Union[GeneData, Dict[str, GeneData]],
             th = data.get_threshold(**threshold_config["params"])
             th.save(Path(threshold_config["saved_path"]) / g_name)
             result[g_name] = th
-
-            th.plot(file_name=(plot_op_path / g_name).with_suffix(".png"),
-                    dpi=450)
+            if plot_op_path is not None:
+                th.plot(file_name=(plot_op_path / g_name).with_suffix(".png"),
+                        dpi=450)
     else:
         assert isinstance(gene_data, dict)
         agg_data = GeneData.aggregate(gene_data, prop="data")
         result = agg_data.find_local_threshold(**threshold_config["params"])
         result.save(threshold_config["saved_path"])
-        result.plot(file_name=(plot_op_path / "local").with_suffix(".png"),
-                    dpi=450)
+        if plot_op_path is not None:
+            result.plot(file_name=(plot_op_path / "local").with_suffix(".png"),
+                        dpi=450)
 
     return result
 

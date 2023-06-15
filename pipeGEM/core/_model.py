@@ -35,6 +35,7 @@ class Model(GEMComposite):
     def __init__(self,
                  name_tag: str = None,
                  model = None,
+                 gene_data_factor_df: pd.DataFrame = None,
                  **kwargs):
         super(Model, self).__init__(name_tag=name_tag or "Unnamed_model")
         if not isinstance(model, cobra.Model):
@@ -47,6 +48,7 @@ class Model(GEMComposite):
         self._original_objs = {}
         self._empty_merged_rxns = []
         self._annotations = kwargs
+        self._gene_data_factor_df = gene_data_factor_df
 
     def __enter__(self):
         return self._model.__enter__()
@@ -127,10 +129,13 @@ class Model(GEMComposite):
 
     @property
     def aggregated_gene_data(self):
-        return GeneData.aggregate(self._gene_data, prop="data")
+        return GeneData.aggregate(self._gene_data, prop="data",
+                                  group_annotation=self._gene_data_factor_df)
 
     def aggregate_gene_data(self, **kwargs):
-        return GeneData.aggregate(data=self._gene_data, **kwargs)
+        return GeneData.aggregate(data=self._gene_data,
+                                  group_annotation=self._gene_data_factor_df,
+                                  **kwargs)
 
     def copy(self,
              copy_gene_data=False,

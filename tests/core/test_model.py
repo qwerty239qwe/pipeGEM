@@ -18,12 +18,28 @@ def test_model_flux_analysis(ecoli_core):
     assert isinstance(result.flux_df, pd.DataFrame)
 
 
-def test_add_data_model(ecoli_core, ecoli_core_data):
+def test_model_add_data(ecoli_core, ecoli_core_data):
     pmod = Model(model=ecoli_core, name_tag="ecoli")
     data_name = "sample_0"
     gene_data = GeneData(data=ecoli_core_data[data_name], data_transform=lambda x: np.log2(x), absent_expression=-np.inf)
     pmod.add_gene_data(data_name, gene_data)
     assert isinstance(pmod.gene_data[data_name].rxn_scores, dict)
+
+
+def test_model_aggregate_data(ecoli_core, ecoli_core_data):
+    group_info = pd.DataFrame({"grp": {data_name: i % 5
+                                       for i, (data_name, data) in enumerate(ecoli_core_data.items())}
+                               })
+    pmod = Model(model=ecoli_core, name_tag="ecoli", gene_data_factor_df=group_info)
+    for d_name, data in ecoli_core_data.items():
+        gene_data = GeneData(data=data,
+                             data_transform=lambda x: np.log2(x), absent_expression=-np.inf)
+        pmod.add_gene_data(d_name, gene_data)
+    assert isinstance(pmod.gene_data["sample_0"].rxn_scores, dict)
+    agg_data = pmod.aggregate_gene_data()
+    th = agg_data.find_local_threshold(group_name="grp", p=50)
+    print(th.exp_ths)
+    th.plot(genes=[pmod.gene_ids[i] for i in range(3)])
 
 
 def test_check_model_scale_geometric_mean(ecoli_core):

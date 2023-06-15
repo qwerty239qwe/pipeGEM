@@ -1,6 +1,6 @@
 import warnings
 
-from typing import Union
+from typing import Union, List
 
 import pandas as pd
 from scipy.stats import gaussian_kde
@@ -244,9 +244,10 @@ class PercentileThreshold(RankBased):
     def __init__(self):
         super().__init__()
 
+    @timing
     def find_threshold(self,
                        data,  # 1d array
-                       p: Union[int, float],
+                       p: Union[int, float, List[int], List[float], np.ndarray],
                        **kwargs) -> PercentileThresholdAnalysis:
         assert 0 <= p <= 100
         if isinstance(data, pd.Series):
@@ -266,6 +267,7 @@ class LocalThreshold(RankBased):
     def __init__(self):
         super().__init__()
 
+    @timing
     def find_threshold(self,
                        data,  # 2d array
                        p,

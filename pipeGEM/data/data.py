@@ -220,7 +220,7 @@ class GeneData(BaseData):
                   method="concat",
                   prop="data",
                   absent_expression=0,
-                  group_annotation=None) -> DataAggregation:
+                  group_annotation: pd.DataFrame = None) -> DataAggregation:
         assert prop in ["data", "score"], "prop should be either data or score"
         obj_prop = {"data": "gene_data", "score": "rxn_scores"}
 
@@ -236,6 +236,10 @@ class GeneData(BaseData):
                                       "prop": prop,
                                       "absent_expression": absent_expression,
                                       "group": _data_parse_group_models(data)})
+        if group_annotation is not None and (method == "concat") and \
+            len(set(group_annotation.index) & set(mg_d.columns)) == 0:
+            raise ValueError("Group annotation does not match aggregated data")
+
         result.add_result(dict(agg_data=mg_d,
                                group_annotation=group_annotation))
         return result
