@@ -80,7 +80,8 @@ def preprocess_model(model_conf):
 def find_threshold(gene_data: Union[GeneData, Dict[str, GeneData]],
                    threshold_config):
     th_name = threshold_config["params"]["name"]
-    if "plot" in threshold_config and "output_path" in threshold_config["plot"]:
+    if "plot" in threshold_config and "output_path" in threshold_config["plot"] and \
+            threshold_config["plot"]["output_path"] is not None:
         plot_op_path = Path(threshold_config["plot"]["output_path"])
         if not plot_op_path.is_dir():
             plot_op_path.mkdir(parents=True, exist_ok=True)
@@ -98,8 +99,15 @@ def find_threshold(gene_data: Union[GeneData, Dict[str, GeneData]],
                         dpi=450)
     else:
         assert isinstance(gene_data, dict)
-        agg_data = GeneData.aggregate(gene_data, prop="data")
-        result = agg_data.find_local_threshold(**threshold_config["params"])
+        if threshold_config["group"]["group_file_name"] is not None:
+            grps = pd.read_csv(threshold_config["group"]["group_file_name"])
+            grp_name = threshold_config["group"]["group_name"]
+        else:
+            grps = None
+            grp_name = None
+
+        agg_data = GeneData.aggregate(gene_data, prop="data", group_annotation=grps)
+        result = agg_data.find_local_threshold(group_name=grp_name, **threshold_config["params"])
         result.save(threshold_config["saved_path"])
         if plot_op_path is not None:
             result.plot(file_name=(plot_op_path / "local").with_suffix(".png"),

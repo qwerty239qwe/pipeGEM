@@ -1,4 +1,4 @@
-from typing import Dict, Union
+from typing import Dict, Union, Literal, List
 from pathlib import Path
 
 import anndata as ad
@@ -199,19 +199,49 @@ class GeneData(BaseData):
         return tf.find_threshold({gn: self.data_transform(gv) if transform else gv
                                   for gn, gv in self.gene_data.items()}, **kwargs)
 
-    def assign_local_threshold(self, local_threshold_result, transform=True, method="binary", group=None, **kwargs):
+    def assign_local_threshold(self,
+                               local_threshold_result,
+                               transform: bool = True,
+                               method: Literal["binary", "ratio", "diff", "rdiff"] = "binary",
+                               group: str = None,
+                               **kwargs):
+        """
+        Assign local threshold result to this object.
+        This will change the gene data based on the passed method.
+            binary: gene data will be changed to either True or False,
+                indicating if the gene data is above (True) or below (False) the threshold.
+            ratio: gene data will be changed to a fraction calculated by dividing data by threshold.
+            diff: gene data will be changed to data - threshold.
+            rdiff: gene data will be changed to threshold - data.
+
+        Parameters
+        ----------
+        local_threshold_result: LocalThresholdAnalysis
+            Assigned threshold object
+        transform: bool
+            If true, apply data_transform to gene data and thresholds.
+        method: str
+            Method to assign the new gene data
+        group: str
+            Group to select from exp_ths's columns of the local_threshold_result.
+
+        Returns
+        -------
+
+        """
         assert method in ["binary", "ratio", "diff", "rdiff"]
         group = group if group is not None else 'exp_th'
         gene_exp_ths = local_threshold_result.exp_ths[group]
-        data_and_ths = pd.concat([gene_exp_ths, pd.DataFrame({"data": {gn: self.data_transform(gv) if transform else gv
-                                                                       for gn, gv in self.gene_data.items()}})], axis=1)
-        if method == "binary":
+        data_and_ths = pd.concat([self.data_transform(gene_exp_ths),
+                                  pd.DataFrame({"data": {gn: self.data_transform(gv) if transform else gv
+                                                         for gn, gv in self.gene_data.items()}})], axis=1)
+        if method == "binary":  # returns True / False
             self.gene_data = (data_and_ths["data"] > data_and_ths[group]).astype(int).to_dict()
-        elif method == "ratio":
+        elif method == "ratio":  # returns data/threshold
             self.gene_data = (data_and_ths["data"] / data_and_ths[group]).to_dict()
-        elif method == "diff":
+        elif method == "diff":  # returns threshold - data (higher values mean lower expression)
             self.gene_data = (data_and_ths[group] - data_and_ths["data"]).to_dict()
-        elif method == "rdiff":
+        elif method == "rdiff":  # returns data - threshold (higher values mean higher expression)
             self.gene_data = (data_and_ths["data"] - data_and_ths[group]).to_dict()
 
     @classmethod

@@ -1,8 +1,17 @@
 saved_path = ""
+
 [params]
     name = "local"
-    group_file_name = ""
-    global_on_p = 90
-    global_off_p = 10
+    p = 50
+    global_on_p = 75
+    global_off_p = 25
     global_on_th = nan
     global_off_th = nan
+
+[group]
+    group_file_name = nan
+    group_name = ""
+
+[plot]
+    output_path = nan
+    genes = [""]
