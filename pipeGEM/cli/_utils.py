@@ -55,16 +55,19 @@ def preprocess_model(model_conf):
         model.apply_medium(name=model_conf["medium_data"]["name"],
                            **model_conf["medium_data"]["apply_params"])
 
-    rescaled_result = model.check_model_scale(method="geometric_mean", n_iter=50)
+    # rescale
+    rescaled_result = model.check_model_scale(method=model_conf["rescale"]["method"],
+                                              n_iter=model_conf["rescale"]["n_iter"])
+    rescaled_result.save(model_conf["rescale"]["saved_path"])
 
     # consistency
     cons_tester = consistency_testers[model_conf["consistency"]["method"]](rescaled_result.rescaled_model)
     cons_result = cons_tester.analyze(**model_conf["consistency"]["params"])
 
-    model.remove_reactions(cons_result.removed_rxn_ids)
-    cons_result.add_result(dict(consistent_model=model))
+    # model.remove_reactions(cons_result.removed_rxn_ids)
+    # cons_result.add_result(dict(consistent_model=model))
     cons_result.save(model_conf["consistency"]["saved_path"])
-    # model = cons_result.consistent_model
+    model = cons_result.consistent_model
 
     # metabolic task testing
     ft_params = model_conf["functionality_test"]["params"]
@@ -166,6 +169,11 @@ def _integration_get_thres(gene_data, threshold_config, integration_conf):
             for data_name in gene_data:
                 th_dic[data_name] = rFASTCORMICSThresholdAnalysis.load(Path(th_path) / data_name)
             return th_dic
+        elif th_type == "local":
+            th_dic = {}
+            for data_name in gene_data:
+                th_dic[data_name] = LocalThresholdAnalysis.load(Path(th_path) / data_name)
+            return th_dic
     return find_threshold(gene_data=gene_data,
                           threshold_config=threshold_config)
 
@@ -212,12 +220,6 @@ def run_integration_pipeline(gene_data_conf,
         int_result = model.integrate_gene_data(data_name=g_name,
                                                **int_c)
         int_result.save(Path(saved_path) / g_name)
-
-
-def _compare_number(grp,
-                    group_by):
-    grp.compare(group_by=group_by,
-                )
 
 
 def do_model_comparison(comparison_configs):

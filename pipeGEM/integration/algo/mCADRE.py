@@ -214,24 +214,24 @@ def apply_mCADRE(model,
                            f"Test details: {salvage_test_result.result_df}")
 
     result_model, removed_rxn_ids = _prune_model(model,
-                                                    score_df,
-                                                    core_rxns,
-                                                    non_expressed_rxns,
-                                                    func_test_result,
-                                                    salvage_test_result,
-                                                    eta=0.333,
-                                                    consistency_test_method="FASTCC",
-                                                    tolerance=1e-8,)
+                                                 score_df,
+                                                 core_rxns,
+                                                 non_expressed_rxns,
+                                                 func_test_result,
+                                                 salvage_test_result,
+                                                 eta=0.333,
+                                                 consistency_test_method="FASTCC",
+                                                 tolerance=1e-8,)
     result = mCADRE_Analysis(log=dict(exp_cutoff=exp_cutoff,
                                       absent_value=absent_value,
                                       absent_value_indicator=absent_value_indicator,
                                       evidence_scores=evidence_scores,))
 
-    result.add_result(model=result_model,
-                      removed_rxns=removed_rxn_ids,
-                      core_rxns=core_rxns,
-                      score_df=score_df,
-                      non_expressed_rxns=non_expressed_rxns,
-                      salvage_test_result=salvage_test_result,
-                      func_test_result=func_test_result)
+    result.add_result(dict(result_model=result_model,
+                           removed_rxn_ids=removed_rxn_ids,
+                           core_rxn_ids=core_rxns,
+                           non_expressed_rxn_ids=non_expressed_rxns,
+                           score_df=score_df,
+                           salvage_test_result=salvage_test_result,
+                           func_test_result=func_test_result))
     return result

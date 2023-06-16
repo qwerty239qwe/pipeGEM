@@ -22,6 +22,10 @@
         time_hr = 96
         flux_unit = "mmol/g/hr"
         threshold = 1e-6
+[rescale]
+    method = "geometric_mean"
+    n_iter = 10
+    saved_path = "./rescaling"
 [consistency]
     method = "FASTCC"
     saved_path = "./consistency_test"
@@ -34,7 +38,7 @@
     [functionality_test.params]
         tasks_file_name = "tasks_for_human1"
     [functionality_test.test_tasks]
-        model_compartment_parenthesis = "[{}]"
+        model_compartment_parenthesis = "{}"
         method="pFBA"
         method_kws=nan
         solver="gurobi"

@@ -102,7 +102,6 @@ class FASTCC(ConsistencyTester):
                             flip_direction(model, Jirev)
                             flipped = True
         rxns_to_remove = np.setdiff1d(all_rxns, A)
-
         if consistent_model is not None:
             consistent_model.remove_reactions(rxns_to_remove, remove_orphans=True)
             if isinstance(consistent_model, pipeGEM.Model):
