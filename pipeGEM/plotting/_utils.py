@@ -1,9 +1,11 @@
 from functools import wraps, partial
 from pathlib import Path
 import string
+import warnings
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
 
 
 def _get_subsystem_ticks(data: pd.DataFrame, rxn_subsystem):
@@ -124,3 +126,16 @@ def draw_significance(ax, x_pos_list, y_pos_list, num_stars):
     if x_pos_list[0] == x_pos_list[1]:
         ax.text(x_pos_list[1] + x_len * 0.02, (y_pos_list[0] + y_pos_list[1]) / 2, '*' * num_stars, size=20,
                 horizontalalignment='center', verticalalignment='center', rotation=90)
+
+
+def handle_colors(palette: str = "deep",
+                  alt_palette: str = "Spectral",
+                  switch_when_exceed: int = 10,
+                  warn_when_switch=True):
+    colors = sns.color_palette(palette, n_colors=sns.palettes.QUAL_PALETTE_SIZES[palette])
+    if len(colors) < switch_when_exceed:
+        if warn_when_switch:
+            warnings.warn(f"{palette} contains less colors ({sns.palettes.QUAL_PALETTE_SIZES[palette]})"
+                          f" than the number of groups ({switch_when_exceed}). Palette has been changed to Spectral.")
+        colors = sns.color_palette(alt_palette, n_colors=len(colors))
+    return colors

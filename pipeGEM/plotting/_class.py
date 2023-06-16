@@ -156,7 +156,9 @@ class PercentileThresholdPlotter(BasePlotter):
     def plot_func(self, data, exp_th, *args, **kwargs):
 
         return plot_percentile_thresholds(data=data,
-                                          exp_th=exp_th, *args, **kwargs)
+                                          exp_th=exp_th,
+                                          *args,
+                                          **kwargs)
 
 
 class LocalThresholdPlotter(BasePlotter):

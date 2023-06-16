@@ -3,6 +3,7 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 from typing import Optional, Tuple, Union
+from ._utils import handle_colors
 
 
 def plot_rFastCormic_thresholds(x: np.ndarray,
@@ -12,28 +13,28 @@ def plot_rFastCormic_thresholds(x: np.ndarray,
                                 right_c: Optional[np.ndarray] = None,
                                 left_c: Optional[np.ndarray] = None) -> dict:
     """
-        Plots a gene expression distribution along with fitted expressed and non-expressed distributions, and gene
-        expression thresholds.
+    Plots a gene expression distribution along with fitted expressed and non-expressed distributions, and gene
+    expression thresholds.
 
-        Parameters
-        ----------
-        x : numpy.ndarray
-            A numpy array containing the values of the x-axis.
-        y : numpy.ndarray
-            A numpy array containing the values of the y-axis.
-        exp_th : float
-            The threshold for expressed genes.
-        nonexp_th : float
-            The threshold for non-expressed genes.
-        right_c : Optional[numpy.ndarray], optional
-            A numpy array containing the values of the fitted expressed distribution, by default None.
-        left_c : Optional[numpy.ndarray], optional
-            A numpy array containing the values of the fitted non-expressed distribution, by default None.
+    Parameters
+    ----------
+    x : numpy.ndarray
+        A numpy array containing the values of the x-axis.
+    y : numpy.ndarray
+        A numpy array containing the values of the y-axis.
+    exp_th : float
+        The threshold for expressed genes.
+    nonexp_th : float
+        The threshold for non-expressed genes.
+    right_c : Optional[numpy.ndarray], optional
+        A numpy array containing the values of the fitted expressed distribution, by default None.
+    left_c : Optional[numpy.ndarray], optional
+        A numpy array containing the values of the fitted non-expressed distribution, by default None.
 
-        Returns
-        -------
-        dict
-            A dictionary containing the plot figure.
+    Returns
+    -------
+    dict
+        A dictionary containing the plot figure.
     """
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.plot(x, y, label="Data")
@@ -49,8 +50,10 @@ def plot_rFastCormic_thresholds(x: np.ndarray,
 
 
 def plot_percentile_thresholds(data: Union[pd.DataFrame, pd.Series],
-                               exp_th: float,
-                               figsize: Tuple[float, float] = (8, 6)) -> dict:
+                               exp_th: Union[float, pd.Series],
+                               figsize: Tuple[float, float] = (8, 6),
+                               palatte: str = "deep",
+                               **kwargs) -> dict:
     """
     Plots a histogram of the input data and a vertical line indicating the expression threshold.
 
@@ -58,10 +61,12 @@ def plot_percentile_thresholds(data: Union[pd.DataFrame, pd.Series],
     ----------
     data : pandas.DataFrame or pandas.Series
         The data to plot in the histogram.
-    exp_th : float
+    exp_th : float, pd.Series
         The threshold for expressed genes.
     figsize : tuple, optional
         A tuple containing the width and height of the figure in inches, by default (8, 6).
+    palatte: str
+        Palatte used to draw the distribution and thresholds.
 
     Returns
     -------
@@ -69,9 +74,31 @@ def plot_percentile_thresholds(data: Union[pd.DataFrame, pd.Series],
         A dictionary containing the plot figure.
     """
     fig, ax = plt.subplots(figsize=figsize)
-    ax = sns.histplot(data=data, ax=ax, kde=True)
+    n_needed_colors = 1 if isinstance(exp_th, float) else len(exp_th)
+
+    colors = handle_colors(palette=palatte,
+                           switch_when_exceed=1+n_needed_colors)
+    ax = sns.histplot(data=data,
+                      ax=ax,
+                      kde=True,
+                      color=colors[0],
+                      **kwargs)
     y_lims = ax.get_ylim()
-    ax.axvline(x=exp_th, ymax=y_lims[1], label="Expression threshold")
+    ax.plot([], label="Data", color=colors[0])
+    if isinstance(exp_th, float):
+        ax.axvline(x=exp_th, ymax=y_lims[1], color=colors[1], label="Expression threshold")
+    elif isinstance(exp_th, pd.Series) or isinstance(exp_th, dict):
+        for i, (idx, e) in enumerate(exp_th.items()):
+            ax.axvline(x=e,
+                       ymax=y_lims[1],
+                       label=f"{idx}",
+                       color=colors[i+1])
+    elif isinstance(exp_th, list) or isinstance(exp_th, np.ndarray):
+        for i, e in enumerate(exp_th):
+            if i == 0:
+                ax.axvline(x=e, ymax=y_lims[1], color=colors[i+1], label="Expression threshold")
+            else:
+                ax.axvline(x=e, ymax=y_lims[1], color=colors[i+1])
     ax.set_ylim(*y_lims)
     ax.legend()
     return {"g": fig}

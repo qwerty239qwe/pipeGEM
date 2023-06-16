@@ -249,7 +249,12 @@ class PercentileThreshold(RankBased):
                        data,  # 1d array
                        p: Union[int, float, List[int], List[float], np.ndarray],
                        **kwargs) -> PercentileThresholdAnalysis:
-        assert 0 <= p <= 100
+
+        if (isinstance(p, float) or isinstance(p, int)) and not (0 <= p <= 100):
+            raise ValueError(f"p should be a number between 0 and 100. Got {p} instead")
+        elif not all([0 <= pi <= 100 for pi in p]):
+            raise ValueError(f"Every number in p should be between 0 and 100. Got {p} instead")
+
         if isinstance(data, pd.Series):
             arr = data.values
         elif isinstance(data, dict):
@@ -260,7 +265,7 @@ class PercentileThreshold(RankBased):
         result = PercentileThresholdAnalysis(log={"p": p})
         if isinstance(p, list) or isinstance(p, np.ndarray):
             exp_ths = [np.percentile(arr, q=pi) for pi in p]
-            exp_th = pd.Series({f"p={pi}": exp_ths for pi in p})
+            exp_th = pd.Series(exp_ths, index=[f"p={pi}"for pi in p])
         else:
             exp_th = np.percentile(arr, q=p)
         result.add_result(dict(data=arr, exp_th=exp_th))
