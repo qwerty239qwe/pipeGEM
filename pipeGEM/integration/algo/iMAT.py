@@ -115,7 +115,7 @@ def apply_iMAT(model,
 
     sol = model.optimize()
     removed_rxn_ids = sol.to_frame().query(f"abs(fluxes) < {tol}").index
-    result_model.remove_reactions(removed_rxn_ids)
+    result_model.remove_reactions(removed_rxn_ids, remove_orphans=True)
 
     result = iMAT_Analysis(log=dict(predefined_threshold=predefined_threshold,
                                     threshold_kws=threshold_kws,

@@ -7,7 +7,7 @@ import seaborn as sns
 import pandas as pd
 from typing import Dict, Optional, Union, List
 
-from pipeGEM.plotting._utils import _set_default_ax
+from pipeGEM.plotting._utils import _set_default_ax, handle_colors
 
 
 def plot_PCA(data: Dict[str, pd.DataFrame],
@@ -154,11 +154,8 @@ def plot_embedding(embedding_df: pd.DataFrame,
     for k in ["file_name", "dpi", "prefix"]:
         if k in kwargs:
             del kwargs[k]
-    colors = sns.color_palette(palette, n_colors=sns.palettes.QUAL_PALETTE_SIZES[palette])
-    if len(colors) < len(groups):
-        warnings.warn(f"{palette} contains less colors ({sns.palettes.QUAL_PALETTE_SIZES[palette]})"
-                      f" than the number of groups ({len(groups)}). Palette has been changed to Spectral.")
-        colors = sns.color_palette("Spectral", n_colors=len(colors))
+    colors = handle_colors(palette=palette,
+                           switch_when_exceed=len(groups))
     fig, ax = plt.subplots(figsize=figsize)
     if sheet_file_name is not None:
         embedding_df.to_csv(sheet_file_name)
@@ -220,11 +217,8 @@ def plot_2D_PCA_score(pca_df,
     plotting_kws : dict
         A dictionary of keyword arguments to be passed to the plotting function.
     """
-    colors = sns.color_palette(palette, n_colors=sns.palettes.QUAL_PALETTE_SIZES[palette])
-    if len(colors) < len(groups):
-        warnings.warn(f"{palette} contains less colors ({sns.palettes.QUAL_PALETTE_SIZES[palette]})"
-                      f" than the number of groups ({len(groups)}). Palette has been changed to Spectral.")
-        colors = sns.color_palette("Spectral", n_colors=len(colors))
+    colors = handle_colors(palette=palette,
+                           switch_when_exceed=len(groups))
     fig, ax = plt.subplots(figsize=(7, 7))
     if features is None:
         for i, (group_name, model_names) in enumerate(groups.items()):
@@ -281,12 +275,8 @@ def plot_3D_PCA_score(pca_df: pd.DataFrame,
         A dictionary containing the plot parameters.
 
     """
-    colors = sns.color_palette(palette, n_colors=sns.palettes.QUAL_PALETTE_SIZES[palette])
-    if len(colors) < len(groups):
-        warnings.warn(f"{palette} contains less colors ({sns.palettes.QUAL_PALETTE_SIZES[palette]})"
-                      f" than the number of groups ({len(groups)}). Palette has been changed to Spectral.")
-        colors = sns.color_palette("Spectral", n_colors=len(colors))
-
+    colors = handle_colors(palette=palette,
+                           switch_when_exceed=len(groups))
     fig = plt.figure(figsize=(7, 7))
     ax = fig.add_subplot(111, projection="3d")
     for i, (group_name, model_names) in enumerate(groups.items()):

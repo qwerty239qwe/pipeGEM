@@ -91,6 +91,9 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
                         flip_direction(model, Jrev)
                         flipped = True
     rxns_to_remove = np.setdiff1d(all_rxns, A)
+    if output_model is not None:
+        output_model.remove_reactions(list(rxns_to_remove), remove_orphans=True)
+
     result = FASTCOREAnalysis(log={"epsilon": epsilon,})
 
     result.add_result(dict(result_model=output_model,

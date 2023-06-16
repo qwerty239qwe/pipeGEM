@@ -14,7 +14,7 @@ def apply_EFlux(model: cobra.Model,
                 max_ub: float = 1000,
                 min_lb: float = 1e-6,
                 min_score: float = -1e3,
-                ignore: Union[str, List[str], None] = None,
+                protected_rxns: Union[str, List[str], None] = None,
                 return_fluxes: bool = True,
                 transform: Callable = exp_x) -> EFluxAnalysis:
     """
@@ -38,7 +38,7 @@ def apply_EFlux(model: cobra.Model,
         (default 1e-6).
     min_score : float, optional
         The minimum gene expression score to consider (default -1e3).
-    ignore : str, list of str, or None, optional
+    protected_rxns : str, list of str, or None, optional
         A single reaction ID, list of reaction IDs, or None. Any reactions in this
         list will be excluded from the analysis (default None).
     return_fluxes : bool, optional
@@ -56,9 +56,9 @@ def apply_EFlux(model: cobra.Model,
     assert max_ub > 0, "max_ub should be a positive number"
     assert min_lb >= 0, "min_lb should be zero or a positive number"
     assert max_ub - min_lb > 0, "max_ub should be larger than min_lb"
-    if ignore:
-        ignore_rxn_ids = select_rxns_from_model(model, ignore, return_id=True)
-        print(f"Ignoring {ignore_rxn_ids}")
+    if protected_rxns:
+        ignore_rxn_ids = select_rxns_from_model(model, protected_rxns, return_id=True)
+        print(f"Ignoring {ignore_rxn_ids} (no constraints will be applied on them)")
     else:
         ignore_rxn_ids = []
     exps = [v if v > min_score else min_score for _, v in rxn_expr_score.items() if not np.isnan(v)]

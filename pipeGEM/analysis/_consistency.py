@@ -104,7 +104,7 @@ class FASTCC(ConsistencyTester):
         rxns_to_remove = np.setdiff1d(all_rxns, A)
 
         if consistent_model is not None:
-            consistent_model.remove_reactions(rxns_to_remove)
+            consistent_model.remove_reactions(rxns_to_remove, remove_orphans=True)
             if isinstance(consistent_model, pipeGEM.Model):
                 consistent_model.rename(name_tag=f"consistent_{self.model.name_tag}")
 
@@ -133,7 +133,7 @@ class FVAConsistencyTester(ConsistencyTester):
         consistent_model = None
         if return_model:
             consistent_model = self.model.copy()
-            consistent_model.remove_reactions(rxns_to_remove)
+            consistent_model.remove_reactions(rxns_to_remove, remove_orphans=True)
             if isinstance(consistent_model, pipeGEM.Model):
                 consistent_model.rename(name_tag=f"consistent_{self.model.name_tag}")
 

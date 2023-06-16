@@ -81,7 +81,7 @@ def apply_rFASTCORMICS(model,
                                    nonP=unpenalized_rxns,
                                    model=model,
                                    epsilon=threshold,
-                                   return_model=False)
+                                   return_model=True)
         pr_result_obj.add_result(dict(fastcore_result=pr_result,
                                       core_rxns=core_rxns,
                                       noncore_rxns=non_core_rxns,
