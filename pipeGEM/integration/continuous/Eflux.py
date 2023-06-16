@@ -15,6 +15,7 @@ def apply_EFlux(model: cobra.Model,
                 min_lb: float = 1e-6,
                 min_score: float = -1e3,
                 protected_rxns: Union[str, List[str], None] = None,
+                remove_zero_fluxes: bool = False,
                 return_fluxes: bool = True,
                 transform: Callable = exp_x) -> EFluxAnalysis:
     """
@@ -87,8 +88,12 @@ def apply_EFlux(model: cobra.Model,
     sol = pfba(model)
     flux_df = sol.to_frame()
 
-    result = EFluxAnalysis(log={"name": model.name, "max_ub": max_ub, "min_lb": min_lb, "ignored_rxns": ignore})
+    result = EFluxAnalysis(log={"name": model.name,
+                                "max_ub": max_ub,
+                                "min_lb": min_lb,
+                                "protected_rxns": protected_rxns})
     result.add_result(dict(rxn_bounds=r_bounds_dict,
                            rxn_scores=rxn_expr_score,
-                           flux_result=flux_df if return_fluxes else None))
+                           flux_result=flux_df if return_fluxes else None,
+                           result_model=model))
     return result

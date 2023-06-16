@@ -63,7 +63,6 @@ def preprocess_model(model_conf):
     # consistency
     cons_tester = consistency_testers[model_conf["consistency"]["method"]](rescaled_result.rescaled_model)
     cons_result = cons_tester.analyze(**model_conf["consistency"]["params"])
-
     # model.remove_reactions(cons_result.removed_rxn_ids)
     # cons_result.add_result(dict(consistent_model=model))
     cons_result.save(model_conf["consistency"]["saved_path"])
@@ -75,6 +74,7 @@ def preprocess_model(model_conf):
     tasks = TaskContainer.load(ft_params["tasks_file_name"])
     model.add_tasks("default", tasks=tasks)
     task_result = model.test_tasks(name="default",
+                                   met_scaling_coefs=rescaled_result.met_scaling_factor,
                                    **tt_params)
     task_result.save(model_conf["functionality_test"]["saved_path"])
     return model, task_result

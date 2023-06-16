@@ -1,3 +1,4 @@
+import warnings
 from typing import Dict, Union, Literal, List
 from pathlib import Path
 
@@ -330,11 +331,19 @@ class MediumData(BaseData):
     def align(self,
               model,
               external_comp_name="e",
-              met_id_format="{met_id}{comp}"):
+              met_id_format="{met_id}{comp}",
+              raise_err=False):
         exs = set([r.id for r in model.exchanges])
-
+        mets_in_model = [m.id for m in model.metabolites]
         for mid, conc in self.data_dict.items():
-            m = model.metabolites.get_by_id(met_id_format.format(met_id=mid, comp=external_comp_name))
+            met_id = met_id_format.format(met_id=mid, comp=external_comp_name)
+            if met_id not in mets_in_model:
+                if raise_err:
+                    raise KeyError(f"{met_id} is not in the model")
+                warnings.warn(f"{met_id} is not in the model so it is ignored")
+                continue
+
+            m = model.metabolites.get_by_id(met_id)
             m_related_r = set([r.id for r in m.reactions]) & exs
             if len(m_related_r) == 1:
                 self.rxn_dict[list(m_related_r)[0]] = conc
@@ -365,7 +374,6 @@ class MediumData(BaseData):
 
         for r_id, conc in self.rxn_dict.items():
             influx_ub = (conc * self.conc_unit / (n_cells_per_l * cell_dgw) / time_hr).to(flux_unit).magnitude
-            print(r_id, influx_ub)
             r = model.reactions.get_by_id(r_id)
             total_c = sum([c for m, c in r.metabolites.items()])
             if total_c < 0:
@@ -382,4 +390,3 @@ class MediumData(BaseData):
             csv_kw = csv_kw or {}
             data = pd.read_csv(file_name, **csv_kw)
         return cls(data, **kwargs)
-

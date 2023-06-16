@@ -162,7 +162,8 @@ class Task:
                add_output_rxns = True,
                add_input_rxns = True,
                loose_input=False,
-               loose_output=False):
+               loose_output=False,
+               met_scaling_coefs=None):
         """
         Assign this task to a model and do the test
 
@@ -180,6 +181,9 @@ class Task:
         -------
 
         """
+        if met_scaling_coefs is None:
+            met_scaling_coefs = {}
+
         if not all_mets_in_model:
             all_mets_in_model = [m.id for m in model.metabolites]
         dummy_rxn_list, obj_rxn_list = [], []
@@ -189,8 +193,10 @@ class Task:
                 met_id = self._substitute_compartment(met[self.met_id_str], met[self.compartment_str])
                 dummy_rxn = cobra.Reaction('input_{}'.format(met_id) if coef == 1 else 'output_{}'.format(met_id))
                 if met_id in all_mets_in_model:
+                    scaling_factor = met_scaling_coefs[met_id] if met_id in met_scaling_coefs else 1
+
                     dummy_rxn.add_metabolites({
-                        model.metabolites.get_by_id(met_id): coef
+                        model.metabolites.get_by_id(met_id): coef / scaling_factor
                     })
                     if coef == -1 and loose_output:
                         dummy_rxn.lower_bound, dummy_rxn.upper_bound = 0, 1000
@@ -444,6 +450,7 @@ class TaskHandler:
                    verbosity=0,
                    fail_threshold=1e-6,
                    n_additional_path=0,
+                   met_scaling_coefs=None,
                    log=None):
         # maybe needs some modifications
         boundary = [r.id for r in self.model.exchanges] + \
@@ -476,7 +483,8 @@ class TaskHandler:
                                                    method_kws=method_kws,
                                                    solver=solver,
                                                    fail_threshold=fail_threshold,
-                                                   n_additional_path=n_additional_path)
+                                                   n_additional_path=n_additional_path,
+                                                   met_scaling_coefs=met_scaling_coefs)
             if task_info[ID]['Passed'] and not task.should_fail and get_support_rxns:
                 sup_exp_result = self.test_task_sinks(ID, task, self.model,
                                                       fail_threshold,
