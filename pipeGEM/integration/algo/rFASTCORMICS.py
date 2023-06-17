@@ -34,10 +34,10 @@ def apply_rFASTCORMICS(model,
     non_core_rxns = non_core_rxns - unpenalized_rxns
 
     pr_result_obj = rFASTCORMICSAnalysis(log={"name": model.name,
-                                             "unpenalized_subsystem": unpenalized_subsystem,
-                                             "use_heuristic_th": use_heuristic_th,
-                                             "method": method,
-                                             "threshold": threshold})
+                                              "unpenalized_subsystem": unpenalized_subsystem,
+                                              "method": method,
+                                              "threshold": threshold,
+                                              **threshold_kws})
     old_exchange_bounds = {r.id: r.bounds for r in model.exchanges}
     for r in model.exchanges:
         r.lower_bound = min(r.lower_bound, -1000) if r.lower_bound < 0 else r.lower_bound

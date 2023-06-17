@@ -35,7 +35,7 @@ def calc_corr_score(model, expr_scores) -> dict:
     con_mat[con_mat != 0] = 1
     con_mat = con_mat - np.eye(con_mat.shape[0])
     edges = con_mat.sum(axis=1)
-    edge_mat = np.tile(edges, con_mat.shaep[0])
+    edge_mat = np.tile(edges, con_mat.shape[0])
     expr_mat = np.tile(np.array([expr_scores[r.id] for r in model.reactions]),
                        con_mat.shape[0])
     con_mat = con_mat * expr_mat / edge_mat
