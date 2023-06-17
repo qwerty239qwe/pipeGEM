@@ -10,7 +10,6 @@ class TaskAnalysis(BaseAnalysis):
                                   'Obj_value', 'Obj_rxns',
                                   'Sink Status']
 
-
     def __init__(self, log):
         """
         An object containing task analysis result.

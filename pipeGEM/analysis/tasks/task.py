@@ -74,13 +74,14 @@ class Task:
     def to_dict(self) -> dict:
         return {"system": self.system,
                 "subsystem": self.subsystem,
+                "description": self.description,
+                "annotation": self.annotation,
                 "in_mets": self.in_mets,
                 "out_mets": self.out_mets,
                 "knockout_input_flag": self.knockout_input_flag,
                 "knockout_output_flag": self.knockout_output_flag,
                 "should_fail": self.should_fail,
-                "description": self.description,
-                "annotation": self.annotation}
+                }
 
     def __str__(self):
         des = f"system : {self.system}\n" \
@@ -403,6 +404,10 @@ class TaskHandler:
                 'Status': true_status,
                 'Obj_value': obj_val,
                 "Obj_rxns": [r.id for r in obj_rxns],
+                "system": task.system,
+                "subsystem": task.subsystem,
+                "description": task.description,
+                "annotation": task.annotation,
                 **test_results}
 
     @staticmethod
@@ -510,8 +515,8 @@ class TaskHandler:
         print(f'score of the model: {score} / {len(self.tasks) if task_ids == "all" else len(task_ids)}')
         log = {"method": method,
                "method_kws": method_kws,
-
                **(log if log is not None else {})}
+
         task_result = TaskAnalysis(log=log)
         task_result.add_result(dict(result_df=result_df,
                                     score=score))
