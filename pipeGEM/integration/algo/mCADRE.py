@@ -35,9 +35,9 @@ def calc_corr_score(model, expr_scores) -> dict:
     con_mat[con_mat != 0] = 1
     con_mat = con_mat - np.eye(con_mat.shape[0])
     edges = con_mat.sum(axis=1)
-    edge_mat = np.tile(edges, con_mat.shape[0])
+    edge_mat = np.tile(edges, (con_mat.shape[0], 1))
     expr_mat = np.tile(np.array([expr_scores[r.id] for r in model.reactions]),
-                       con_mat.shape[0])
+                       (con_mat.shape[0], 1))
     con_mat = con_mat * expr_mat / edge_mat
     return dict(zip([r.id for r in model.reactions], con_mat.sum(axis=0)))
 
@@ -158,6 +158,7 @@ def _prune_model(model,
                  score_df,
                  core_rxns,
                  non_expressed_rxns,
+                 protected_rxns,
                  func_test_result,
                  salv_test_result,
                  eta=0.333,
@@ -183,6 +184,9 @@ def _prune_model(model,
                                               return_model=False)
             removed_rxns = test_result.removed_rxn_ids
             pruned_model = test_result.consistent_model
+
+        if len(set(protected_rxns) & set(test_result.removed_rxn_ids)) > 0:
+            continue
 
         pass_tests = all(_check_all_test(rid, func_test_result, salv_test_result) for rid in removed_rxns)
         if not pass_tests:
@@ -249,6 +253,7 @@ def apply_mCADRE(model,
                                                  score_df,
                                                  core_rxns,
                                                  non_expressed_rxns,
+                                                 protected_rxns,
                                                  func_test_result,
                                                  salvage_test_result,
                                                  eta=0.333,

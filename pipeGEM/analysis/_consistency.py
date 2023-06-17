@@ -65,7 +65,9 @@ class FASTCC(ConsistencyTester):
                 flip_direction(model, backward_rxns)
             A = np.array(LP7(J, model, tol, use_abs=True, flux_logger=self._flux_recorder))  # rxns to keeps
             # print("A: ", len(A))
-            J = np.setdiff1d(all_rxns, np.union1d(np.union1d(A, J), no_expressed))  # rev rxns to check
+
+            print(f"Inconsistent irreversible rxns: {len(np.setdiff1d(J, A))}")
+            J = np.setdiff1d(all_rxns, np.union1d(A, no_expressed))  # rev rxns to check
             # print("J: ", len(J))
             singleton, flipped = False, False
             with tqdm(total=len(J)) as pbar:
@@ -94,7 +96,7 @@ class FASTCC(ConsistencyTester):
                             flipped = False
                             if singleton:
                                 J = np.setdiff1d(J, Ji)
-                                # print("[Removed] ", Ji, "is flux inconsistent.")
+                                tqdm.write("Remove", Ji, ", which is flux inconsistent.")
                                 pbar.update(1)
                             else:
                                 singleton = True

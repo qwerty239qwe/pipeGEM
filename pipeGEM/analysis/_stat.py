@@ -1,5 +1,6 @@
 import pandas as pd
 import scikit_posthocs as sp
+import pingouin as pg
 from scipy import stats
 import numpy as np
 import itertools
@@ -29,15 +30,15 @@ class NormalityTester(AssumptionTester):
         return new_result
 
 
-class VarHomogeneityTester(AssumptionTester):
+class HomoscedasticityTester(AssumptionTester):
     def __init__(self):
-        super(VarHomogeneityTester, self).__init__()
+        super(HomoscedasticityTester, self).__init__()
 
 
 class MultipleComparisonTester:
     def __init__(self):
         self._assumption_testers = {"normality": NormalityTester(),
-                                    "var_homogeneity": VarHomogeneityTester()}
+                                    "var_homogeneity": HomoscedasticityTester()}
         self._alpha_list = [0.05, 0.01, 0.001, 0.0001]
 
     def test_assumptions(self,

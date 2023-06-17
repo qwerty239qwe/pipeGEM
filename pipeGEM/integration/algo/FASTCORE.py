@@ -58,7 +58,7 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
                     singleJ = None
 
                     if track_irrev:
-                        print(f"Irrev in J: {len(np.intersect1d(J, irr_rxns))}, J: {len(J)}")
+                        tqdm.write(f"Irrev in J: {len(np.intersect1d(J, irr_rxns))}, J: {len(J)}")
                 else:
                     if singleton and len(np.setdiff1d(J, irr_rxns)) != 0:
                         if singleJ is None:
@@ -73,7 +73,7 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
                                 raise ValueError(f"Error: Global network is not consistent. \nLast rxn: {J}\n |J| = {len(J)}")
                             else:
                                 to_remove = singleJ
-                                warn(f"Error: Global network is not consistent. Removing core rxn: {to_remove}")
+                                tqdm.write(f"Warning: Global network is not consistent. Removing core rxn: {to_remove}")
                                 J = np.setdiff1d(J, to_remove)
                                 n_j = len(J)
                                 pbar.update(1)

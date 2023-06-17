@@ -33,7 +33,8 @@ def LP3(J: Union[set, np.ndarray, List[str]],
             model.objective = model.reactions.get_by_id(J)
         fm = model.optimize(objective_sense="maximize").to_frame()["fluxes"].abs()
         if flux_logger is not None:
-            flux_logger.add(name="LP3", flux_series=fm)
+            rxn_name = J if isinstance(J, str) else list(J)[0]
+            flux_logger.add(name=f"LP3_{rxn_name}", flux_series=fm)
 
     return fm[fm > 0.99*epsilon].index.to_list()
 
@@ -135,7 +136,7 @@ def LP7(J,
     J
         A rxn set that the number of feasible fluxes in it is maximized by LP7
     model
-        Used cobra model that contains all of the J
+        Used cobra model that contains all the J
     epsilon
         Threshold of non-zero fluxes
     use_abs
@@ -181,7 +182,8 @@ def LP7(J,
         fm = sol.to_frame()["fluxes"]
 
     if flux_logger is not None:
-        flux_logger.add(name="LP7", flux_series=fm)
+        rxn_name = list(J)[0]
+        flux_logger.add(name=f"LP7_{rxn_name}", flux_series=fm)
     if rxn_scale_eps is None:
         if return_min_v:
             return fm[fm > tol_coef*epsilon].index.to_list(), fm

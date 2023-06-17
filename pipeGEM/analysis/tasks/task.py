@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 import cobra
 from cobra.flux_analysis.parsimonious import pfba
-from cobra.exceptions import Infeasible
+from cobra.exceptions import Infeasible, OptimizationError
 
 from pipeGEM.utils import get_organic_exs
 from pipeGEM.analysis import flux_analyzers, TaskAnalysis
@@ -414,6 +414,10 @@ class TaskHandler:
             except Infeasible:
                 sol = None
                 print(f"Task {ID} cannot support tasks' metabolites")
+            except OptimizationError:
+                sol = None
+                print(f"Weird result happened when testing Task {ID}")
+
         return sol
 
     def test_task_sink_one_path(self, ID, task, model, fail_threshold, rxn_fluxes) -> dict:
