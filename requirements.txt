@@ -19,3 +19,4 @@ pint
 openpyxl
 anndata
 tomlkit
+pingouin

@@ -353,6 +353,31 @@ class Model(GEMComposite):
                             integrator="GIMME",
                             integrator_init_kwargs=None,
                             **kwargs):
+        """
+        Integrate gene data with this model.
+
+        Parameters
+        ----------
+        data_name
+        integrator
+        integrator_init_kwargs
+        kwargs: dict
+            Keyword arguments for integrating the data.
+            Common ones are -
+            predefined_threshold: ThresholdAnalysis or a dict
+                Threshold analysis object contains expression threshold needed.
+                Or a dict contains an expression threshold with a key named exp_th
+                and a non-expression threshold with a key named non_exp_th
+
+            protected_rxns: list of str
+                Protected reaction IDs contained in a list
+
+
+
+        Returns
+        -------
+
+        """
         if isinstance(integrator, str):
             integrator_init_kwargs = {} if integrator_init_kwargs is None else integrator_init_kwargs
             integrator = integrator_factory.create(integrator, **integrator_init_kwargs)

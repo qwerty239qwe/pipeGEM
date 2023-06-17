@@ -223,6 +223,7 @@ class mCADRE_Analysis(BaseAnalysis):
         score_df: pd.DataFrame
         func_test_result: TaskAnalysis
         salvage_test_result: TaskAnalysis
+        threshold_analysis: ThresholdAnalysis
     Parameters
     ----------
     log: dict

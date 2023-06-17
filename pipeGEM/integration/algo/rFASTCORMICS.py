@@ -10,16 +10,16 @@ def apply_rFASTCORMICS(model,
                        data,
                        protected_rxns,
                        predefined_threshold = None,
-                       consistent_checking_method: Literal["FASTCC"] = "FASTCC",
+                       threshold_kws: dict = None,
+                       consistent_checking_method: Literal["FASTCC", "FVA"] = "FASTCC",
                        unpenalized_subsystem = "Transport.*",
-                       use_heuristic_th: bool = False,
                        method: str = "onestep",
                        threshold: float = 1e-6,
                        FASTCORE_raise_error: bool = False):
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
     threshold_dic = parse_predefined_threshold(predefined_threshold,
                                                gene_data=gene_data,
-                                               use_heuristic_th=use_heuristic_th)
+                                               **threshold_kws)
     th_result, exp_th, non_exp_th = threshold_dic["th_result"], threshold_dic["exp_th"], threshold_dic["non_exp_th"]
 
     if consistent_checking_method is not None:

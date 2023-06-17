@@ -1,0 +1,7 @@
+saved_path = ""
+
+[params]
+name = "percentile"
+p = [10, 25, 50, 75, 90]
+[plot]
+    output_path = ""

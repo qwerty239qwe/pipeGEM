@@ -224,10 +224,10 @@ discrete_strategies = {"linear": LinearDiscreteStrategy}
 @timing
 def apply_CORDA(model,
                 data,
-                predefined_threshold = None,
-                use_heuristic_th = False,
-                discrete_strategy_name: str = "linear",
                 protected_rxns=None,
+                predefined_threshold = None,
+                threshold_kws = None,
+                discrete_strategy_name: str = "linear",
                 n_iters=np.inf,
                 penalty_factor=100,
                 penalty_increase_factor=1.1,
@@ -241,7 +241,7 @@ def apply_CORDA(model,
     mocks = []
     threshold_dic = parse_predefined_threshold(predefined_threshold,
                                                gene_data=data.gene_data,
-                                               use_heuristic_th=use_heuristic_th)
+                                               **threshold_kws)
     th_result, exp_th, non_exp_th = threshold_dic["th_result"], threshold_dic["exp_th"], threshold_dic["non_exp_th"]
     transformer = discrete_strategies[discrete_strategy_name](exp_th, non_exp_th, data.rxn_scores)
     conf_scores = transformer.transform()

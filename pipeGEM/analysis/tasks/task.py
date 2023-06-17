@@ -355,7 +355,7 @@ class TaskHandler:
             return {'Passed': False,
                     'Should fail': task.should_fail,
                     'Missing mets': True,
-                    'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": obj_rxns}
+                    'Status': 'infeasible', 'Obj_value': 0, "Obj_rxns": [r.id for r in obj_rxns]}
 
         all_supp_rxns = set()
         test_results = {}

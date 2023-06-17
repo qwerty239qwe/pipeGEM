@@ -1,16 +1,32 @@
+from typing import Union, Dict
+
 import numpy as np
 import pandas as pd
 from cobra.util.array import create_stoichiometric_matrix
 from pipeGEM.analysis.tasks import Task, TaskContainer, TaskHandler
 from pipeGEM.analysis import consistency_testers, timing, mCADRE_Analysis
+from pipeGEM.integration.utils import parse_predefined_threshold
 from tqdm import tqdm
 
 
-def calc_expr_score(data, expr_th, nonexpr_th, absent_value, absent_value_indicator=-1e-6) -> dict:
+def calc_expr_score(data,
+                    expr_th,
+                    nonexpr_th,
+                    absent_value,
+                    protected_rxns=None,
+                    absent_value_indicator=-1e-6) -> dict:
+    if protected_rxns is None:
+        protected_rxns = []
+
     rxn_ids, rxn_scores = list(data.rxn_scores.keys()), list(data.rxn_scores.values())
     mapped_scores = np.interp(rxn_scores, [nonexpr_th, expr_th], [0, 1])
     mapped_scores[rxn_scores == absent_value] = absent_value_indicator
-    return dict(zip(rxn_ids, mapped_scores))
+    expr_scores = dict(zip(rxn_ids, mapped_scores))
+    for r_id in expr_scores.keys():
+        if r_id in protected_rxns:
+            expr_scores[r_id] = 1
+
+    return expr_scores
 
 
 def calc_corr_score(model, expr_scores) -> dict:
@@ -30,17 +46,26 @@ def get_score_df(model,
                  data,
                  expr_th,
                  nonexpr_th,
+                 protected_rxns=None,
                  exp_cutoff=0.9,
                  absent_value: float = 0,
                  absent_value_indicator=-1e-6,
                  evidence_scores=None):
-    expr_scores = calc_expr_score(data, expr_th, nonexpr_th, absent_value, absent_value_indicator)
+    expr_scores = calc_expr_score(data,
+                                  expr_th, nonexpr_th,
+                                  absent_value,
+                                  protected_rxns=protected_rxns,
+                                  absent_value_indicator=absent_value_indicator)
     core_rxns = [r for r, exp in expr_scores.items() if exp >= exp_cutoff]
     conn_scores = calc_corr_score(model, expr_scores)
     non_expressed_rxns = [r for r, exp in expr_scores.items() if exp <= absent_value_indicator]
     if evidence_scores is None:
         evidence_scores = {r.id: 0 for r in model.reactions}
     elif isinstance(evidence_scores, dict):
+        es_not_included = {r.id: 0 for r in model.reactions if r.id not in evidence_scores}
+        evidence_scores = {**evidence_scores, **es_not_included}
+    elif isinstance(evidence_scores, pd.Series):
+        evidence_scores = evidence_scores.to_dict()
         es_not_included = {r.id: 0 for r in model.reactions if r.id not in evidence_scores}
         evidence_scores = {**evidence_scores, **es_not_included}
     score_df = pd.DataFrame({"expression": expr_scores,
@@ -176,22 +201,29 @@ def _prune_model(model,
 @timing
 def apply_mCADRE(model,
                  data,
-                 expr_th,
-                 nonexpr_th,
+                 protected_rxns,
+                 predefined_threshold = None,
+                 threshold_kws: dict = None,
                  exp_cutoff: float = 0.9,
                  absent_value: float = 0,
                  absent_value_indicator: float = -1e-6,
-                 evidence_scores=None,
+                 evidence_scores: Union[Dict[str, float | int], pd.Series] = None,
                  salvage_check_tasks=None,
                  default_salv_test=False,
                  func_test_tasks=None,
                  required_met_ids=None,
                  default_func_test=False,
                  ) -> mCADRE_Analysis:
+    threshold_dic = parse_predefined_threshold(predefined_threshold=predefined_threshold,
+                                               gene_data=data.gene_data,
+                                               **threshold_kws)
+    th_result, exp_th, non_exp_th = threshold_dic["th_result"], threshold_dic["exp_th"], threshold_dic["non_exp_th"]
+
     score_df, core_rxns, non_expressed_rxns = get_score_df(model,
                                                            data,
-                                                           expr_th,
-                                                           nonexpr_th,
+                                                           exp_th,
+                                                           non_exp_th,
+                                                           protected_rxns=protected_rxns,
                                                            exp_cutoff=exp_cutoff,
                                                            absent_value=absent_value,
                                                            absent_value_indicator=absent_value_indicator,
@@ -233,5 +265,6 @@ def apply_mCADRE(model,
                            non_expressed_rxn_ids=non_expressed_rxns,
                            score_df=score_df,
                            salvage_test_result=salvage_test_result,
-                           func_test_result=func_test_result))
+                           func_test_result=func_test_result,
+                           threshold_analysis=th_result))
     return result

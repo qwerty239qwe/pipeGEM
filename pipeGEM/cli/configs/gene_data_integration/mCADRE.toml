@@ -1,10 +1,14 @@
-integrator_name = "rFASTCORMICS"
+integrator_name = "mCADRE"
 saved_path = ""
-protected_rxns = []
-consistent_checking_method = "FASTCC"
-unpenalized_subsystem = "Transport.*"
-method = "onestep"
-threshold = 1e-6
+exp_cutoff = 0.9
+absent_value = 0
+absent_value_indicator = -1e-6
+evidence_scores = nan
+salvage_check_tasks = nan
+default_salv_test = true
+func_test_tasks = nan
+required_met_ids = nan
+default_func_test = false
 
 [threshold_kws]
     return_heuristic = false
