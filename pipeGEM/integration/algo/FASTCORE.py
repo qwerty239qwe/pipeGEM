@@ -4,6 +4,7 @@ from tqdm import tqdm
 
 import cobra
 import numpy as np
+import pandas as pd
 
 from pipeGEM.utils import get_rxn_set, flip_direction
 from pipeGEM.analysis import find_sparse_mode, FASTCOREAnalysis, timing
@@ -16,7 +17,7 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
                    epsilon: float,
                    return_model: bool,
                    raise_err: bool = True,
-                   scale_by_coef: bool = True) -> FASTCOREAnalysis:
+                   rxn_scaling_coefs=None,) -> FASTCOREAnalysis:
     output_model = None
     if return_model:
         output_model = model.copy()
@@ -27,11 +28,13 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
     all_rxns = get_rxn_set(model, dtype=np.array)
     irr_rxns = get_rxn_set(model, "irreversible", dtype=np.array)
     backward_rxns = get_rxn_set(model, "backward", dtype=np.array)
+    if rxn_scaling_coefs is not None:
+        tol = pd.Series({k: epsilon * v
+                        for k, v in rxn_scaling_coefs.items()}).sort_index()
 
     with model:
         if len(backward_rxns) > 0:
             flip_direction(model, backward_rxns)
-
         flipped, singleton = False, False
         J = np.intersect1d(C, irr_rxns)
         P = np.setdiff1d(np.setdiff1d(all_rxns, C), nonP)

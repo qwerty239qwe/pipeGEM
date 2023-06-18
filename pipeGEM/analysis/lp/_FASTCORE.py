@@ -26,16 +26,18 @@ def LP3(J: Union[set, np.ndarray, List[str]],
     -------
         A list of rxn IDs that have zero flux while J are the objective function.
     """
+    if isinstance(epsilon, pd.Series):
+        epsilon = epsilon.sort_index()
+
     with model:
         if isinstance(J, set) or isinstance(J, np.ndarray) or isinstance(J, list):
             model.objective = [model.reactions.get_by_id(j) for j in J]
         else:
             model.objective = model.reactions.get_by_id(J)
-        fm = model.optimize(objective_sense="maximize").to_frame()["fluxes"].abs()
+        fm = model.optimize(objective_sense="maximize").to_frame()["fluxes"].abs().sort_index()
         if flux_logger is not None:
             rxn_name = J if isinstance(J, str) else list(J)[0]
             flux_logger.add(name=f"LP3_{rxn_name}", flux_series=fm)
-
     return fm[fm > 0.99*epsilon].index.to_list()
 
 
@@ -72,7 +74,10 @@ def non_convex_LP3(J, model, epsilon,
 #     return np.minimum(abs(v)/epsilon, np.ones(v.shape)).dot(rho)
 
 
-def non_convex_LP7(J, model: cobra.Model, epsilon: float, use_abs=True,
+def non_convex_LP7(J,
+                   model: cobra.Model,
+                   epsilon: float,
+                   use_abs=True,
                    flux_logger=None) -> list:
     max_iter = 20
     with model:
@@ -148,6 +153,8 @@ def LP7(J,
     -------
         a list of rxn IDs, the rxns can produce feasible fluxes.
     """
+    if isinstance(epsilon, pd.Series):
+        epsilon = epsilon.sort_index()
     with model:
         prob = model.problem
         vars = []
@@ -157,7 +164,11 @@ def LP7(J,
             rxn = model.reactions.get_by_id(j)
 
             # we make the lb negative because some reactions need to be negative to produce valid fluxes sometimes
-            var = prob.Variable(f"LP7_z_{rxn.id}", lb=-np.inf, ub=epsilon)  # -inf <= zi <= eps
+
+            if isinstance(epsilon, pd.Series):
+                var = prob.Variable(f"LP7_z_{rxn.id}", lb=-np.inf, ub=epsilon[j])
+            else:
+                var = prob.Variable(f"LP7_z_{rxn.id}", lb=-np.inf, ub=epsilon)  # -inf <= zi <= eps
 
             c_name = f"const_LP7_{rxn.id}"
             const = prob.Constraint(Zero,
@@ -177,9 +188,9 @@ def LP7(J,
         model.solver.update()
         sol = model.optimize(objective_sense="maximize", raise_error=True)
     if use_abs:
-        fm = sol.to_frame()["fluxes"].abs()
+        fm = sol.to_frame()["fluxes"].abs().sort_index()
     else:
-        fm = sol.to_frame()["fluxes"]
+        fm = sol.to_frame()["fluxes"].sort_index()
 
     if flux_logger is not None:
         rxn_name = list(J)[0]
@@ -221,6 +232,8 @@ def LP9(K: np.ndarray,
     -------
         The result rxn ids list
     """
+    if isinstance(epsilon, pd.Series):
+        epsilon = epsilon.sort_index()
     assert (min_v_ser > 0).all()
     assert len(np.intersect1d(P, K)) == 0
     with model:
@@ -266,13 +279,13 @@ def LP9(K: np.ndarray,
         try:
             sol = model.optimize(objective_sense="maximize", raise_error=True)
         except:
-            print("infeasible result: K = ", K)
+            print("infeasible result: |K| = ", len(K))
             return []
-        fm = sol.to_frame()["fluxes"].abs()
+        fm = sol.to_frame()["fluxes"].abs().sort_index()
     if flux_logger is not None:
         flux_logger.add(name="LP9", flux_series=fm)
     if rxn_scale_eps is None:
-        return fm[fm > tol_coef * min(epsilon, min_v_ser.min())].index.to_list()  # supp
+        return fm[fm > tol_coef * np.minimum(epsilon, min_v_ser.min())].index.to_list()  # supp
     return fm[fm > rxn_scale_eps[fm.index]].index.to_list()
 
 

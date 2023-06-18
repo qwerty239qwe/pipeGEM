@@ -21,11 +21,18 @@ def get_subsystems(model):
     return list(set([rxn.subsystem for rxn in model.reactions]))
 
 
-def get_rxns_in_subsystem(model, subsystem, attr="id"):
-    return [getattr(r, attr) if attr != "" else r
-            for r in model.reactions
-            if (r.subsystem in subsystem if isinstance(subsystem, list)
-                else re.match(subsystem, r.subsystem))]
+def get_rxns_in_subsystem(model, subsystem, attr="id") -> list:
+    rxn_prop = []
+    for r in model.reactions:
+        if isinstance(r.subsystem, str):
+            if (r.subsystem in subsystem) if isinstance(subsystem, list) else re.match(subsystem, r.subsystem):
+                rxn_prop.append(getattr(r, attr) if attr != "" else r)
+        elif isinstance(r.subsystem, list) or isinstance(r.subsystem, np.ndarray):
+            if (isinstance(subsystem, list) and len(set(r.subsystem) & set(subsystem)) > 0) or \
+               any([re.match(subsystem, s) for s in r.subsystem]):
+                rxn_prop.append(getattr(r, attr) if attr != "" else r)
+
+    return rxn_prop
 
 
 def get_genes_in_subsystem(model, subsystem):

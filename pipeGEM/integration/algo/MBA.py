@@ -1,19 +1,34 @@
 import numpy as np
 from pipeGEM.analysis import timing, MBA_Analysis, consistency_testers
+from pipeGEM.integration.utils import parse_predefined_threshold
 
 
 @timing
 def apply_MBA(model,
-              medium_conf_rxn_ids,
-              high_conf_rxn_ids,
+              data=None,
+              predefined_threshold=None,
+              threshold_kws: dict = None,
+              protected_rxns=None,
+              medium_conf_rxn_ids=None,
+              high_conf_rxn_ids=None,
               consistency_test_method="FASTCC",
               tolerance=1e-8,
               epsilon=0.5,
               random_state=42):
     rxn_ids = [r.id for r in model.reactions]
-    assert all([r in rxn_ids for r in medium_conf_rxn_ids])
-    assert all([r in rxn_ids for r in high_conf_rxn_ids])
+    if data is not None:
+        print(f"Using data-inferred threshold. Ignoring medium_conf_rxn_ids and high_conf_rxn_ids.")
+        threshold_dic = parse_predefined_threshold(predefined_threshold,
+                                                   gene_data=data.gene_data,
+                                                   **threshold_kws)
 
+    else:
+        print(f"Using defined medium and high conf rxns. Ignoring predefined_threshold.")
+        assert all([r in rxn_ids for r in medium_conf_rxn_ids])
+        assert all([r in rxn_ids for r in high_conf_rxn_ids])
+    protected_rxns = protected_rxns if protected_rxns is not None else []
+    high_conf_rxn_ids = list(set(high_conf_rxn_ids) | set(protected_rxns))
+    medium_conf_rxn_ids = list(set(medium_conf_rxn_ids) - set(high_conf_rxn_ids))
     no_conf_set = np.array(list(set(rxn_ids) - set(medium_conf_rxn_ids) - set(high_conf_rxn_ids)))
     rng = np.random.default_rng(random_state)
     rng.shuffle(no_conf_set)
@@ -49,7 +64,7 @@ def apply_MBA(model,
     result = MBA_Analysis(log={"tolerance": tolerance,
                                "epsilon": epsilon,
                                "random_state": random_state})
-    result.add_result(dict(result_model = model,
+    result.add_result(dict(result_model=model,
                            removed_rxn_ids=removed_rxns,
                            threshold_analysis=None))
 

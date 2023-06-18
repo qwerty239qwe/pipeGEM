@@ -19,7 +19,7 @@ class NormalityTester(AssumptionTester):
 
     @staticmethod
     def test(data, method="shapiro", **kwargs):
-        assert method in ["shapiro", "kstest", "anderson"]
+        assert method in ["shapiro", "normaltest", "kstest", "anderson"]
 
         statistic, pvalue = getattr(stats, method)(data)
         new_result = NormalityTestResult(log={"method": method})
@@ -51,7 +51,6 @@ class MultipleComparisonTester:
             if normality_kws is None:
                 normality_kws = {}
             norm_result = self._assumption_testers["normality"].test(data=data, **normality_kws)
-
 
     def test(self,
              data,

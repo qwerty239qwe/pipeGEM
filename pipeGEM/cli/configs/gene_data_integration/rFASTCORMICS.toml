@@ -18,3 +18,5 @@ threshold = 1e-6
     [precompute.threshold]
         threshold_result_path = nan
         type = "rFASTCORMICS"
+    [precompute.rxn_scaling_factor]
+        file_path = nan

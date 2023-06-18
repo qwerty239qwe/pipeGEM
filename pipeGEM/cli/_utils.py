@@ -12,7 +12,8 @@ from pipeGEM.utils import parse_toml_file, save_toml_file
 from pipeGEM.data.data import GeneData, MediumData
 from pipeGEM.analysis import consistency_testers
 from pipeGEM.analysis.tasks import TaskContainer
-from pipeGEM.analysis import TaskAnalysis, LocalThresholdAnalysis, rFASTCORMICSThresholdAnalysis
+from pipeGEM.analysis import TaskAnalysis, LocalThresholdAnalysis, rFASTCORMICSThresholdAnalysis, \
+    PercentileThresholdAnalysis, ModelScalingResult
 
 
 pl_needed_config = {"integration": ["thresholds", "gene_data",
@@ -56,13 +57,21 @@ def preprocess_model(model_conf):
                            **model_conf["medium_data"]["apply_params"])
 
     # rescale
-    rescaled_result = model.check_model_scale(method=model_conf["rescale"]["method"],
-                                              n_iter=model_conf["rescale"]["n_iter"])
-    rescaled_result.save(model_conf["rescale"]["saved_path"])
+    if model_conf["rescale"]["precompute_path"] is not None:
+        rescaled_result = ModelScalingResult.load(model_conf["rescale"]["precompute_path"])
+    else:
+        rescaled_result = model.check_model_scale(method=model_conf["rescale"]["method"],
+                                                  n_iter=model_conf["rescale"]["n_iter"])
+        rescaled_result.save(model_conf["rescale"]["saved_path"])
 
     # consistency
     cons_tester = consistency_testers[model_conf["consistency"]["method"]](rescaled_result.rescaled_model)
-    cons_result = cons_tester.analyze(**model_conf["consistency"]["params"])
+
+    if model_conf["consistency"]["method"] == "FASTCC":
+        cons_result = cons_tester.analyze(rxn_scaling_coefs=rescaled_result.rxn_scaling_factor,
+                                          **model_conf["consistency"]["params"])
+    else:
+        cons_result = cons_tester.analyze(**model_conf["consistency"]["params"])
     # model.remove_reactions(cons_result.removed_rxn_ids)
     # cons_result.add_result(dict(consistent_model=model))
     cons_result.save(model_conf["consistency"]["saved_path"])
@@ -145,7 +154,7 @@ def map_data(gene_data,
 
 
 def _integration_get_model_and_task(model_conf, integration_conf):
-    model, task_result = None, None
+    model, task_result, rxn_s_factors = None, None, None
     if integration_conf["precompute"]["model"]["cobra_model_path"] is not None:
         prec_mod_params = integration_conf["precompute"]["model"]
         model = Model(model=load_model(prec_mod_params["cobra_model_path"]),
@@ -153,9 +162,12 @@ def _integration_get_model_and_task(model_conf, integration_conf):
     if integration_conf["precompute"]["tasks"]["task_result_path"] is not None:
         prec_tasks_path = integration_conf["precompute"]["tasks"]["task_result_path"]
         task_result = TaskAnalysis.load(file_path=prec_tasks_path)
+    if "rxn_scaling_factor" in integration_conf["precompute"] and \
+        (integration_conf["precompute"]["rxn_scaling_factor"]["file_path"] is not None):
+        rxn_s_factors = parse_toml_file(integration_conf["precompute"]["rxn_scaling_factor"]["file_path"])
     if model is None and task_result is None:
         model, task_result = preprocess_model(model_conf=model_conf)
-    return model, task_result
+    return model, task_result, rxn_s_factors
 
 
 def _integration_get_thres(gene_data, threshold_config, integration_conf):
@@ -169,10 +181,10 @@ def _integration_get_thres(gene_data, threshold_config, integration_conf):
             for data_name in gene_data:
                 th_dic[data_name] = rFASTCORMICSThresholdAnalysis.load(Path(th_path) / data_name)
             return th_dic
-        elif th_type == "local":
+        elif th_type == "percentile":
             th_dic = {}
             for data_name in gene_data:
-                th_dic[data_name] = LocalThresholdAnalysis.load(Path(th_path) / data_name)
+                th_dic[data_name] = PercentileThresholdAnalysis.load(Path(th_path) / data_name)
             return th_dic
     return find_threshold(gene_data=gene_data,
                           threshold_config=threshold_config)
@@ -203,8 +215,8 @@ def run_integration_pipeline(gene_data_conf,
                              integration_conf,
                              **kwargs):
     gene_data_dic = load_gene_data(gene_data_conf=gene_data_conf)
-    model, task_result = _integration_get_model_and_task(model_conf=model_conf,
-                                                         integration_conf=integration_conf)
+    model, task_result, rxn_s_factors = _integration_get_model_and_task(model_conf=model_conf,
+                                                                        integration_conf=integration_conf)
     th_result = _integration_get_thres(gene_data=gene_data_dic,
                                        threshold_config=threshold_conf,
                                        integration_conf=integration_conf)

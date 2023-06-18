@@ -11,6 +11,7 @@ def apply_rFASTCORMICS(model,
                        protected_rxns,
                        predefined_threshold = None,
                        threshold_kws: dict = None,
+                       rxn_scaling_coefs: dict = None,
                        consistent_checking_method: Literal["FASTCC", "FVA"] = "FASTCC",
                        unpenalized_subsystem = "Transport.*",
                        method: str = "onestep",
@@ -50,7 +51,8 @@ def apply_rFASTCORMICS(model,
                                    model=model,
                                    epsilon=threshold,
                                    return_model=True,
-                                   raise_err=FASTCORE_raise_error)
+                                   raise_err=FASTCORE_raise_error,
+                                   rxn_scaling_coefs=rxn_scaling_coefs)
         for r in pr_result.result_model.exchanges:
             if r.id in old_exchange_bounds:
                 pr_result.result_model.reactions.get_by_id(r.id).bounds = old_exchange_bounds[r.id]
@@ -67,7 +69,8 @@ def apply_rFASTCORMICS(model,
                                    nonP=core_rxns,
                                    model=model,
                                    epsilon=threshold,
-                                   return_model=False)
+                                   return_model=False,
+                                   rxn_scaling_coefs=rxn_scaling_coefs)
 
         core_rxns |= set(pr_result.rxn_ids)
         unpenalized_rxns = unpenalized_rxns - core_rxns
@@ -81,7 +84,8 @@ def apply_rFASTCORMICS(model,
                                    nonP=unpenalized_rxns,
                                    model=model,
                                    epsilon=threshold,
-                                   return_model=True)
+                                   return_model=True,
+                                   rxn_scaling_coefs=rxn_scaling_coefs)
         pr_result_obj.add_result(dict(fastcore_result=pr_result,
                                       core_rxns=core_rxns,
                                       noncore_rxns=non_core_rxns,

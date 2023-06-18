@@ -189,6 +189,10 @@ class FBA_Analysis(FluxAnalysis):
         result.add_result(dict(correlation_result=corr_result))
         return result
 
+    def diff_test(self):
+        pass
+
+
 
 class FVA_Analysis(FluxAnalysis):
     def __init__(self, log):
