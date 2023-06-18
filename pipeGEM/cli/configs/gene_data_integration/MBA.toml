@@ -1,0 +1,22 @@
+integrator_name = "MBA"
+saved_path = ""
+protected_rxns = []
+consistent_checking_method = "FASTCC"
+tolerance = 1e-8
+epsilon = 0.5
+random_state = 42
+
+[threshold_kws]
+    return_heuristic = false
+
+[precompute]
+    [precompute.model]
+        cobra_model_path = nan
+        model_name_tag = "human1"
+    [precompute.tasks]
+        task_result_path = nan
+    [precompute.threshold]
+        threshold_result_path = nan
+        type = "rFASTCORMICS"
+    [precompute.rxn_scaling_factor]
+        file_path = nan

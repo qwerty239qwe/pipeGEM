@@ -26,9 +26,6 @@ def LP3(J: Union[set, np.ndarray, List[str]],
     -------
         A list of rxn IDs that have zero flux while J are the objective function.
     """
-    if isinstance(epsilon, pd.Series):
-        epsilon = epsilon.sort_index()
-
     with model:
         if isinstance(J, set) or isinstance(J, np.ndarray) or isinstance(J, list):
             model.objective = [model.reactions.get_by_id(j) for j in J]
@@ -38,6 +35,8 @@ def LP3(J: Union[set, np.ndarray, List[str]],
         if flux_logger is not None:
             rxn_name = J if isinstance(J, str) else list(J)[0]
             flux_logger.add(name=f"LP3_{rxn_name}", flux_series=fm)
+    if isinstance(epsilon, pd.Series):
+        epsilon = epsilon[fm.index]
     return fm[fm > 0.99*epsilon].index.to_list()
 
 
@@ -153,8 +152,7 @@ def LP7(J,
     -------
         a list of rxn IDs, the rxns can produce feasible fluxes.
     """
-    if isinstance(epsilon, pd.Series):
-        epsilon = epsilon.sort_index()
+
     with model:
         prob = model.problem
         vars = []
@@ -191,6 +189,9 @@ def LP7(J,
         fm = sol.to_frame()["fluxes"].abs().sort_index()
     else:
         fm = sol.to_frame()["fluxes"].sort_index()
+
+    if isinstance(epsilon, pd.Series):
+        epsilon = epsilon[fm.index]
 
     if flux_logger is not None:
         rxn_name = list(J)[0]
@@ -284,6 +285,9 @@ def LP9(K: np.ndarray,
         fm = sol.to_frame()["fluxes"].abs().sort_index()
     if flux_logger is not None:
         flux_logger.add(name="LP9", flux_series=fm)
+
+    if isinstance(epsilon, pd.Series):
+        epsilon = epsilon[fm.index]
     if rxn_scale_eps is None:
         return fm[fm > tol_coef * np.minimum(epsilon, min_v_ser.min())].index.to_list()  # supp
     return fm[fm > rxn_scale_eps[fm.index]].index.to_list()

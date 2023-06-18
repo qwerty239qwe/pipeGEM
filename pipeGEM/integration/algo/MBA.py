@@ -11,7 +11,7 @@ def apply_MBA(model,
               protected_rxns=None,
               medium_conf_rxn_ids=None,
               high_conf_rxn_ids=None,
-              consistency_test_method="FASTCC",
+              consistent_checking_method="FASTCC",
               tolerance=1e-8,
               epsilon=0.5,
               random_state=42):
@@ -21,7 +21,12 @@ def apply_MBA(model,
         threshold_dic = parse_predefined_threshold(predefined_threshold,
                                                    gene_data=data.gene_data,
                                                    **threshold_kws)
-
+        rxn_in_model = set([r.id for r in model.reactions])
+        th_result, exp_th, non_exp_th = threshold_dic["th_result"], threshold_dic["exp_th"], threshold_dic["non_exp_th"]
+        high_conf_rxn_ids = (set([r for r, c in data.rxn_scores.items() if c > exp_th]) | set(
+            protected_rxns)) & rxn_in_model
+        medium_conf_rxn_ids = (set([r for r, c in data.rxn_scores.items() if (c < exp_th) and (c > non_exp_th)]) - set(
+            protected_rxns)) & rxn_in_model
     else:
         print(f"Using defined medium and high conf rxns. Ignoring predefined_threshold.")
         assert all([r in rxn_ids for r in medium_conf_rxn_ids])
@@ -45,7 +50,7 @@ def apply_MBA(model,
             if sol.status != "optimal":
                 kept_nc_rxns.append(r)
                 continue
-            cons_tester = consistency_testers[consistency_test_method](model)
+            cons_tester = consistency_testers[consistent_checking_method](model)
             test_result = cons_tester.analyze(tol=tolerance,
                                               return_model=False)
         excluded_HC = set(high_conf_rxn_ids) & set(test_result.removed_rxn_ids)

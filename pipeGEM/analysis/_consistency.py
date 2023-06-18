@@ -67,14 +67,11 @@ class FASTCC(ConsistencyTester):
             if len(backward_rxns) > 0:
                 print(f"Found and flipped {len(backward_rxns)} reactions")
                 flip_direction(model, backward_rxns)
-
-            tol_ = tol[J] if isinstance(tol, pd.Series) else tol
-            A = np.array(LP7(J, model, tol_, use_abs=True, flux_logger=self._flux_recorder))  # rxns to keeps
+            A = np.array(LP7(J, model, tol, use_abs=True, flux_logger=self._flux_recorder))  # rxns to keeps
             # print("A: ", len(A))
             print(f"Inconsistent irreversible rxns: {len(np.setdiff1d(J, A))}")
 
-            tol_ = tol[np.setdiff1d(J, A)] if isinstance(tol, pd.Series) else tol
-            A_2 = np.array(LP7(np.setdiff1d(J, A), model, tol_, use_abs=True, flux_logger=self._flux_recorder))
+            A_2 = np.array(LP7(np.setdiff1d(J, A), model, tol, use_abs=True, flux_logger=self._flux_recorder))
             print(f"Inconsistent irreversible rxns (2nd run): {len(np.setdiff1d(np.setdiff1d(J, A), A_2))}")
 
             A = np.union1d(A, A_2)
@@ -86,16 +83,14 @@ class FASTCC(ConsistencyTester):
                     self._flux_recorder.tic()
                     if singleton:
                         Ji = np.array([J[0]])
-                        tol_ = tol[Ji] if isinstance(tol, pd.Series) else tol
-                        new_supps = np.array(LP3(Ji, model, tol_,
+                        new_supps = np.array(LP3(Ji, model, tol,
                                                  flux_logger=self._flux_recorder)) if is_convex else np.array(
-                            non_convex_LP3(Ji, model, tol_, flux_logger=self._flux_recorder))
+                            non_convex_LP3(Ji, model, tol, flux_logger=self._flux_recorder))
                     else:
                         Ji = J.copy()
-                        tol_ = tol[Ji] if isinstance(tol, pd.Series) else tol
-                        new_supps = np.array(LP7(Ji, model, tol_,
+                        new_supps = np.array(LP7(Ji, model, tol,
                                                  flux_logger=self._flux_recorder)) if is_convex else np.array(
-                            non_convex_LP7(Ji, model, tol_, flux_logger=self._flux_recorder))
+                            non_convex_LP7(Ji, model, tol, flux_logger=self._flux_recorder))
                     A = np.union1d(A, new_supps)
                     before_n = len(J)
                     J = np.setdiff1d(J, A)
