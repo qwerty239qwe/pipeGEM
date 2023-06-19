@@ -128,7 +128,7 @@ def apply_iMAT(model,
                                     protected_rxns=protected_rxns,
                                     eps=eps,
                                     tol=tol))
-    result.add_result(dict(model=result_model,
-                           removed_rxns=np.array(removed_rxn_ids),
+    result.add_result(dict(result_model=result_model,
+                           removed_rxn_ids=np.array(removed_rxn_ids),
                            threshold_analysis=th_result))
     return result

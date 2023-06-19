@@ -101,8 +101,8 @@ def apply_INIT(model,
                                     tol=tol,
                                     weight_method=weight_method))
 
-    result.add_result(dict(model=result_model,
-                           removed_rxns=np.array(removed_rxn_ids),
+    result.add_result(dict(result_model=result_model,
+                           removed_rxn_ids=np.array(removed_rxn_ids),
                            threshold_analysis=th_result if weight_method == "threshold" else None,
                            weight_dic=weight_dic))
 
