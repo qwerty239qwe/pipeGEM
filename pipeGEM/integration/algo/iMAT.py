@@ -67,6 +67,7 @@ def apply_iMAT(model,
                predefined_threshold,
                threshold_kws: dict,
                protected_rxns = None,
+               rxn_scaling_coefs=None,
                eps = 1.,
                tol = 1e-8) -> iMAT_Analysis:
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
@@ -114,14 +115,20 @@ def apply_iMAT(model,
                            eps=eps)
 
     sol = model.optimize()
-    removed_rxn_ids = sol.to_frame().query(f"abs(fluxes) < {tol}").index
+    fluxes = abs(sol.to_frame()["fluxes"])
+    if rxn_scaling_coefs is not None:
+        tol_ = pd.Series({rxn_scaling_coefs[r] * tol for r in fluxes.index}, index=fluxes.index)
+    else:
+        tol_ = tol
+
+    removed_rxn_ids = (fluxes > tol_).index.to_list()
     result_model.remove_reactions(removed_rxn_ids, remove_orphans=True)
 
     result = iMAT_Analysis(log=dict(threshold_kws=threshold_kws,
                                     protected_rxns=protected_rxns,
                                     eps=eps,
                                     tol=tol))
-    result.add_result(model=result_model,
-                      removed_rxns=removed_rxn_ids,
-                      threshold_analysis=th_result)
+    result.add_result(dict(model=result_model,
+                           removed_rxns=np.array(removed_rxn_ids),
+                           threshold_analysis=th_result))
     return result

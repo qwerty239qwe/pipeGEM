@@ -102,7 +102,7 @@ def apply_INIT(model,
                                     weight_method=weight_method))
 
     result.add_result(dict(model=result_model,
-                           removed_rxns=removed_rxn_ids,
+                           removed_rxns=np.array(removed_rxn_ids),
                            threshold_analysis=th_result if weight_method == "threshold" else None,
                            weight_dic=weight_dic))
 

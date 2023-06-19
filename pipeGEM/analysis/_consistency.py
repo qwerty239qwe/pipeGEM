@@ -4,7 +4,8 @@ import numpy as np
 from optlang import Model, Variable, Constraint, Objective
 
 import pipeGEM
-from pipeGEM.analysis import timing, LP3, LP7, non_convex_LP7, non_convex_LP3, FVAConsistencyAnalysis, FastCCAnalysis
+from pipeGEM.analysis import timing, LP3, LP7, non_convex_LP7, non_convex_LP3, \
+    FVAConsistencyAnalysis, FastCCAnalysis
 from ._flux import FVA_Analyzer
 from pipeGEM.utils import ObjectFactory
 from pipeGEM.utils import get_rxn_set, flip_direction

@@ -207,6 +207,7 @@ class MBA_Analysis(BaseAnalysis):
     def __init__(self, log):
 
         super().__init__(log)
+        self._result_saving_params["removed_rxn_ids"] = {"fm_name": "NDArrayStr"}
 
 
 class mCADRE_Analysis(BaseAnalysis):
@@ -231,13 +232,17 @@ class mCADRE_Analysis(BaseAnalysis):
     """
     def __init__(self, log):
         super().__init__(log)
+        self._result_saving_params["removed_rxn_ids"] = {"fm_name": "NDArrayStr"}
+        self._result_saving_params["core_rxn_ids"] = {"fm_name": "NDArrayStr"}
 
 
 class iMAT_Analysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
+        self._result_saving_params["removed_rxn_ids"] = {"fm_name": "NDArrayStr"}
 
 
 class INIT_Analysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
+        self._result_saving_params["removed_rxn_ids"] = {"fm_name": "NDArrayStr"}
