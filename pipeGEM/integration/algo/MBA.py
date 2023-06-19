@@ -1,5 +1,6 @@
 import numpy as np
-from pipeGEM.analysis import timing, MBA_Analysis, consistency_testers
+from pipeGEM.analysis import timing, MBA_Analysis, consistency_testers, \
+    NumInequalityStoppingCriteria, IsInSetStoppingCriteria
 from pipeGEM.integration.utils import parse_predefined_threshold
 
 
@@ -46,6 +47,12 @@ def apply_MBA(model,
     for r in no_conf_set:
         if r in (removed_rxns + kept_nc_rxns):
             continue
+
+        stop_crit = [IsInSetStoppingCriteria(ess_set=set(protected_rxns) | set(high_conf_rxn_ids)),
+                     NumInequalityStoppingCriteria(var={"mc": list(set(medium_conf_rxn_ids) - set(removed_rxns)),
+                                                        "nc": list(set(no_conf_set) - set(removed_rxns))},
+                                                   cons_dict={"mc": -1,
+                                                              "nc": epsilon})]
         with model:
             model.reactions.get_by_id(r).bounds = (0, 0)
             sol = model.optimize()
@@ -55,10 +62,11 @@ def apply_MBA(model,
             cons_tester = consistency_testers[consistent_checking_method](model)
             test_result = cons_tester.analyze(tol=tolerance,
                                               return_model=False,
+                                              stopping_callback=stop_crit,
                                               rxn_scaling_coefs=rxn_scaling_coefs)
         excluded_HC = set(high_conf_rxn_ids) & set(test_result.removed_rxn_ids)
         excluded_MC = set(medium_conf_rxn_ids) & set(test_result.removed_rxn_ids)
-        excluded_NC = set(medium_conf_rxn_ids) & set(test_result.removed_rxn_ids)
+        excluded_NC = set(test_result.removed_rxn_ids) - excluded_HC - excluded_MC
 
         if len(excluded_HC) == 0 and len(excluded_MC) < epsilon * len(excluded_NC):
             for removed_r in test_result.removed_rxn_ids:

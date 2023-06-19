@@ -165,7 +165,7 @@ def _prune_model(model,
                  eta=0.333,
                  consistency_test_method="FASTCC",
                  tolerance=1e-8,
-                 ):
+                 rxn_scaling_coefs=None):
     non_core_df = score_df.loc[~score_df.index.isin(core_rxns), :]
     all_removed_rxn_ids = []
     model = model.copy()
@@ -197,10 +197,12 @@ def _prune_model(model,
             if consistency_test_method == "FASTCC":
                 test_result = cons_tester.analyze(tol=tolerance,
                                                   return_model=False,
-                                                  stopping_callback=stop_crit)
+                                                  stopping_callback=stop_crit,
+                                                  rxn_scaling_coefs=rxn_scaling_coefs)
             else:
                 test_result = cons_tester.analyze(tol=tolerance,
-                                                  return_model=False)
+                                                  return_model=False,
+                                                  rxn_scaling_coefs=rxn_scaling_coefs)
         if "stopped" in test_result.log and test_result.log["stopped"]:
             continue
         removed_rxns = test_result.removed_rxn_ids
@@ -220,6 +222,7 @@ def apply_mCADRE(model,
                  protected_rxns,
                  predefined_threshold = None,
                  threshold_kws: dict = None,
+                 rxn_scaling_coefs: dict = None,
                  exp_cutoff: float = 0.9,
                  absent_value: float = 0,
                  absent_value_indicator: float = -1e-6,
@@ -272,7 +275,8 @@ def apply_mCADRE(model,
                                                  salvage_test_result,
                                                  eta=eta,
                                                  consistency_test_method="FASTCC",
-                                                 tolerance=tol,)
+                                                 tolerance=tol,
+                                                 rxn_scaling_coefs=rxn_scaling_coefs)
     result = mCADRE_Analysis(log=dict(exp_cutoff=exp_cutoff,
                                       absent_value=absent_value,
                                       absent_value_indicator=absent_value_indicator,
