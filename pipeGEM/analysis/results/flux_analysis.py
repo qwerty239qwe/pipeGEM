@@ -95,6 +95,18 @@ class FluxAnalysis(BaseAnalysis):
 
 
 class FBA_Analysis(FluxAnalysis):
+    """
+    FBA analysis result.
+
+    flux_df: pd.DataFrame
+        A frame having Reaction ID index and a column containing fluxes.
+
+
+    Parameters
+    ----------
+    log
+    """
+
     def __init__(self, log):
         super().__init__(log)
 

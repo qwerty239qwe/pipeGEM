@@ -5,7 +5,10 @@ from scipy import stats
 import numpy as np
 import itertools
 from functools import reduce
-from .results import NormalityTestResult
+from .results import NormalityTestResult, VarHomogeneityTestResult
+
+
+DEFAULT_SIGS = [0.05, 0.01, 0.001, 0.0001]
 
 
 class AssumptionTester:
@@ -34,33 +37,68 @@ class HomoscedasticityTester(AssumptionTester):
     def __init__(self):
         super(HomoscedasticityTester, self).__init__()
 
+    @staticmethod
+    def test(data, method="levene", **kwargs):
+        assert method in ["levene", "bartlett"]
+        statistic, pvalue = getattr(stats, method)(data)
+        new_result = VarHomogeneityTestResult(log={"method": method})
+        new_result.add_result(dict(pvalue=pvalue,
+                                   statistic=statistic,
+                                   data=data,
+                                   **kwargs))  # annotations or factors
+        return new_result
 
-class MultipleComparisonTester:
+
+class PairwiseTester:
     def __init__(self):
-        self._assumption_testers = {"normality": NormalityTester(),
-                                    "var_homogeneity": HomoscedasticityTester()}
-        self._alpha_list = [0.05, 0.01, 0.001, 0.0001]
-
-    def test_assumptions(self,
-                         data,
-                         test_normality=True,
-                         test_var_homogeneity=True,
-                         normality_kws=None,
-                         var_hom_kws=None):
-        if test_normality:
-            if normality_kws is None:
-                normality_kws = {}
-            norm_result = self._assumption_testers["normality"].test(data=data, **normality_kws)
+        self._alpha_list = DEFAULT_SIGS
+        self.parametric_methods = {"tukey": (pg.pairwise_tukey, "pingouin"),
+                                   "dunn": (sp.posthoc_dunn, "scikit_posthocs")}
 
     def test(self,
              data,
+             between,
              non_parametric=True):
         pass
 
 
-class PostHocTester:
+class MultiGroupComparison:
     def __init__(self):
-        pass
+        self._assumption_testers = {"normality": NormalityTester(),
+                                    "var_homogeneity": HomoscedasticityTester()}
+        self._alpha_list = DEFAULT_SIGS
+
+    def test_assumptions(self,
+                         data,
+                         test_normality=True,
+                         test_homoscedasticity=True,
+                         normality_kws=None,
+                         homoscedasticity_kws=None):
+        if test_normality:
+            if normality_kws is None:
+                normality_kws = {}
+            return self._assumption_testers["normality"].test(data=data, **normality_kws)
+        if test_homoscedasticity:
+            if normality_kws is None:
+                homoscedasticity_kws = {}
+            return self._assumption_testers["var_homogeneity"].test(data=data, **homoscedasticity_kws)
+
+    def test(self,
+             data,
+             dep_var,
+             between,
+             non_parametric=True,
+             **kwargs):
+        if not non_parametric:
+            result = pg.anova(data=data,
+                              dv=dep_var,
+                              between=between,
+                              **kwargs)
+        else:
+            result = pg.kruskal(data=data,
+                                dv=dep_var,
+                                between=between,
+                                **kwargs)
 
 
 class HyperGeometricTester:
