@@ -76,7 +76,7 @@ def apply_MBA(model,
         else:
             kept_nc_rxns.append(r)
 
-    model = model.remove_reactions(removed_rxns, remove_orphans=True)
+    model.remove_reactions(removed_rxns, remove_orphans=True)
     result = MBA_Analysis(log={"tolerance": tolerance,
                                "epsilon": epsilon,
                                "random_state": random_state})

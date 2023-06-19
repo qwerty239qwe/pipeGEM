@@ -36,7 +36,7 @@ def add_cons_to_model(model,
     if not hasattr(ubs, "__len__"):
         ubs = [ubs for _ in var_coefs]
 
-    for (name, coefs), lb, ub in (var_coefs.items(), lbs, ubs):
+    for (name, coefs), lb, ub in zip(var_coefs.items(), lbs, ubs):
         cons = model.problem.Constraint(Zero, name=f"{prefix}{name}", lb=lb, ub=ub)
         con_dict[f"{prefix}{name}"] = coefs
         added_cons.append(cons)

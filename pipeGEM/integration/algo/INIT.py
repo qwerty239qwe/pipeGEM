@@ -1,6 +1,8 @@
 from typing import Literal
 
 import numpy as np
+import pandas as pd
+
 from pipeGEM.integration.algo.iMAT import add_iMAT_cons_to_model, get_ind_var_for_rxns
 from pipeGEM.integration.utils import *
 from pipeGEM.analysis import timing, INIT_Analysis
@@ -27,7 +29,8 @@ def apply_INIT(model,
                protected_rxns=None,
                eps=1.,
                tol=1e-8,
-               weight_method: Literal["default", "threshold"] = "threshold") -> INIT_Analysis:
+               weight_method: Literal["default", "threshold"] = "threshold",
+               rxn_scaling_coefs: dict = None,) -> INIT_Analysis:
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
     if weight_method == "threshold":
         threshold_dic = parse_predefined_threshold(predefined_threshold,
@@ -35,6 +38,7 @@ def apply_INIT(model,
                                                    **threshold_kws)
         th_result, exp_th, non_exp_th = threshold_dic["th_result"], threshold_dic["exp_th"], threshold_dic["non_exp_th"]
     else:
+        th_result = None
         non_exp_th = 0
         exp_th = 0
 
@@ -48,11 +52,11 @@ def apply_INIT(model,
     core_rxn_ids = list(set(core_rxn_ids) | set(protected_rxns))
     non_core_rxn_ids = list(set(non_core_rxn_ids) - set(protected_rxns))
 
-    core_rxn_lbs = [model.reactions.get_by_id(r).lower_bound for r in core_rxn_ids]
-    core_rxn_ubs = [model.reactions.get_by_id(r).upper_bound for r in core_rxn_ids]
+    core_rxn_lbs = {r: model.reactions.get_by_id(r).lower_bound for r in core_rxn_ids}
+    core_rxn_ubs = {r: model.reactions.get_by_id(r).upper_bound for r in core_rxn_ids}
 
-    non_core_rxn_lbs = [model.reactions.get_by_id(r).lower_bound for r in non_core_rxn_ids]
-    non_core_rxn_ubs = [model.reactions.get_by_id(r).upper_bound for r in non_core_rxn_ids]
+    non_core_rxn_lbs = {r: model.reactions.get_by_id(r).lower_bound for r in non_core_rxn_ids}
+    non_core_rxn_ubs = {r: model.reactions.get_by_id(r).upper_bound for r in non_core_rxn_ids}
 
     model.objective.set_linear_coefficients({v: 0 for v in model.variables})
     new_objs = {}
@@ -61,11 +65,11 @@ def apply_INIT(model,
                                                                                core_rxn_ids=core_rxn_ids,
                                                                                non_core_rxn_ids=non_core_rxn_ids)
 
-    for name, var in non_core_ind_vars:
+    for name, var in non_core_ind_vars.items():
         new_objs[var] = abs(weight_dic[name[4:]])
-    for name, var in core_f_ind_vars:
+    for name, var in core_f_ind_vars.items():
         new_objs[var] = weight_dic[name[4:]]
-    for name, var in core_b_ind_vars:
+    for name, var in core_b_ind_vars.items():
         new_objs[var] = weight_dic[name[4:]]
 
     add_iMAT_cons_to_model(model=model,
@@ -81,19 +85,25 @@ def apply_INIT(model,
                            eps=eps)
 
     sol = model.optimize()
-    removed_rxn_ids = sol.to_frame().query(f"abs(fluxes) < {tol}").index
+
+    fluxes = abs(sol.to_frame()["fluxes"])
+    if rxn_scaling_coefs is not None:
+        tol_ = pd.Series({rxn_scaling_coefs[r] * tol for r in fluxes.index}, index=fluxes.index)
+    else:
+        tol_ = tol
+
+    removed_rxn_ids = (fluxes > tol_).index.to_list()
     result_model.remove_reactions(removed_rxn_ids, remove_orphans=True)
 
-    result = INIT_Analysis(log=dict(predefined_threshold=predefined_threshold,
-                                    threshold_kws=threshold_kws,
+    result = INIT_Analysis(log=dict(threshold_kws=threshold_kws,
                                     protected_rxns=protected_rxns,
                                     eps=eps,
                                     tol=tol,
                                     weight_method=weight_method))
 
-    result.add_result(model=result_model,
-                      removed_rxns=removed_rxn_ids,
-                      threshold_analysis=th_result if weight_method == "threshold" else None,
-                      weight_dic=weight_dic)
+    result.add_result(dict(model=result_model,
+                           removed_rxns=removed_rxn_ids,
+                           threshold_analysis=th_result if weight_method == "threshold" else None,
+                           weight_dic=weight_dic))
 
     return result

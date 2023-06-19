@@ -6,6 +6,7 @@ from pipeGEM.integration.algo.rFASTCORMICS import apply_rFASTCORMICS
 from pipeGEM.integration.algo.CORDA import apply_CORDA
 from pipeGEM.integration.algo.mCADRE import apply_mCADRE
 from pipeGEM.integration.algo.MBA import apply_MBA
+from pipeGEM.integration.algo.INIT import apply_INIT
 from pipeGEM.utils import ObjectFactory
 
 
@@ -161,6 +162,17 @@ class MBA(GeneDataIntegrator):
                          **kwargs)
 
 
+class INIT(GeneDataIntegrator):
+    def __init__(self):
+        super().__init__()
+
+    def integrate(self, model, data, **kwargs):
+        return apply_INIT(model=model,
+                          data=data,
+                          **kwargs)
+
+
+
 integrator_factory = Integrators()
 integrator_factory.register("GIMME", GIMME)
 integrator_factory.register("EFlux", EFlux)
@@ -171,3 +183,4 @@ integrator_factory.register("rFASTCORMICS", rFASTCORMICS)
 integrator_factory.register("CORDA", CORDA)
 integrator_factory.register("mCADRE", mCADRE)
 integrator_factory.register("MBA", MBA)
+integrator_factory.register("INIT", INIT)
