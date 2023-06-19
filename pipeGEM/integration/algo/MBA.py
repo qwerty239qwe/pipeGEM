@@ -9,6 +9,7 @@ def apply_MBA(model,
               predefined_threshold=None,
               threshold_kws: dict = None,
               protected_rxns=None,
+              rxn_scaling_coefs: dict = None,
               medium_conf_rxn_ids=None,
               high_conf_rxn_ids=None,
               consistent_checking_method="FASTCC",
@@ -28,6 +29,7 @@ def apply_MBA(model,
         medium_conf_rxn_ids = (set([r for r, c in data.rxn_scores.items() if (c < exp_th) and (c > non_exp_th)]) - set(
             protected_rxns)) & rxn_in_model
     else:
+        th_result= None
         print(f"Using defined medium and high conf rxns. Ignoring predefined_threshold.")
         assert all([r in rxn_ids for r in medium_conf_rxn_ids])
         assert all([r in rxn_ids for r in high_conf_rxn_ids])
@@ -52,7 +54,8 @@ def apply_MBA(model,
                 continue
             cons_tester = consistency_testers[consistent_checking_method](model)
             test_result = cons_tester.analyze(tol=tolerance,
-                                              return_model=False)
+                                              return_model=False,
+                                              rxn_scaling_coefs=rxn_scaling_coefs)
         excluded_HC = set(high_conf_rxn_ids) & set(test_result.removed_rxn_ids)
         excluded_MC = set(medium_conf_rxn_ids) & set(test_result.removed_rxn_ids)
         excluded_NC = set(medium_conf_rxn_ids) & set(test_result.removed_rxn_ids)
@@ -71,7 +74,7 @@ def apply_MBA(model,
                                "random_state": random_state})
     result.add_result(dict(result_model=model,
                            removed_rxn_ids=removed_rxns,
-                           threshold_analysis=None))
+                           threshold_analysis=th_result))
 
     return result
 

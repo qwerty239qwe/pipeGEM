@@ -1,6 +1,7 @@
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
+from optlang import Model, Variable, Constraint, Objective
 
 import pipeGEM
 from pipeGEM.analysis import timing, LP3, LP7, non_convex_LP7, non_convex_LP3, FVAConsistencyAnalysis, FastCCAnalysis
@@ -38,6 +39,56 @@ class ConsistencyTester:
         raise NotImplementedError("")
 
 
+class StoppingCriteria:
+    def __init__(self):
+        pass
+
+    def check(self, removed, kept) -> bool:
+        raise NotImplementedError("")
+
+
+class IsInSetStoppingCriteria(StoppingCriteria):
+    def __init__(self, ess_set):
+        super().__init__()
+        self.ess_set = ess_set
+
+    def check(self, removed, kept):
+        return all([c not in self.ess_set for c in removed])
+
+
+class NumInequalityStoppingCriteria(StoppingCriteria):
+    def __init__(self, var, cons_dict, cons_lb=0):
+        super().__init__()
+        self.var = var  # {'a': list(rxn_ids)}
+        self._kept_var = {k: set() for k, v in self.var.items()}
+        self._removed_var = {k: set() for k, v in self.var.items()}
+        self.cons_dict = cons_dict
+        self.cons_lb = cons_lb
+
+    def _update_var_num(self, new_vars, lbs, n_ubs):
+        return {k: Variable(k, ub=len(v) - n_ubs.get(k, 0), lb=lbs.get(k, 0)) for k, v in new_vars.items()}
+
+    def check(self, removed, kept) -> bool:
+        for k, v in self.var.items():
+            for vi in v:
+                if vi in kept:
+                    self._kept_var[k].add(vi)
+                if vi in removed:
+                    self._removed_var[k].add(vi)
+        variables = self._update_var_num(new_vars=self.var,
+                                         lbs={k: len(v) for k, v in self._removed_var.items()},
+                                         n_ubs={k: len(v) for k, v in self._kept_var.items()})
+        cons = Constraint(sum([variables[k] * v for k, v in self.cons_dict.items()]), lb=self.cons_lb)
+        model = Model(name='Ineq')
+        model.add([cons])
+        status = model.optimize()
+        if status != "optimal":
+            print("removed", {k: len(v) for k, v in self._removed_var.items()})
+            print("kept", {k: len(v) for k, v in self._kept_var.items()})
+
+        return status != "optimal"
+
+
 class FASTCC(ConsistencyTester):
     def __init__(self, model):
         super().__init__(model)
@@ -48,10 +99,12 @@ class FASTCC(ConsistencyTester):
                 return_model: bool = True,
                 is_convex=True,
                 rxn_scaling_coefs=None,
+                stopping_callback=None,
                 **kwargs) -> FastCCAnalysis:
         if not is_convex:
             print("Using non-convex fastcc method")
         print(f"Flux tolerance used: {tol}")
+        tol_ = tol
         consistent_model = None
         if rxn_scaling_coefs is not None:
             tol = pd.Series({k: tol * v
@@ -68,13 +121,21 @@ class FASTCC(ConsistencyTester):
                 print(f"Found and flipped {len(backward_rxns)} reactions")
                 flip_direction(model, backward_rxns)
             A = np.array(LP7(J, model, tol, use_abs=True, flux_logger=self._flux_recorder))  # rxns to keeps
-            # print("A: ", len(A))
             print(f"Inconsistent irreversible rxns: {len(np.setdiff1d(J, A))}")
 
             A_2 = np.array(LP7(np.setdiff1d(J, A), model, tol, use_abs=True, flux_logger=self._flux_recorder))
             print(f"Inconsistent irreversible rxns (2nd run): {len(np.setdiff1d(np.setdiff1d(J, A), A_2))}")
 
             A = np.union1d(A, A_2)
+            if stopping_callback is not None:
+                reach_stop_crit = False
+                for cb in stopping_callback:
+                    reach_stop_crit = reach_stop_crit or cb.check(removed=np.union1d(no_expressed, np.setdiff1d(J, A)),
+                                                                  kept=A)
+                if reach_stop_crit:
+                    print("Stopping criteria is met, stop the process.")
+                    return FastCCAnalysis(log={"is_convex": is_convex, "tol": tol_, "stopped": True})
+
             J = np.setdiff1d(all_rxns, np.union1d(np.union1d(A, no_expressed), J))  # rev rxns to check
             # print("J: ", len(J))
             singleton, flipped = False, False
@@ -91,6 +152,8 @@ class FASTCC(ConsistencyTester):
                         new_supps = np.array(LP7(Ji, model, tol,
                                                  flux_logger=self._flux_recorder)) if is_convex else np.array(
                             non_convex_LP7(Ji, model, tol, flux_logger=self._flux_recorder))
+                    new_kept = np.setdiff1d(new_supps, A)
+                    new_removed = []
                     A = np.union1d(A, new_supps)
                     before_n = len(J)
                     J = np.setdiff1d(J, A)
@@ -103,21 +166,32 @@ class FASTCC(ConsistencyTester):
                         if flipped or len(Jirev) == 0:
                             flipped = False
                             if singleton:
+                                new_removed = Ji
                                 J = np.setdiff1d(J, Ji)
-                                tqdm.write(f"Remove {Ji}, which is flux inconsistent.")
+                                tqdm.write(f"Remove inconsistent reaction: {Ji}")
                                 pbar.update(1)
                             else:
                                 singleton = True
                         else:
                             flip_direction(model, Jirev)
                             flipped = True
+                if stopping_callback is not None:
+                    reach_stop_crit = False
+                    for cb in stopping_callback:
+                        reach_stop_crit = reach_stop_crit or cb.check(removed=new_removed,
+                                                                      kept=new_kept)
+                    if reach_stop_crit:
+                        print("Stopping criteria is met, stop the process.")
+                        pbar.close()
+                        return FastCCAnalysis(log={"is_convex": is_convex, "tol": tol_, "stopped": True})
+
         rxns_to_remove = np.setdiff1d(all_rxns, A)
         if consistent_model is not None:
             consistent_model.remove_reactions(rxns_to_remove, remove_orphans=True)
             if isinstance(consistent_model, pipeGEM.Model):
                 consistent_model.rename(name_tag=f"consistent_{self.model.name_tag}")
 
-        result = FastCCAnalysis(log={"is_convex": is_convex, "tol": tol})
+        result = FastCCAnalysis(log={"is_convex": is_convex, "tol": tol_})
         result.add_result(dict(consistent_model=consistent_model,
                                removed_rxn_ids=rxns_to_remove,
                                kept_rxn_ids=A,

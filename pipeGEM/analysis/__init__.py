@@ -31,4 +31,4 @@ __all__ = ("flux_analyzers", "ProblemAnalyzer", "modified_pfba",
            "ModelScalingResult",
            "model_scaler_collection", "L1NormScaler", "L2NormScaler",
            "deBuchetScalerP2", "deBuchetScalerP1",
-           "ArithmeticScaler", "GeoMeanScaler")
+           "ArithmeticScaler", "GeoMeanScaler", "IsInSetStoppingCriteria", "NumInequalityStoppingCriteria")

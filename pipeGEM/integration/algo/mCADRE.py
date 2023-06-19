@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 from cobra.util.array import create_stoichiometric_matrix
 from pipeGEM.analysis.tasks import Task, TaskContainer, TaskHandler
-from pipeGEM.analysis import consistency_testers, timing, mCADRE_Analysis
+from pipeGEM.analysis import consistency_testers, timing, mCADRE_Analysis, \
+    NumInequalityStoppingCriteria, IsInSetStoppingCriteria
 from pipeGEM.integration.utils import parse_predefined_threshold
 from tqdm import tqdm
 
@@ -167,6 +168,7 @@ def _prune_model(model,
                  ):
     non_core_df = score_df.loc[~score_df.index.isin(core_rxns), :]
     all_removed_rxn_ids = []
+    model = model.copy()
 
     for non_core_rxn_id in tqdm(non_core_df.index):
         if non_core_rxn_id in all_removed_rxn_ids:
@@ -176,28 +178,38 @@ def _prune_model(model,
         if not pass_tests:
             continue
 
+        if non_core_rxn_id in non_expressed_rxns:
+            stop_crit = [IsInSetStoppingCriteria(ess_set=set(core_rxns) - set(all_removed_rxn_ids))]
+        else:
+            stop_crit = [NumInequalityStoppingCriteria(var={"core": list(set(core_rxns) - set(all_removed_rxn_ids)),
+                                                            "non_core": list(set(non_core_df.index) -
+                                                                             set(all_removed_rxn_ids))},
+                                                       cons_dict={"core": -1,
+                                                                  "non_core": eta})]
+        stop_crit.append(IsInSetStoppingCriteria(ess_set=set(protected_rxns)))
+
         with model:
+            tqdm.write(f"Trying to remove {non_core_rxn_id}")
             model.reactions.get_by_id(non_core_rxn_id).bounds = (0, 0)
             #consistency check
             cons_tester = consistency_testers[consistency_test_method](model)
-            test_result = cons_tester.analyze(tol=tolerance,
-                                              return_model=False)
-            removed_rxns = test_result.removed_rxn_ids
-            pruned_model = test_result.consistent_model
 
-        if len(set(protected_rxns) & set(test_result.removed_rxn_ids)) > 0:
+            if consistency_test_method == "FASTCC":
+                test_result = cons_tester.analyze(tol=tolerance,
+                                                  return_model=False,
+                                                  stopping_callback=stop_crit)
+            else:
+                test_result = cons_tester.analyze(tol=tolerance,
+                                                  return_model=False)
+        if "stopped" in test_result.log and test_result.log["stopped"]:
             continue
-
+        removed_rxns = test_result.removed_rxn_ids
         pass_tests = all(_check_all_test(rid, func_test_result, salv_test_result) for rid in removed_rxns)
         if not pass_tests:
             continue
-
-        n_core_rm = len(set(core_rxns) & set(removed_rxns))
-        n_non_core_rm = len(set(non_core_df.index) & set(removed_rxns))
-
-        if (non_core_rxn_id in non_expressed_rxns and (n_core_rm <= n_non_core_rm * eta)) or (n_core_rm == 0):
-            model = pruned_model
-            all_removed_rxn_ids.extend(removed_rxns)
+        for r in removed_rxns:
+            model.reactions.get_by_id(r).bounds = (0, 0)
+        all_removed_rxn_ids.extend(removed_rxns)
 
     return model, all_removed_rxn_ids
 
@@ -211,6 +223,8 @@ def apply_mCADRE(model,
                  exp_cutoff: float = 0.9,
                  absent_value: float = 0,
                  absent_value_indicator: float = -1e-6,
+                 tol=1e-6,
+                 eta=0.333,
                  evidence_scores: Union[Dict[str, float | int], pd.Series] = None,
                  salvage_check_tasks=None,
                  default_salv_test=False,
@@ -256,13 +270,15 @@ def apply_mCADRE(model,
                                                  protected_rxns,
                                                  func_test_result,
                                                  salvage_test_result,
-                                                 eta=0.333,
+                                                 eta=eta,
                                                  consistency_test_method="FASTCC",
-                                                 tolerance=1e-8,)
+                                                 tolerance=tol,)
     result = mCADRE_Analysis(log=dict(exp_cutoff=exp_cutoff,
                                       absent_value=absent_value,
                                       absent_value_indicator=absent_value_indicator,
-                                      evidence_scores=evidence_scores,))
+                                      evidence_scores=evidence_scores,
+                                      tol=tol,
+                                      eta=eta,))
 
     result.add_result(dict(result_model=result_model,
                            removed_rxn_ids=removed_rxn_ids,

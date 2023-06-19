@@ -25,7 +25,7 @@ def apply_rFASTCORMICS(model,
 
     if consistent_checking_method is not None:
         consistency_tester = consistency_testers[consistent_checking_method](model=model)
-        cons_result = consistency_tester.analyze(tol=threshold)
+        cons_result = consistency_tester.analyze(tol=threshold, rxn_scaling_coefs=rxn_scaling_coefs)
         model = cons_result.consistent_model
 
     rxn_in_model = set([r.id for r in model.reactions])
