@@ -1,0 +1,4 @@
+models_input_dir = "path_dir"
+model_type = "pg"
+group_factor_path = "factor_path"
+models_input_path = ""

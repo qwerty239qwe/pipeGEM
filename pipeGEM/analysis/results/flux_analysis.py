@@ -277,17 +277,22 @@ class SamplingAnalysis(FluxAnalysis):
         super(SamplingAnalysis, self).__init__(log)
 
     @classmethod
-    def aggregate(cls, analyses, method, log, **kwargs):
-        new = cls(log=log)
-        if method == "concat":
-            new.add_result(dict(flux_df=pd.concat([i.flux_df for i in analyses],
-                                                  axis=0)))
-        else:
-            raise ValueError()
-        return new
+    def aggregate(cls,
+                  analyses: List["FluxAnalysis"],
+                  method: str = "concat",
+                  log: Optional[dict] = None,
+                  **kwargs):
+        cat_log = set()
 
-    def add_name(self, name, col_name="name"):
-        self._result["flux_df"][col_name] = name
+        if method == "concat":
+            for a in analyses:
+                cat_log |= a.log["categorical"]
+            new = cls(log={"categorical": cat_log, **log})
+            new.add_result(dict(flux_df=pd.concat([i.flux_df for i in analyses],
+                                                  axis=0).reset_index(drop=True)))
+        else:
+            raise NotImplementedError()
+        return new
 
     def plot(self,
              rxn_id,

@@ -1,0 +1,5 @@
+method = "pFBA"
+solver = "gurobi"
+aggregate_method = "concat"
+group_by = "group"
+saved_path = ""

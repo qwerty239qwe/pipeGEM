@@ -1,0 +1,21 @@
+integrator_name = "RIPTiDeSampling"
+saved_path = ""
+protected_rxns = ["MAR13082"]
+sampling_n = 100
+do_sampling = true
+sampling_method = "optgp"
+obj_frac = 0.2
+sampling_obj_frac = 0.2
+
+
+[precompute]
+    [precompute.model]
+        cobra_model_path = nan
+        model_name_tag = "human1"
+    [precompute.tasks]
+        task_result_path = nan
+    [precompute.threshold]
+        threshold_result_path = nan
+        type = "rFASTCORMICS"
+    [precompute.rxn_scaling_factor]
+        file_path = nan

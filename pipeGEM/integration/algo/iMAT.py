@@ -38,28 +38,26 @@ def add_iMAT_cons_to_model(model,
                                             model.reactions.get_by_id(ri).reverse_variable: -1,
                                             } for ri in core_rxn_ids},
                       prefix="",
-                      lbs=-np.inf, ubs=[core_rxn_ubs[ri] for ri in core_rxn_ids])
-
+                      lbs=[core_rxn_lbs[ri] for ri in core_rxn_ids], ubs=np.inf)
     add_cons_to_model(model, {f"cbi_{ri}": {core_b_ind_vars[f"cbi_{ri}"]: core_rxn_ubs[ri] + eps,
                                             model.reactions.get_by_id(ri).forward_variable: 1,
                                             model.reactions.get_by_id(ri).reverse_variable: -1,
                                             } for ri in core_rxn_ids},
                       prefix="",
-                      lbs=[core_rxn_lbs[ri] for ri in core_rxn_ids], ubs=np.inf)
+                      lbs=-np.inf, ubs=[core_rxn_ubs[ri] for ri in core_rxn_ids])
 
-    add_cons_to_model(model, {f"ncfi_{ri}": {non_core_ind_vars[f"nci_{ri}"]: non_core_rxn_lbs[ri],
-                                             model.reactions.get_by_id(ri).forward_variable: 1,
-                                             model.reactions.get_by_id(ri).reverse_variable: -1,
-                                             } for ri in non_core_rxn_ids},
-                      prefix="",
-                      lbs=-np.inf, ubs=[non_core_rxn_ubs[ri] for ri in non_core_rxn_ids])
-
-    add_cons_to_model(model, {f"ncbi_{ri}": {non_core_ind_vars[f"nci_{ri}"]: non_core_rxn_ubs[ri],
+    add_cons_to_model(model, {f"ncbi_{ri}": {non_core_ind_vars[f"nci_{ri}"]: non_core_rxn_lbs[ri],
                                              model.reactions.get_by_id(ri).forward_variable: 1,
                                              model.reactions.get_by_id(ri).reverse_variable: -1,
                                              } for ri in non_core_rxn_ids},
                       prefix="",
                       lbs=[non_core_rxn_lbs[ri] for ri in non_core_rxn_ids], ubs=np.inf)
+    add_cons_to_model(model, {f"ncfi_{ri}": {non_core_ind_vars[f"nci_{ri}"]: non_core_rxn_ubs[ri],
+                                             model.reactions.get_by_id(ri).forward_variable: 1,
+                                             model.reactions.get_by_id(ri).reverse_variable: -1,
+                                             } for ri in non_core_rxn_ids},
+                      prefix="",
+                      lbs=-np.inf, ubs=[non_core_rxn_ubs[ri] for ri in non_core_rxn_ids])
     model.solver.update()
 
 

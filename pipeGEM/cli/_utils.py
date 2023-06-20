@@ -201,7 +201,7 @@ def _preprocess_int_configs(integration_conf,
     if int_name == "GIMME":
         if integration_conf["high_exp"] == "default":
             integration_conf["high_exp"] = th_result.exp_th if not isinstance(th_result, LocalThresholdAnalysis) else 0
-    else:
+    elif int_name not in ["RIPTiDeSampling", "EFlux"]:
         integration_conf["predefined_threshold"] = th_result
 
     integration_conf["protected_rxns"] = integration_conf.get("protected_rxns", []) + protected_rxns
@@ -227,7 +227,8 @@ def run_integration_pipeline(gene_data_conf,
                                           model=model,
                                           mapping_config=mapping_conf)
         int_c, saved_path = _preprocess_int_configs(integration_conf=integration_conf,
-                                                    th_result=th_result[g_name] if isinstance(th_result, dict) else th_result,
+                                                    th_result=th_result[g_name]
+                                                        if isinstance(th_result, dict) else th_result,
                                                     protected_rxns=task_supp_rxns[g_name])
         int_result = model.integrate_gene_data(data_name=g_name,
                                                **int_c)
@@ -283,3 +284,68 @@ def do_model_comparison(comparison_configs):
                   prefix="")
     plt.show(block=False)
     plt.close('all')
+
+
+def _load_exist_model(path_pattern, model_name, model_type):
+    if model_type == "cobra":
+        return Model(model=load_model(path_pattern.format(model_name)), name_tag=model_name)
+    if model_type == "pg":
+        return Model.load_model(path_pattern.format(model_name))
+
+
+def _fa_with_data(multi_model_conf,
+                  gene_data_conf,
+                  threshold_conf,
+                  mapping_conf,
+                  integration_conf):
+    model_path_struct = multi_model_conf["models_input_path"]
+    model_type = multi_model_conf["model_type"]
+    gene_data_dic = load_gene_data(gene_data_conf=gene_data_conf)
+    th_result = _integration_get_thres(gene_data=gene_data_dic,
+                                       threshold_config=threshold_conf,
+                                       integration_conf=integration_conf)
+    # prec_tasks_path = integration_conf["precompute"]["tasks"]["task_result_path"]
+    # task_result = TaskAnalysis.load(file_path=prec_tasks_path)
+    task_supp_rxns = {}
+    for g_name, g_data in gene_data_dic.items():
+        model = _load_exist_model(model_path_struct, g_name, model_type)
+        task_supp_rxns[g_name] = map_data(data_name=g_name,
+                                          gene_data=g_data,
+                                          model=model,
+                                          mapping_config=mapping_conf)
+        int_c, saved_path = _preprocess_int_configs(integration_conf=integration_conf,
+                                                    th_result=th_result[g_name]
+                                                    if isinstance(th_result, dict) else th_result,
+                                                    protected_rxns=task_supp_rxns[g_name])
+        int_result = model.integrate_gene_data(data_name=g_name,
+                                               **int_c)
+        int_result.flux_result.to_csv(saved_path.format(g_name))
+
+
+def do_flux_analysis(fa_configs,
+                     multi_model_conf,
+                     gene_data_conf,
+                     threshold_conf,
+                     mapping_conf,
+                     integration_conf,
+                     ):
+    if integration_conf is not None:
+        _fa_with_data(multi_model_conf, gene_data_conf, threshold_conf, mapping_conf, integration_conf)
+        return
+    else:
+        model_path_dir = multi_model_conf["models_input_dir"]
+        model_type = multi_model_conf["model_type"]
+        group_factor = pd.read_csv(multi_model_conf["group_factor_path"])
+        models = []
+        for fn in Path(model_path_dir).iterdir():
+            if model_type == "cobra":
+                models.append(Model(model=load_model(str(fn)), name_tag=fn.stem))
+            elif model_type == "pg":
+                models.append(Model.load_model(fn))
+
+        group = Group(group=models, name_tag="group", factors=group_factor)
+
+        fa_saved_path = fa_configs.pop("saved_path")
+        flux_result = group.do_flux_analysis(**fa_configs)
+        flux_result.save(fa_saved_path)
+

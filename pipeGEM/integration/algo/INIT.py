@@ -47,8 +47,8 @@ def apply_INIT(model,
                                   exp_th=exp_th, non_exp_th=non_exp_th, method=weight_method)
     model = model.copy()
     result_model = model.copy()
-    core_rxn_ids = [r.id for r in model.reactions if rxn_scores[r.id] >= exp_th]
-    non_core_rxn_ids = [r.id for r in model.reactions if rxn_scores[r.id] <= non_exp_th]
+    core_rxn_ids = [r.id for r in model.reactions if rxn_scores[r.id] >= non_exp_th]
+    non_core_rxn_ids = [r.id for r in model.reactions if rxn_scores[r.id] < non_exp_th]
 
     core_rxn_ids = list(set(core_rxn_ids) | set(protected_rxns))
     for r in protected_rxns:
@@ -109,6 +109,7 @@ def apply_INIT(model,
     result.add_result(dict(result_model=result_model,
                            removed_rxn_ids=np.array(removed_rxn_ids),
                            threshold_analysis=th_result if weight_method == "threshold" else None,
-                           weight_dic=weight_dic))
+                           weight_dic=weight_dic,
+                           fluxes=fluxes.to_frame()))
 
     return result
