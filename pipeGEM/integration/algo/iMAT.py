@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from pipeGEM.integration.utils import *
 from pipeGEM.analysis import timing, iMAT_Analysis
 
@@ -10,9 +11,9 @@ def get_ind_var_for_rxns(model, core_rxn_ids, non_core_rxn_ids):
                                                 lbs=0, ubs=1, type_ab="b")
 
     core_b_ind_vars = build_vars_dict_from_rxns(model=model,
-                                                      rxn_ids=core_rxn_ids,
-                                                      prefix="cbi_",
-                                                      lbs=0, ubs=1, type_ab="b")
+                                                rxn_ids=core_rxn_ids,
+                                                prefix="cbi_",
+                                                lbs=0, ubs=1, type_ab="b")
 
     non_core_ind_vars = build_vars_dict_from_rxns(model=model,
                                                   rxn_ids=non_core_rxn_ids,
@@ -59,6 +60,7 @@ def add_iMAT_cons_to_model(model,
                                              } for ri in non_core_rxn_ids},
                       prefix="",
                       lbs=[non_core_rxn_lbs[ri] for ri in non_core_rxn_ids], ubs=np.inf)
+    model.solver.update()
 
 
 @timing
@@ -68,8 +70,8 @@ def apply_iMAT(model,
                threshold_kws: dict,
                protected_rxns = None,
                rxn_scaling_coefs=None,
-               eps = 1.,
-               tol = 1e-8) -> iMAT_Analysis:
+               eps = 1e-6,
+               tol = 1e-6) -> iMAT_Analysis:
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
     threshold_dic = parse_predefined_threshold(predefined_threshold,
                                                gene_data=gene_data,
@@ -113,8 +115,9 @@ def apply_iMAT(model,
                            non_core_rxn_lbs=non_core_rxn_lbs,
                            non_core_rxn_ubs=non_core_rxn_ubs,
                            eps=eps)
-
-    sol = model.optimize()
+    model.objective.set_linear_coefficients(new_objs)
+    model.solver.update()
+    sol = model.optimize("maximize")
     fluxes = abs(sol.to_frame()["fluxes"])
     if rxn_scaling_coefs is not None:
         tol_ = pd.Series({rxn_scaling_coefs[r] * tol for r in fluxes.index}, index=fluxes.index)

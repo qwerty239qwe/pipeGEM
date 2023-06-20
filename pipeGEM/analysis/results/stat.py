@@ -18,3 +18,13 @@ class VarHomogeneityTestResult(BaseAnalysis):
         pass
 
 
+class PairwiseTestResult(BaseAnalysis):
+    def __init__(self, log):
+        super().__init__(log=log)
+
+    @classmethod
+    def aggregate(cls, results):
+        pass
+
+    def plot(self, method, **kwargs):
+        pass

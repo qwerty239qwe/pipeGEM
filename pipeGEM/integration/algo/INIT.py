@@ -11,14 +11,15 @@ from pipeGEM.analysis import timing, INIT_Analysis
 def calc_INIT_weight(rxn_scores,
                      exp_th=None,
                      non_exp_th=None,
-                     method: Literal["default", "threshold"] = "default"
+                     method: Literal["default", "threshold"] = "default",
+                     absent_weight: float = -5,
                      ):
     if method == "default":
         return {r: 5 * np.log(v) for r, v in rxn_scores.items()}
     elif method == "threshold":
         z = np.polyfit([non_exp_th, exp_th], [0, 20], 1)
         p = np.poly1d(z)
-        return {r: p(v) for r, v in rxn_scores.items()}
+        return {r: max(absent_weight, p(v)) if np.isfinite(v) else absent_weight for r, v in rxn_scores.items()}
 
 
 @timing
@@ -27,8 +28,8 @@ def apply_INIT(model,
                predefined_threshold,
                threshold_kws: dict,
                protected_rxns=None,
-               eps=1.,
-               tol=1e-8,
+               eps=1e-6,
+               tol=1e-6,
                weight_method: Literal["default", "threshold"] = "threshold",
                rxn_scaling_coefs: dict = None,) -> INIT_Analysis:
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
@@ -50,6 +51,9 @@ def apply_INIT(model,
     non_core_rxn_ids = [r.id for r in model.reactions if rxn_scores[r.id] <= non_exp_th]
 
     core_rxn_ids = list(set(core_rxn_ids) | set(protected_rxns))
+    for r in protected_rxns:
+        weight_dic[r] = max(weight_dic[r], 20)
+
     non_core_rxn_ids = list(set(non_core_rxn_ids) - set(protected_rxns))
 
     core_rxn_lbs = {r: model.reactions.get_by_id(r).lower_bound for r in core_rxn_ids}
@@ -83,8 +87,9 @@ def apply_INIT(model,
                            non_core_rxn_lbs=non_core_rxn_lbs,
                            non_core_rxn_ubs=non_core_rxn_ubs,
                            eps=eps)
-
-    sol = model.optimize()
+    model.objective.set_linear_coefficients(new_objs)
+    model.solver.update()
+    sol = model.optimize("maximize")
 
     fluxes = abs(sol.to_frame()["fluxes"])
     if rxn_scaling_coefs is not None:

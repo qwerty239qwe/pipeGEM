@@ -5,7 +5,7 @@ from scipy import stats
 import numpy as np
 import itertools
 from functools import reduce
-from .results import NormalityTestResult, VarHomogeneityTestResult
+from .results import NormalityTestResult, VarHomogeneityTestResult, PairwiseTestResult
 
 
 DEFAULT_SIGS = [0.05, 0.01, 0.001, 0.0001]
@@ -52,14 +52,34 @@ class HomoscedasticityTester(AssumptionTester):
 class PairwiseTester:
     def __init__(self):
         self._alpha_list = DEFAULT_SIGS
-        self.parametric_methods = {"tukey": (pg.pairwise_tukey, "pingouin"),
-                                   "dunn": (sp.posthoc_dunn, "scikit_posthocs")}
+        self.parametric_methods = {"tukey": (sp.posthoc_tukey, "scikit_posthocs"),
+                                   "dunn": (sp.posthoc_dunn, "scikit_posthocs"),
+                                   }
+        self.non_parametric_methods = {"mw": (sp.posthoc_mannwhitney, "scikit_posthocs"),
+                                       "wilcoxon": (sp.posthoc_wilcoxon, "scikit_posthocs")}
 
     def test(self,
              data,
+             dep_var,
              between,
-             non_parametric=True):
-        pass
+             parametric=False,
+             method="mw",
+             **kwargs):
+        result_obj = PairwiseTestResult(dict(dep_var=dep_var,
+                                             between=between,
+                                             parametric=parametric,
+                                             method=method,
+                                             **kwargs))
+        if parametric:
+            if self.parametric_methods[method][1] == "scikit_posthocs":
+                result = self.parametric_methods[method][0](data,
+                                                            val_col=dep_var,
+                                                            group_col=between,
+                                                            **kwargs)
+                result_obj.add_result(dict(p_value_df=result))
+
+
+        return result_obj
 
 
 class MultiGroupComparison:
@@ -87,9 +107,9 @@ class MultiGroupComparison:
              data,
              dep_var,
              between,
-             non_parametric=True,
+             parametric=True,
              **kwargs):
-        if not non_parametric:
+        if parametric is True:
             result = pg.anova(data=data,
                               dv=dep_var,
                               between=between,
@@ -99,6 +119,11 @@ class MultiGroupComparison:
                                 dv=dep_var,
                                 between=between,
                                 **kwargs)
+
+
+def oneway_mkw(data, dv, between, **kwargs):
+    pass
+
 
 
 class HyperGeometricTester:

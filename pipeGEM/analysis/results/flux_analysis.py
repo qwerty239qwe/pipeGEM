@@ -201,8 +201,10 @@ class FBA_Analysis(FluxAnalysis):
         result.add_result(dict(correlation_result=corr_result))
         return result
 
-    def diff_test(self):
-        pass
+    def diff_test(self,
+                  between,
+                  parametric="auto"):
+        assert parametric in ["auto", True, False]
 
 
 

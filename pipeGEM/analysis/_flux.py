@@ -82,9 +82,9 @@ class FVA_Analyzer(FluxAnalyzer):
                          solver=solver)
 
     def analyze(self,
-                      is_loopless=True,
-                      fraction_of_optimum=0,
-                      **kwargs):
+                is_loopless=True,
+                fraction_of_optimum=0,
+                **kwargs):
         result = FVA_Analysis(log={"solver": self.solver_name,
                                    **kwargs, **self._log})
 
