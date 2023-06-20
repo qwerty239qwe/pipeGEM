@@ -7,7 +7,7 @@ from pipeGEM.plotting import FBAPlotter, FVAPlotter, SamplingPlotter, HeatmapPlo
 from pipeGEM.analysis._dim_reduction import prepare_PCA_dfs, prepare_embedding_dfs
 from .corr import CorrelationAnalysis
 from .dim_reduction import PCA_Analysis, EmbeddingAnalysis
-from pipeGEM.analysis._stat import PairwiseTester
+
 from .stat import PairwiseTestResult
 
 
@@ -207,7 +207,8 @@ class FBA_Analysis(FluxAnalysis):
                   between,
                   parametric="auto",
                   method="mw",
-                  label_str_format="{reaction}"):
+                  label_str_format="{reaction}") -> PairwiseTestResult:
+        from pipeGEM.analysis._stat import PairwiseTester
         if between not in self._result["flux_df"].columns:
             raise KeyError(f"{between} is not in the categorical features. \n"
                            f"Possible features are {list(self.log['categorical'])}")
@@ -331,7 +332,8 @@ class SamplingAnalysis(FluxAnalysis):
                   between,
                   parametric="auto",
                   method="mw",
-                  label_str_format="{reaction}"):
+                  label_str_format="{reaction}") -> PairwiseTestResult:
+        from pipeGEM.analysis._stat import PairwiseTester
         if between not in self._result["flux_df"].columns:
             raise KeyError(f"{between} is not in the categorical features. \n"
                            f"Possible features are {list(self.log['categorical'])}")

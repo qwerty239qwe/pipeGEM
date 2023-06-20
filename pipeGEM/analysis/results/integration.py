@@ -92,18 +92,11 @@ class RIPTiDeSamplingAnalysis(BaseAnalysis):
     """
 
     def __init__(self, log):
-
         super().__init__(log)
 
     @property
     def flux_result(self):
-        results = []
-        for i, result_df in self.sampling_result.result.items():
-            result_df = result_df.rename(columns={"flux": i})
-            result_df.index = result_df["rxn_id"]
-            result_df = result_df[i].to_frame().T
-            results.append(result_df)
-        return pd.concat(results, axis=0)
+        return self._result["sampling_result"].flux_df
 
 
 class FASTCOREAnalysis(BaseAnalysis):

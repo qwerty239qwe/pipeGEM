@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 from pipeGEM.analysis import timing, MBA_Analysis, consistency_testers, \
     NumInequalityStoppingCriteria, IsInSetStoppingCriteria
 from pipeGEM.integration.utils import parse_predefined_threshold
@@ -44,7 +45,7 @@ def apply_MBA(model,
     kept_nc_rxns = []
     model = model.copy()
 
-    for r in no_conf_set:
+    for r in tqdm(no_conf_set):
         if r in (removed_rxns + kept_nc_rxns):
             continue
 
@@ -64,6 +65,9 @@ def apply_MBA(model,
                                               return_model=False,
                                               stopping_callback=stop_crit,
                                               rxn_scaling_coefs=rxn_scaling_coefs)
+        if "stopped" in test_result.log and test_result.log["stopped"]:
+            continue
+
         excluded_HC = set(high_conf_rxn_ids) & set(test_result.removed_rxn_ids)
         excluded_MC = set(medium_conf_rxn_ids) & set(test_result.removed_rxn_ids)
         excluded_NC = set(test_result.removed_rxn_ids) - excluded_HC - excluded_MC
