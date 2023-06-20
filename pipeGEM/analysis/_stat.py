@@ -52,7 +52,7 @@ class HomoscedasticityTester(AssumptionTester):
 class PairwiseTester:
     def __init__(self):
         self._alpha_list = DEFAULT_SIGS
-        self.parametric_methods = {"tukey": (sp.posthoc_tukey, "scikit_posthocs"),
+        self.parametric_methods = {"tukey": (pg.pairwise_tukey, "scikit_posthocs"),
                                    "dunn": (sp.posthoc_dunn, "scikit_posthocs"),
                                    }
         self.non_parametric_methods = {"mw": (sp.posthoc_mannwhitney, "scikit_posthocs"),
@@ -64,6 +64,7 @@ class PairwiseTester:
              between,
              parametric=False,
              method="mw",
+             added_label=None,
              **kwargs):
         result_obj = PairwiseTestResult(dict(dep_var=dep_var,
                                              between=between,
@@ -76,8 +77,9 @@ class PairwiseTester:
                                                             val_col=dep_var,
                                                             group_col=between,
                                                             **kwargs)
-                result_obj.add_result(dict(p_value_df=result))
-
+                if added_label is not None:
+                    result["label"] = added_label
+                result_obj.add_result(dict(result_df=result))
 
         return result_obj
 

@@ -7,6 +7,8 @@ from pipeGEM.plotting import FBAPlotter, FVAPlotter, SamplingPlotter, HeatmapPlo
 from pipeGEM.analysis._dim_reduction import prepare_PCA_dfs, prepare_embedding_dfs
 from .corr import CorrelationAnalysis
 from .dim_reduction import PCA_Analysis, EmbeddingAnalysis
+from pipeGEM.analysis._stat import PairwiseTester
+from .stat import PairwiseTestResult
 
 
 class NotAggregatedError(Exception):
@@ -203,9 +205,28 @@ class FBA_Analysis(FluxAnalysis):
 
     def diff_test(self,
                   between,
-                  parametric="auto"):
+                  parametric="auto",
+                  method="mw",
+                  label_str_format="{reaction}"):
+        if between not in self._result["flux_df"].columns:
+            raise KeyError(f"{between} is not in the categorical features. \n"
+                           f"Possible features are {list(self.log['categorical'])}")
         assert parametric in ["auto", True, False]
+        all_rxns = self.result["flux_df"]["Reaction"].unique()
 
+        all_res = []
+        for r in all_rxns:
+            test_res = PairwiseTester().test(data=self.result["flux_df"].query(f"Reaction == '{r}'"),
+                                             dep_var="fluxes",
+                                             between=between,
+                                             parametric=parametric,
+                                             method=method,
+                                             added_label=label_str_format.format(reaction=r))
+            all_res.append(test_res)
+        return PairwiseTestResult.aggregate(results=all_res,
+                                            log=dict(label_str_format=label_str_format,
+                                                     between=between,
+                                                     parametric=parametric,))
 
 
 class FVA_Analysis(FluxAnalysis):
@@ -305,6 +326,33 @@ class SamplingAnalysis(FluxAnalysis):
                   rxn_id=rxn_id,
                   *args,
                   **kwargs)
+
+    def diff_test(self,
+                  between,
+                  parametric="auto",
+                  method="mw",
+                  label_str_format="{reaction}"):
+        if between not in self._result["flux_df"].columns:
+            raise KeyError(f"{between} is not in the categorical features. \n"
+                           f"Possible features are {list(self.log['categorical'])}")
+        assert parametric in ["auto", True, False]
+        all_rxns = self.result["flux_df"].columns
+
+        all_res = []
+
+        for r in all_rxns:
+            sel_col = [between, r] if isinstance(between, str) else between + [r]
+            test_res = PairwiseTester().test(data=self.result["flux_df"].loc[:, sel_col],
+                                             dep_var=r,
+                                             between=between,
+                                             parametric=parametric,
+                                             method=method,
+                                             added_label=label_str_format.format(reaction=r))
+            all_res.append(test_res)
+        return PairwiseTestResult.aggregate(results=all_res,
+                                            log=dict(label_str_format=label_str_format,
+                                                     between=between,
+                                                     parametric=parametric,))
 
 
 def combine(analyses, method, log, **kwargs):
