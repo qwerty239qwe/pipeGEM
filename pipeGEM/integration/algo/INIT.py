@@ -32,6 +32,25 @@ def apply_INIT(model,
                tol=1e-6,
                weight_method: Literal["default", "threshold"] = "threshold",
                rxn_scaling_coefs: dict = None,) -> INIT_Analysis:
+    """
+
+    Parameters
+    ----------
+    model
+    data
+    predefined_threshold
+    threshold_kws
+    protected_rxns
+    eps
+    tol
+    weight_method
+    rxn_scaling_coefs
+
+
+    Returns
+    -------
+
+    """
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
     if weight_method == "threshold":
         threshold_dic = parse_predefined_threshold(predefined_threshold,
@@ -97,7 +116,7 @@ def apply_INIT(model,
     else:
         tol_ = tol
 
-    removed_rxn_ids = (fluxes > tol_).index.to_list()
+    removed_rxn_ids = fluxes[fluxes < tol_].index.to_list()
     result_model.remove_reactions(removed_rxn_ids, remove_orphans=True)
 
     result = INIT_Analysis(log=dict(threshold_kws=threshold_kws,

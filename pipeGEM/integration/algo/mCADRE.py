@@ -3,6 +3,8 @@ from typing import Union, Dict
 import numpy as np
 import pandas as pd
 from cobra.util.array import create_stoichiometric_matrix
+from cobra.exceptions import OptimizationError
+
 from pipeGEM.analysis.tasks import Task, TaskContainer, TaskHandler
 from pipeGEM.analysis import consistency_testers, timing, mCADRE_Analysis, \
     NumInequalityStoppingCriteria, IsInSetStoppingCriteria
@@ -188,21 +190,24 @@ def _prune_model(model,
                                                                   "non_core": eta})]
         stop_crit.append(IsInSetStoppingCriteria(ess_set=set(protected_rxns)))
 
+        cons_tester = consistency_testers[consistency_test_method](model)
         with model:
             tqdm.write(f"Trying to remove {non_core_rxn_id}")
             model.reactions.get_by_id(non_core_rxn_id).bounds = (0, 0)
             #consistency check
-            cons_tester = consistency_testers[consistency_test_method](model)
-
-            if consistency_test_method == "FASTCC":
-                test_result = cons_tester.analyze(tol=tolerance,
-                                                  return_model=False,
-                                                  stopping_callback=stop_crit,
-                                                  rxn_scaling_coefs=rxn_scaling_coefs)
-            else:
-                test_result = cons_tester.analyze(tol=tolerance,
-                                                  return_model=False,
-                                                  rxn_scaling_coefs=rxn_scaling_coefs)
+            try:
+                if consistency_test_method == "FASTCC":
+                    test_result = cons_tester.analyze(tol=tolerance,
+                                                      return_model=False,
+                                                      stopping_callback=stop_crit,
+                                                      rxn_scaling_coefs=rxn_scaling_coefs)
+                else:
+                    test_result = cons_tester.analyze(tol=tolerance,
+                                                      return_model=False,
+                                                      rxn_scaling_coefs=rxn_scaling_coefs)
+            except OptimizationError:
+                print(f"{non_core_rxn_id} knocking-out makes the model infeasible.")
+                continue
         if "stopped" in test_result.log and test_result.log["stopped"]:
             continue
         removed_rxns = test_result.removed_rxn_ids
@@ -285,9 +290,9 @@ def apply_mCADRE(model,
                                       eta=eta,))
 
     result.add_result(dict(result_model=result_model,
-                           removed_rxn_ids=removed_rxn_ids,
-                           core_rxn_ids=core_rxns,
-                           non_expressed_rxn_ids=non_expressed_rxns,
+                           removed_rxn_ids=np.array(removed_rxn_ids),
+                           core_rxn_ids=np.array(core_rxns),
+                           non_expressed_rxn_ids=np.array(non_expressed_rxns),
                            score_df=score_df,
                            salvage_test_result=salvage_test_result,
                            func_test_result=func_test_result,

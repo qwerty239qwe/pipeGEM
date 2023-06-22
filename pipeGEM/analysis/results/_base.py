@@ -153,6 +153,10 @@ class BaseAnalysis:
         print(f"Created a folder {file_path} to store the result")
         result_types = {}
         for k, v in self._result.items():
+            if v is None:
+                print(f"Skipped {k} cause it is None")
+                continue
+
             module_sp_kw = self._result_saving_params[k]["module_name"] if (
                     k in self._result_saving_params and "module_name" in self._result_saving_params[k]) else {}
             module_name = _get_module(v, **module_sp_kw)

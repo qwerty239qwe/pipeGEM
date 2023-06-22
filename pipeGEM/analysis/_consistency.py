@@ -176,15 +176,15 @@ class FASTCC(ConsistencyTester):
                         else:
                             flip_direction(model, Jirev)
                             flipped = True
-                if stopping_callback is not None:
-                    reach_stop_crit = False
-                    for cb in stopping_callback:
-                        reach_stop_crit = reach_stop_crit or cb.check(removed=new_removed,
-                                                                      kept=new_kept)
-                    if reach_stop_crit:
-                        print("Stopping criteria is met, stop the process.")
-                        pbar.close()
-                        return FastCCAnalysis(log={"is_convex": is_convex, "tol": tol_, "stopped": True})
+                    if stopping_callback is not None:
+                        reach_stop_crit = False
+                        for cb in stopping_callback:
+                            reach_stop_crit = reach_stop_crit or cb.check(removed=new_removed,
+                                                                          kept=new_kept)
+                        if reach_stop_crit:
+                            print("Stopping criteria is met, stop the process.")
+                            pbar.close()
+                            return FastCCAnalysis(log={"is_convex": is_convex, "tol": tol_, "stopped": True})
 
         rxns_to_remove = np.setdiff1d(all_rxns, A)
         if consistent_model is not None:

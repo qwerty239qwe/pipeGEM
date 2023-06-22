@@ -7,6 +7,7 @@ from pipeGEM.integration.algo.CORDA import apply_CORDA
 from pipeGEM.integration.algo.mCADRE import apply_mCADRE
 from pipeGEM.integration.algo.MBA import apply_MBA
 from pipeGEM.integration.algo.INIT import apply_INIT
+from pipeGEM.integration.algo.iMAT import apply_iMAT
 from pipeGEM.utils import ObjectFactory
 
 
@@ -172,6 +173,15 @@ class INIT(GeneDataIntegrator):
                           **kwargs)
 
 
+class iMAT(GeneDataIntegrator):
+    def __init__(self):
+        super().__init__()
+
+    def integrate(self, model, data, **kwargs):
+        return apply_iMAT(model=model,
+                          data=data,
+                          **kwargs)
+
 
 integrator_factory = Integrators()
 integrator_factory.register("GIMME", GIMME)
@@ -184,3 +194,4 @@ integrator_factory.register("CORDA", CORDA)
 integrator_factory.register("mCADRE", mCADRE)
 integrator_factory.register("MBA", MBA)
 integrator_factory.register("INIT", INIT)
+integrator_factory.register("iMAT", iMAT)

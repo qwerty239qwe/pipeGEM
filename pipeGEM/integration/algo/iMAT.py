@@ -33,31 +33,56 @@ def add_iMAT_cons_to_model(model,
                            non_core_rxn_lbs,
                            non_core_rxn_ubs,
                            eps=1):
-    add_cons_to_model(model, {f"cfi_{ri}": {core_f_ind_vars[f"cfi_{ri}"]: core_rxn_lbs[ri] - eps,
-                                            model.reactions.get_by_id(ri).forward_variable: 1,
-                                            model.reactions.get_by_id(ri).reverse_variable: -1,
-                                            } for ri in core_rxn_ids},
-                      prefix="",
-                      lbs=[core_rxn_lbs[ri] for ri in core_rxn_ids], ubs=np.inf)
-    add_cons_to_model(model, {f"cbi_{ri}": {core_b_ind_vars[f"cbi_{ri}"]: core_rxn_ubs[ri] + eps,
-                                            model.reactions.get_by_id(ri).forward_variable: 1,
-                                            model.reactions.get_by_id(ri).reverse_variable: -1,
-                                            } for ri in core_rxn_ids},
-                      prefix="",
-                      lbs=-np.inf, ubs=[core_rxn_ubs[ri] for ri in core_rxn_ids])
+    # add_cons_to_model(model, {f"cfi_{ri}": {core_f_ind_vars[f"cfi_{ri}"]: core_rxn_lbs[ri] - eps,
+    #                                         model.reactions.get_by_id(ri).forward_variable: 1,
+    #                                         #model.reactions.get_by_id(ri).reverse_variable: -1,
+    #                                         } for ri in core_rxn_ids},
+    #                   prefix="",
+    #                   lbs=[core_rxn_lbs[ri] for ri in core_rxn_ids], ubs=np.inf)
+    # add_cons_to_model(model, {f"cbi_{ri}": {core_b_ind_vars[f"cbi_{ri}"]: core_rxn_ubs[ri] + eps,
+    #                                         #model.reactions.get_by_id(ri).forward_variable: 1,
+    #                                         model.reactions.get_by_id(ri).reverse_variable: -1,
+    #                                         } for ri in core_rxn_ids},
+    #                   prefix="",
+    #                   lbs=-np.inf, ubs=[core_rxn_ubs[ri] for ri in core_rxn_ids])
 
-    add_cons_to_model(model, {f"ncbi_{ri}": {non_core_ind_vars[f"nci_{ri}"]: non_core_rxn_lbs[ri],
-                                             model.reactions.get_by_id(ri).forward_variable: 1,
-                                             model.reactions.get_by_id(ri).reverse_variable: -1,
-                                             } for ri in non_core_rxn_ids},
+    # add_cons_to_model(model, {f"ncbi_{ri}": {non_core_ind_vars[f"nci_{ri}"]: non_core_rxn_lbs[ri],
+    #                                          #model.reactions.get_by_id(ri).forward_variable: 1,
+    #                                          model.reactions.get_by_id(ri).reverse_variable: -1,
+    #                                          } for ri in non_core_rxn_ids},
+    #                   prefix="",
+    #                   lbs=[non_core_rxn_lbs[ri] for ri in non_core_rxn_ids], ubs=np.inf)
+    # add_cons_to_model(model, {f"ncfi_{ri}": {non_core_ind_vars[f"nci_{ri}"]: non_core_rxn_ubs[ri],
+    #                                          #model.reactions.get_by_id(ri).forward_variable: 1,
+    #                                          #model.reactions.get_by_id(ri).reverse_variable: -1,
+    #                                          } for ri in non_core_rxn_ids},
+    #                   prefix="",
+    #                   lbs=-np.inf, ubs=[non_core_rxn_ubs[ri] for ri in non_core_rxn_ids])
+
+    add_cons_to_model(model, {f"cfi_{ri}": {model.reactions.get_by_id(ri).forward_variable: 1,
+                                            model.reactions.get_by_id(ri).reverse_variable: -1,
+                                            } for ri in core_rxn_ids},
                       prefix="",
-                      lbs=[non_core_rxn_lbs[ri] for ri in non_core_rxn_ids], ubs=np.inf)
-    add_cons_to_model(model, {f"ncfi_{ri}": {non_core_ind_vars[f"nci_{ri}"]: non_core_rxn_ubs[ri],
-                                             model.reactions.get_by_id(ri).forward_variable: 1,
-                                             model.reactions.get_by_id(ri).reverse_variable: -1,
-                                             } for ri in non_core_rxn_ids},
+                      lbs=eps, ubs=np.inf,
+                      binary_vars=[core_f_ind_vars[f"cfi_{ri}"] for ri in core_rxn_ids],
+                      bin_active_val=1)
+
+    add_cons_to_model(model, {f"cbi_{ri}": {model.reactions.get_by_id(ri).reverse_variable: 1,
+                                            model.reactions.get_by_id(ri).forward_variable: -1,
+                                            } for ri in core_rxn_ids},
                       prefix="",
-                      lbs=-np.inf, ubs=[non_core_rxn_ubs[ri] for ri in non_core_rxn_ids])
+                      lbs=eps, ubs=np.inf,
+                      binary_vars=[core_b_ind_vars[f"cbi_{ri}"] for ri in core_rxn_ids],
+                      bin_active_val=1)
+
+    add_cons_to_model(model, {f"nci_{ri}": {model.reactions.get_by_id(ri).forward_variable: 1,
+                                            model.reactions.get_by_id(ri).reverse_variable: -1,
+                                            } for ri in non_core_rxn_ids},
+                      prefix="",
+                      lbs=0, ubs=0,
+                      binary_vars=[non_core_ind_vars[f"nci_{ri}"] for ri in non_core_rxn_ids],
+                      bin_active_val=1)
+
     model.solver.update()
 
 
@@ -96,11 +121,17 @@ def apply_iMAT(model,
                                                                                non_core_rxn_ids=non_core_rxn_ids)
 
     for name, var in non_core_ind_vars.items():
-        new_objs[var] = 1
+        new_objs[var] = 0
     for name, var in core_f_ind_vars.items():
         new_objs[var] = 1
+        if name[4:] in protected_rxns:
+            print(name)
+            new_objs[var] = 1000
     for name, var in core_b_ind_vars.items():
         new_objs[var] = 1
+        if name[4:] in protected_rxns:
+            print(name)
+            new_objs[var] = 1000
 
     add_iMAT_cons_to_model(model=model,
                            core_f_ind_vars=core_f_ind_vars,
@@ -115,14 +146,20 @@ def apply_iMAT(model,
                            eps=eps)
     model.objective.set_linear_coefficients(new_objs)
     model.solver.update()
+    # print(model.objective)
     sol = model.optimize("maximize")
+    print(sol.objective_value)
+    # print(non_core_rxn_ubs)
+    # print(non_core_rxn_lbs)
+    print(model.solver.primal_values)
     fluxes = abs(sol.to_frame()["fluxes"])
     if rxn_scaling_coefs is not None:
         tol_ = pd.Series({rxn_scaling_coefs[r] * tol for r in fluxes.index}, index=fluxes.index)
     else:
         tol_ = tol
 
-    removed_rxn_ids = (fluxes > tol_).index.to_list()
+    print(fluxes)
+    removed_rxn_ids = fluxes[fluxes < tol_].index.to_list()
     result_model.remove_reactions(removed_rxn_ids, remove_orphans=True)
 
     result = iMAT_Analysis(log=dict(threshold_kws=threshold_kws,

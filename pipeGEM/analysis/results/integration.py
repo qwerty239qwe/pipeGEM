@@ -227,6 +227,8 @@ class mCADRE_Analysis(BaseAnalysis):
         super().__init__(log)
         self._result_saving_params["removed_rxn_ids"] = {"fm_name": "NDArrayStr"}
         self._result_saving_params["core_rxn_ids"] = {"fm_name": "NDArrayStr"}
+        self._result_saving_params["non_expressed_rxn_ids"] = {"fm_name": "NDArrayStr"}
+
 
 
 class iMAT_Analysis(BaseAnalysis):

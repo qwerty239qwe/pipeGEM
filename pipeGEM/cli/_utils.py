@@ -319,7 +319,11 @@ def _fa_with_data(multi_model_conf,
                                                     protected_rxns=task_supp_rxns[g_name])
         int_result = model.integrate_gene_data(data_name=g_name,
                                                **int_c)
-        int_result.flux_result.to_csv(saved_path.format(g_name))
+        file_saved_path = saved_path.format(g_name)
+        if not Path(file_saved_path).parent.is_dir():
+            Path(file_saved_path).parent.mkdir(parents=True)
+
+        int_result.flux_result.to_csv(file_saved_path)
 
 
 def do_flux_analysis(fa_configs,
