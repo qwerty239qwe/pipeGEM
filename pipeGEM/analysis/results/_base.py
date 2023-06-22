@@ -112,20 +112,33 @@ class BaseAnalysis:
     def log(self):
         return self._log
 
-    def _load_results(self, parent_dir, result_types):
+    def _load_results(self,
+                      parent_dir,
+                      result_types,
+                      fn_to_key=None,
+                      ignore_not_in_types=True):
         result_dic = {}
+        fn_to_key = fn_to_key or {}
         for fn in Path(parent_dir).iterdir():
+            if fn.stem in fn_to_key:
+                result_key = fn_to_key[fn.stem]
+            else:
+                result_key = fn.stem
+
+            if result_key not in result_types and ignore_not_in_types:
+                continue
+
             if fn.name == "other_values.toml":
                 result_dic.update(parse_toml_file(fn))
                 continue
 
-            if result_types[fn.stem] == "Analysis":
-                result_dic[fn.stem] = BaseAnalysis.load(str(fn))
+            if result_types[result_key] == "Analysis":
+                result_dic[result_key] = BaseAnalysis.load(str(fn))
                 continue
 
-            file_manager = self._fmanagers[result_types[fn.stem]]()
-            kws = {} if fn.stem not in self._result_loading_params else self._result_loading_params[fn.stem]
-            result_dic[fn.stem] = file_manager.read(fn, **kws)
+            file_manager = self._fmanagers[result_types[result_key]]()
+            kws = {} if result_key not in self._result_loading_params else self._result_loading_params[result_key]
+            result_dic[result_key] = file_manager.read(fn, **kws)
         self.add_result(result_dic)
 
     def _save_results(self, parent_dir, result_types):
@@ -182,6 +195,18 @@ class BaseAnalysis:
         new_analysis.add_running_time(all_configs["running_time"])
         new_analysis._load_results(parent_dir=file_path / new_analysis._result_folder_name,
                                    result_types=all_configs["result_types"])
+        return new_analysis
+
+    @classmethod
+    def load_result(cls,
+                    file_path,
+                    key,
+                    result_type):
+        file_path = Path(file_path)
+        new_analysis = cls(log={})
+        new_analysis._load_results(parent_dir=file_path.parent,
+                                   result_types={key: result_type},
+                                   fn_to_key={file_path.stem: key})
         return new_analysis
 
     def plot(self, **kwargs):

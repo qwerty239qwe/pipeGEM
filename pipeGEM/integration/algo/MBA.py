@@ -85,7 +85,7 @@ def apply_MBA(model,
                                "epsilon": epsilon,
                                "random_state": random_state})
     result.add_result(dict(result_model=model,
-                           removed_rxn_ids=removed_rxns,
+                           removed_rxn_ids=np.array(removed_rxns),
                            threshold_analysis=th_result))
 
     return result

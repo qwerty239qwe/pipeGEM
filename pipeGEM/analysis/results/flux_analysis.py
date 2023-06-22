@@ -41,7 +41,7 @@ class FluxAnalysis(BaseAnalysis):
         if "categorical" in self._log:
             self._log["categorical"].add(col_name)
         else:
-            self._log["categorical"] = set(col_name)
+            self._log["categorical"] = set(col_name) if not isinstance(col_name, str) else set([col_name])
 
     @classmethod
     def aggregate(cls,
@@ -297,6 +297,7 @@ class FVA_Analysis(FluxAnalysis):
 class SamplingAnalysis(FluxAnalysis):
     def __init__(self, log):
         super(SamplingAnalysis, self).__init__(log)
+        self._result_loading_params["flux_df"] = {"index_col": 0}
 
     @classmethod
     def aggregate(cls,
@@ -305,6 +306,7 @@ class SamplingAnalysis(FluxAnalysis):
                   log: Optional[dict] = None,
                   **kwargs):
         cat_log = set()
+        log = log or {}
 
         if method == "concat":
             for a in analyses:

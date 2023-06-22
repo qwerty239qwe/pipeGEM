@@ -4,7 +4,7 @@ import pingouin as pg
 from scipy import stats
 import numpy as np
 import itertools
-from functools import reduce
+from functools import reduce, partial
 from pipeGEM.analysis.results import NormalityTestResult, VarHomogeneityTestResult, PairwiseTestResult
 
 
@@ -52,11 +52,13 @@ class HomoscedasticityTester(AssumptionTester):
 class PairwiseTester:
     def __init__(self):
         self._alpha_list = DEFAULT_SIGS
-        self.parametric_methods = {"tukey": (pg.pairwise_tukey, "scikit_posthocs"),
+        self.parametric_methods = {"tukey": (pg.pairwise_tukey, "pingouin"),
                                    "dunn": (sp.posthoc_dunn, "scikit_posthocs"),
                                    }
-        self.non_parametric_methods = {"mw": (sp.posthoc_mannwhitney, "scikit_posthocs"),
-                                       "wilcoxon": (sp.posthoc_wilcoxon, "scikit_posthocs")}
+        self.non_parametric_methods = {"mw": (partial(pg.pairwise_tests, parametric=False,
+                                                      within=None), "pingouin"),
+                                       "wilcoxon": (partial(pg.pairwise_tests,
+                                                            parametric=False), "pingouin")}
 
     def test(self,
              data,
@@ -71,15 +73,23 @@ class PairwiseTester:
                                              parametric=parametric,
                                              method=method,
                                              **kwargs))
-        if parametric:
-            if self.parametric_methods[method][1] == "scikit_posthocs":
-                result = self.parametric_methods[method][0](data,
-                                                            val_col=dep_var,
-                                                            group_col=between,
-                                                            **kwargs)
-                if added_label is not None:
-                    result["label"] = added_label
-                result_obj.add_result(dict(result_df=result))
+        method_pool = self.non_parametric_methods if parametric else self.non_parametric_methods
+        if method_pool[method][1] == "scikit_posthocs":
+            result = method_pool[method][0](data,
+                                            val_col=dep_var,
+                                            group_col=between,
+                                            **kwargs)
+            if added_label is not None:
+                result["label"] = added_label
+            result_obj.add_result(dict(result_df=result))
+        elif method_pool[method][1] == "pingouin":
+            result = method_pool[method][0](data,
+                                            dv=dep_var,
+                                            between=between,
+                                            **kwargs)
+            if added_label is not None:
+                result["label"] = added_label
+            result_obj.add_result(dict(result_df=result))
 
         return result_obj
 
