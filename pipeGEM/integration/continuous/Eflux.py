@@ -15,6 +15,7 @@ def apply_EFlux(model: cobra.Model,
                 min_lb: float = 1e-6,
                 min_score: float = -1e3,
                 protected_rxns: Union[str, List[str], None] = None,
+                flux_threshold: float = 1e-6,
                 remove_zero_fluxes: bool = False,
                 return_fluxes: bool = True,
                 transform: Callable = exp_x) -> EFluxAnalysis:
@@ -78,6 +79,7 @@ def apply_EFlux(model: cobra.Model,
     print(denominator, trans_min_exp)
     assert all([v >= 0 for v in trans_rxn_exp_dict.values() if not np.isnan(v)]), trans_rxn_exp_dict
     r_bounds_dict = {}
+    model = model.copy()
     for r in model.reactions:
         if r not in model.exchanges and r.id not in ignore_rxn_ids:
             if not np.isnan(trans_rxn_exp_dict[r.id]) and (-trans_rxn_exp_dict[r.id] > r.lower_bound):
@@ -87,11 +89,14 @@ def apply_EFlux(model: cobra.Model,
         r_bounds_dict[r.id] = r.bounds
     sol = pfba(model)
     flux_df = sol.to_frame()
-
+    if remove_zero_fluxes:
+        to_remove = set(flux_df[abs(flux_df["fluxes"]) <= flux_threshold].index.to_list()) - set(protected_rxns)
+        model.remove_reactions(list(to_remove), remove_orphans=True)
     result = EFluxAnalysis(log={"name": model.name,
                                 "max_ub": max_ub,
                                 "min_lb": min_lb,
-                                "protected_rxns": protected_rxns})
+                                "protected_rxns": protected_rxns,
+                                "remove_zero_fluxes": remove_zero_fluxes})
     result.add_result(dict(rxn_bounds=r_bounds_dict,
                            rxn_scores=rxn_expr_score,
                            flux_result=flux_df if return_fluxes else None,
