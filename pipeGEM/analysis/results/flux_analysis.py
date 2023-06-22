@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 
 from typing import Optional, Union, List
 from ._base import *
@@ -308,12 +309,13 @@ class SamplingAnalysis(FluxAnalysis):
         cat_log = set()
         log = log or {}
 
+        na_fill_val = kwargs.get("na_value", 0)
         if method == "concat":
             for a in analyses:
                 cat_log |= a.log["categorical"]
             new = cls(log={"categorical": cat_log, **log})
             new.add_result(dict(flux_df=pd.concat([i.flux_df for i in analyses],
-                                                  axis=0).reset_index(drop=True)))
+                                                  axis=0).reset_index(drop=True).fillna(value=na_fill_val)))
         else:
             raise NotImplementedError()
         return new
@@ -344,7 +346,7 @@ class SamplingAnalysis(FluxAnalysis):
 
         all_res = []
 
-        for r in all_rxns:
+        for r in tqdm(all_rxns):
             sel_col = [between, r] if isinstance(between, str) else between + [r]
             test_res = PairwiseTester().test(data=self.result["flux_df"].loc[:, sel_col],
                                              dep_var=r,

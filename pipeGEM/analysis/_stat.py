@@ -135,9 +135,3 @@ class MultiGroupComparison:
 
 def oneway_mkw(data, dv, between, **kwargs):
     pass
-
-
-
-class HyperGeometricTester:
-    def __init__(self):
-        pass
