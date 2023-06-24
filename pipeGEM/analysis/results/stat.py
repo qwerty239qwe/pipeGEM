@@ -35,10 +35,11 @@ class PairwiseTestResult(BaseAnalysis):
     def aggregate(cls, results, log=None):
         new_log = {} if log is None else log
         p_val_col = list(set([result.p_value_col for result in results]))
-        assert p_val_col == 1, "P-value column should be the same across the analyses, " \
+        assert len(p_val_col) == 1, "P-value column should be the same across the analyses, " \
                                "please make sure concatenated analyses use the same method."
         result_df = pd.concat([result.result_df for result in results], axis=0)
         result_df["adjusted_p_value"] = bh_adjust(result_df[p_val_col[0]])
+        result_df.reset_index(drop=True)
         new_obj = cls(new_log)
         new_obj.add_result(dict(result_df=result_df))
         return new_obj
@@ -52,8 +53,11 @@ class PairwiseTestResult(BaseAnalysis):
         self._log.update({"sig_key": key,
                           "sig_query": query})
 
-    def annotate(self, key, annot_dic):
-        self._result["result_df"][key] = self._result["result_df"].index.to_series().map(annot_dic)
+    def annotate(self, key, annot_dic, map_from="label", map_index=False):
+        if map_index:
+            self._result["result_df"][key] = self._result["result_df"].index.to_series().map(annot_dic)
+        else:
+            self._result["result_df"][key] = self._result["result_df"][map_from].map(annot_dic)
 
     def do_hypergeom_test(self, draw_from_col):
         hg_result_df = hypergeometric_test(data=self._result["result_df"],
@@ -62,6 +66,7 @@ class PairwiseTestResult(BaseAnalysis):
         result = HyperGeometricTestResult(log=dict(draw_from_col=draw_from_col,
                                                    sig_col=self._log["sig_key"]))
         result.add_result(dict(result_df=hg_result_df))
+        return result
 
     def plot(self, method, **kwargs):
         pass

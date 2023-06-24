@@ -89,7 +89,8 @@ class PairwiseTester:
                                             **kwargs)
             if added_label is not None:
                 result["label"] = added_label
-            result_obj.add_result(dict(result_df=result))
+            result_obj.add_result(dict(result_df=result,
+                                       p_value_col="p-unc"))
 
         return result_obj
 

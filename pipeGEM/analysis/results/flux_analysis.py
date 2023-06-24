@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
+import warnings
 
 from typing import Optional, Union, List
 from ._base import *
@@ -217,14 +218,16 @@ class FBA_Analysis(FluxAnalysis):
         all_rxns = self.result["flux_df"]["Reaction"].unique()
 
         all_res = []
-        for r in all_rxns:
-            test_res = PairwiseTester().test(data=self.result["flux_df"].query(f"Reaction == '{r}'"),
-                                             dep_var="fluxes",
-                                             between=between,
-                                             parametric=parametric,
-                                             method=method,
-                                             added_label=label_str_format.format(reaction=r))
-            all_res.append(test_res)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            for r in all_rxns:
+                test_res = PairwiseTester().test(data=self.result["flux_df"].query(f"Reaction == '{r}'"),
+                                                 dep_var="fluxes",
+                                                 between=between,
+                                                 parametric=parametric,
+                                                 method=method,
+                                                 added_label=label_str_format.format(reaction=r))
+                all_res.append(test_res)
         return PairwiseTestResult.aggregate(results=all_res,
                                             log=dict(label_str_format=label_str_format,
                                                      between=between,
@@ -342,8 +345,7 @@ class SamplingAnalysis(FluxAnalysis):
             raise KeyError(f"{between} is not in the categorical features. \n"
                            f"Possible features are {list(self.log['categorical'])}")
         assert parametric in ["auto", True, False]
-        all_rxns = self.result["flux_df"].columns
-
+        all_rxns = [i for i in self.result["flux_df"].columns if i not in self.log["categorical"]]
         all_res = []
 
         for r in tqdm(all_rxns):

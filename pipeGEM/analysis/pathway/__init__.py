@@ -1,1 +1,1 @@
-from _base import hypergeometric_test
+from ._base import hypergeometric_test
