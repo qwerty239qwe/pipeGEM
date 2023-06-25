@@ -209,7 +209,8 @@ class FBA_Analysis(FluxAnalysis):
                   between,
                   parametric="auto",
                   method="mw",
-                  label_str_format="{reaction}") -> PairwiseTestResult:
+                  label_str_format="{reaction}",
+                  save_p_val: bool = True) -> PairwiseTestResult:
         from pipeGEM.analysis._stat import PairwiseTester
         if between not in self._result["flux_df"].columns:
             raise KeyError(f"{between} is not in the categorical features. \n"
@@ -228,10 +229,14 @@ class FBA_Analysis(FluxAnalysis):
                                                  method=method,
                                                  added_label=label_str_format.format(reaction=r))
                 all_res.append(test_res)
-        return PairwiseTestResult.aggregate(results=all_res,
-                                            log=dict(label_str_format=label_str_format,
-                                                     between=between,
-                                                     parametric=parametric,))
+        result = PairwiseTestResult.aggregate(results=all_res,
+                                              log=dict(label_str_format=label_str_format,
+                                                       between=between,
+                                                       parametric=parametric,))
+        if save_p_val:
+            self._diff_test_result = result
+        return result
+
 
 
 class FVA_Analysis(FluxAnalysis):
@@ -325,13 +330,20 @@ class SamplingAnalysis(FluxAnalysis):
 
     def plot(self,
              rxn_id,
+             plot_significance=False,
              dpi=150,
              prefix="sampling_",
              *args,
              **kwargs):
         pltr = SamplingPlotter(dpi=dpi, prefix=prefix)
+        if plot_significance:
+            stat_analysis = self._diff_test_result
+        else:
+            stat_analysis = None
+
         pltr.plot(flux_df=self._result["flux_df"],
                   rxn_id=rxn_id,
+                  stat_analysis=stat_analysis,
                   *args,
                   **kwargs)
 
@@ -339,7 +351,8 @@ class SamplingAnalysis(FluxAnalysis):
                   between,
                   parametric="auto",
                   method="mw",
-                  label_str_format="{reaction}") -> PairwiseTestResult:
+                  label_str_format="{reaction}",
+                  save_p_val=True) -> PairwiseTestResult:
         from pipeGEM.analysis._stat import PairwiseTester
         if between not in self._result["flux_df"].columns:
             raise KeyError(f"{between} is not in the categorical features. \n"
@@ -357,10 +370,13 @@ class SamplingAnalysis(FluxAnalysis):
                                              method=method,
                                              added_label=label_str_format.format(reaction=r))
             all_res.append(test_res)
-        return PairwiseTestResult.aggregate(results=all_res,
-                                            log=dict(label_str_format=label_str_format,
-                                                     between=between,
-                                                     parametric=parametric,))
+        result = PairwiseTestResult.aggregate(results=all_res,
+                                              log=dict(label_str_format=label_str_format,
+                                                       between=between,
+                                                       parametric=parametric,))
+        if save_p_val:
+            self._diff_test_result = result
+        return result
 
 
 def combine(analyses, method, log, **kwargs):

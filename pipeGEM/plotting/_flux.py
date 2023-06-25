@@ -117,17 +117,62 @@ def plot_sampling_catplot(flux_df,
                           rxn_id,
                           kind,
                           group_by,
+                          group_order,
                           vertical,
-                          stat_analysis=None):
-    xy_val = {"x": rxn_id if vertical else group_by,
-              "y": rxn_id if not vertical else group_by}
+                          stat_analysis=None,
+                          stat_analysis_rxn_id_col="label",
+                          star_notation_cutoffs=None):
+    xy_val = {"x": rxn_id if not vertical else group_by,
+              "y": rxn_id if vertical else group_by}
+    if group_order is None:
+        group_order = sorted(flux_df[group_by].unique())
+
     facet = sns.catplot(data=flux_df,
                         x=xy_val["x"],
                         y=xy_val["y"],
                         kind=kind,
-                        hue=group_by)
+                        hue=group_by,
+                        dodge=False,
+                        order=group_order)
     if stat_analysis is not None:
-        pass
+        if star_notation_cutoffs is None:
+            star_notation_cutoffs = [0.05,] + [10**(-i) for i in range(2, 5)]
+
+        num_significance = 0
+
+        for ia, ib in itertools.combinations(range(len(group_order)), 2):
+            sig_df = stat_analysis.result_df
+            sig_df = sig_df[sig_df[stat_analysis_rxn_id_col] == rxn_id]
+            sig_df = sig_df[((sig_df["A"] == group_order[ia]) & (sig_df["B"] == group_order[ib]) |
+                             (sig_df["B"] == group_order[ia]) & (sig_df["A"] == group_order[ib]))]
+
+            n_stars = sum([sig_df["adjusted_p_value"].values[0] < alpha for alpha in star_notation_cutoffs])
+            if n_stars < 1:
+                continue
+
+            if vertical:
+                x_pos = [ia, ib]
+                y_pos = [flux_df[rxn_id].values.max() + (facet.ax.get_ylim()[1] - facet.ax.get_ylim()[0]) *
+                         (num_significance + 1) * 0.08
+                         for _ in range(2)]
+            else:
+                x_pos = [flux_df[rxn_id].values.max() + (facet.ax.get_xlim()[1] - facet.ax.get_xlim()[0]) *
+                         (num_significance + 1) * 0.1
+                         for _ in range(2)]
+                print(x_pos)
+                y_pos = [ia, ib]
+
+            draw_significance(facet.ax, x_pos, y_pos, n_stars)
+            num_significance += 1
+        if vertical:
+            facet.set(ylim=(facet.ax.get_ylim()[0], facet.ax.get_ylim()[1] +
+                             (facet.ax.get_ylim()[1] - facet.ax.get_ylim()[0]) *
+                             (num_significance + 1) * 0.08))
+        else:
+            facet.set(xlim=(facet.ax.get_xlim()[0], facet.ax.get_xlim()[1] +
+                             (facet.ax.get_xlim()[1] - facet.ax.get_xlim()[0]) *
+                             (num_significance + 1) * 0.1))
+
 
     return facet
 
@@ -136,6 +181,7 @@ def plot_sampling_df(flux_df,
                      rxn_id,
                      kind,
                      group_by,
+                     group_order=None,
                      vertical=True,
                      plotting_type = "displot",
                      stat_analysis = None,
@@ -154,6 +200,7 @@ def plot_sampling_df(flux_df,
                                       rxn_id=rxn_id,
                                       kind=kind,
                                       group_by=group_by,
+                                      group_order=group_order,
                                       vertical=vertical,
                                       stat_analysis=stat_analysis)
     fig_kws = {"g": facet.figure}
