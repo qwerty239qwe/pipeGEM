@@ -82,12 +82,7 @@ class BaseAnalysis:
 
     def format_str(self) -> str:
         showed_str = dedent(f"""{self.__class__.__name__} at {hex(id(self))}
-    -----------
-    Parameters:
-    {self._log}
-    -----------
-    Result keys:
-    {', '.join([i for i in self._result.keys()])}
+\n-----------\nParameters:\n{self._log}\n-----------\nResult keys:\n{', '.join([i for i in self._result.keys()])}
     """)
         if self._running_time:
             showed_str += f"-----------\nRunning time: \n {self._running_time}"
@@ -145,6 +140,9 @@ class BaseAnalysis:
         (parent_dir / self._result_folder_name).mkdir()
         singular_values = {}
         for k, v in self._result.items():
+            if k not in result_types:
+                continue
+
             if any([isinstance(v, tp) for tp in self._s_val_tps]):
                 singular_values[k] = v
                 continue

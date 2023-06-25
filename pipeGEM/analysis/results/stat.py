@@ -39,7 +39,7 @@ class PairwiseTestResult(BaseAnalysis):
                                "please make sure concatenated analyses use the same method."
         result_df = pd.concat([result.result_df for result in results], axis=0)
         result_df["adjusted_p_value"] = bh_adjust(result_df[p_val_col[0]])
-        result_df.reset_index(drop=True)
+        result_df = result_df.reset_index(drop=True)
         new_obj = cls(new_log)
         new_obj.add_result(dict(result_df=result_df))
         return new_obj
@@ -60,12 +60,21 @@ class PairwiseTestResult(BaseAnalysis):
             self._result["result_df"][key] = self._result["result_df"][map_from].map(annot_dic)
 
     def do_hypergeom_test(self, draw_from_col):
-        hg_result_df = hypergeometric_test(data=self._result["result_df"],
-                                           pathway_col=draw_from_col,
-                                           sig_col=self._log["sig_key"])
+        comp_pairs = self._result["result_df"].apply(lambda x: (x["A"], x["B"]), axis=1).unique()
+
+        hg_result_dfs = []
+        for ga, gb in comp_pairs:
+            sel_data = self._result["result_df"]
+            sel_data = sel_data[(sel_data["A"] == ga) & (sel_data["B"] == gb)]
+            hg_result_df = hypergeometric_test(data=sel_data,
+                                               pathway_col=draw_from_col,
+                                               sig_col=self._log["sig_key"])
+            hg_result_df["contrast_pair"] = f"{ga}_vs_{gb}"
+            hg_result_dfs.append(hg_result_df)
+        hg_result_dfs = pd.concat(hg_result_dfs, axis=0)
         result = HyperGeometricTestResult(log=dict(draw_from_col=draw_from_col,
                                                    sig_col=self._log["sig_key"]))
-        result.add_result(dict(result_df=hg_result_df))
+        result.add_result(dict(result_df=hg_result_dfs))
         return result
 
     def plot(self, method, **kwargs):
