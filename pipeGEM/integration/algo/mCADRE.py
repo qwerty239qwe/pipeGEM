@@ -43,7 +43,6 @@ def calc_corr_score(model, expr_scores) -> dict:
                        (con_mat.shape[0], 1))
     con_mat = con_mat * expr_mat / edge_mat
     con_mat[~np.isfinite(con_mat)] = 0
-    print(con_mat[~np.isfinite(con_mat)])
     return dict(zip([r.id for r in model.reactions], con_mat.sum(axis=1)))
 
 

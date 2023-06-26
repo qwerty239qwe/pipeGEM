@@ -94,6 +94,11 @@ if __name__ == "__main__":
                         metavar="config_file_path",
                         default=None)
 
+    parser.add_argument("-j", "--n_jobs",
+                        dest="n_jobs",
+                        metavar="n_workers",
+                        default=None)
+
     args = parser.parse_args()
     config_dic = read_configs({"gene_data_conf": args.gene_data_conf_path,
                                "model_conf": args.model_testing_conf_path,
