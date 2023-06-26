@@ -248,12 +248,46 @@ class PercentileThreshold(RankBased):
     def find_threshold(self,
                        data,  # 1d array
                        p: Union[int, float, List[int], List[float], np.ndarray],
+                       exp_p: int = None,
+                       non_exp_p: int = None,
                        **kwargs) -> PercentileThresholdAnalysis:
+        """
 
-        if (isinstance(p, float) or isinstance(p, int)) and not (0 <= p <= 100):
-            raise ValueError(f"p should be a number between 0 and 100. Got {p} instead")
-        elif not all([0 <= pi <= 100 for pi in p]):
-            raise ValueError(f"Every number in p should be between 0 and 100. Got {p} instead")
+        Parameters
+        ----------
+        data
+        p: float, int, or a sequence of int or float
+            Percentile or sequence of percentiles to compute, which must be between 0 and 100 inclusive.
+        exp_p: float or int
+            Percentile to compute the expression threshold.
+            If None, the maximum value of the percentiles is returned as the exp_th.
+        non_exp_p: float or int
+            Percentile to compute the non-expression threshold.
+            If None, the minimum value of the percentiles is returned as the non_exp_th.
+        kwargs: dict
+            kwargs used by np.percentile().
+
+        Returns
+        -------
+        result: PercentileThresholdAnalysis
+
+        """
+        if isinstance(p, float) or isinstance(p, int):
+            if not (0 <= p <= 100):
+                raise ValueError(f"p should be a number between 0 and 100. Got {p} instead")
+            if exp_p is not None and exp_p != p:
+                raise ValueError(f"exp_p ({exp_p}) must be equal to p ({p}) if p is a value")
+            if non_exp_p is not None and non_exp_p != p:
+                raise ValueError(f"non_exp_p ({non_exp_p}) must be equal to p ({p}) if p is a value")
+        else:
+            if not all([0 <= pi <= 100 for pi in p]):
+                raise ValueError(f"Every number in p should be between 0 and 100. Got {p} instead")
+            if exp_p is not None and exp_p not in p:
+                raise ValueError(f"exp_p ({exp_p}) must be in the p ({p}) if p is a sequence")
+            if non_exp_p is not None and non_exp_p not in p:
+                raise ValueError(f"non_exp_p ({non_exp_p}) must be in the p ({p}) if p is a sequence")
+            if exp_p is not None and non_exp_p is not None and exp_p < non_exp_p:
+                raise ValueError("exp_p must be greater or equal to non_exp_p.")
 
         if isinstance(data, pd.Series):
             arr = data.values
@@ -262,13 +296,21 @@ class PercentileThreshold(RankBased):
         else:
             arr = data
         arr = arr[np.isfinite(arr)]
-        result = PercentileThresholdAnalysis(log={"p": p})
+        result = PercentileThresholdAnalysis(log={"p": p, "exp_p": exp_p, "non_exp_p": non_exp_p})
         if isinstance(p, list) or isinstance(p, np.ndarray):
-            exp_ths = [np.percentile(arr, q=pi) for pi in p]
-            exp_th = pd.Series(exp_ths, index=[f"p={pi}"for pi in p])
+            ths = [np.percentile(arr, q=pi, **kwargs) for pi in p]
+            ths = pd.Series(ths, index=[f"p={pi}"for pi in p])
+            exp_th = ths.values.max() if exp_p is None else ths[exp_p]
+            non_exp_th = ths.values.min() if non_exp_p is None else ths[non_exp_p]
         else:
-            exp_th = np.percentile(arr, q=p)
-        result.add_result(dict(data=arr, exp_th=exp_th))
+            exp_th = np.percentile(arr, q=p, **kwargs)
+            non_exp_th = exp_th
+            ths = None
+
+        result.add_result(dict(data=arr,
+                               exp_th=exp_th,
+                               non_exp_th=non_exp_th,
+                               threshold_series=ths))
         return result
 
 
@@ -279,19 +321,20 @@ class LocalThreshold(RankBased):
     @timing
     def find_threshold(self,
                        data,  # 2d array
-                       p,
-                       global_on_p=90,
-                       global_off_p=10,
-                       global_on_th=None,
-                       global_off_th=None,
-                       groups=None,
+                       p: Union[int, float, List[int], List[float], np.ndarray],
+                       global_on_p : Union[int, float] = 90,
+                       global_off_p: Union[int, float] = 10,
+                       global_on_th: Union[int, float] = None,
+                       global_off_th: Union[int, float] = None,
+                       groups: Union[pd.Series, dict] = None,
                        **kwargs):
         """
 
         Parameters
         ----------
         data
-        p
+        p: float or int
+            Percentile or sequence of percentiles to compute, which must be between 0 and 100 inclusive.
         global_on_p
         global_off_p
         global_on_th
