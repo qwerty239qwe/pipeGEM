@@ -12,7 +12,7 @@ def test_mCADRE(ecoli_core, ecoli_core_data):
                          data_transform=lambda x: np.log2(x),
                          absent_expression=-np.inf)
     pmod.add_gene_data(data_name, gene_data)
-    thres = gene_data.get_threshold("percentile", p = [99, 1])
+    thres = gene_data.get_threshold("percentile", p = [50, 10])
     print(gene_data.rxn_scores)
     print(thres.exp_th)
 
@@ -21,5 +21,5 @@ def test_mCADRE(ecoli_core, ecoli_core_data):
                                       predefined_threshold=thres,
                                       threshold_kws={},
                                       protected_rxns=["BIOMASS_Ecoli_core_w_GAM"])
-    print(result.result_model.reactions)
-    print(result.removed_rxn_ids)
+    print("Kept: ", len(result.result_model.reactions))
+    print("Removed: ", len(result.removed_rxn_ids))

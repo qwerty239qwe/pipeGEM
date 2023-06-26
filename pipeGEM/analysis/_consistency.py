@@ -54,7 +54,7 @@ class IsInSetStoppingCriteria(StoppingCriteria):
         self.ess_set = ess_set
 
     def check(self, removed, kept):
-        return all([c not in self.ess_set for c in removed])
+        return any([c in self.ess_set for c in removed])
 
 
 class NumInequalityStoppingCriteria(StoppingCriteria):
@@ -124,10 +124,11 @@ class FASTCC(ConsistencyTester):
             A = np.array(LP7(J, model, tol, use_abs=True, flux_logger=self._flux_recorder))  # rxns to keeps
             print(f"Inconsistent irreversible rxns: {len(np.setdiff1d(J, A))}")
 
-            A_2 = np.array(LP7(np.setdiff1d(J, A), model, tol, use_abs=True, flux_logger=self._flux_recorder))
-            print(f"Inconsistent irreversible rxns (2nd run): {len(np.setdiff1d(np.setdiff1d(J, A), A_2))}")
+            if len(np.setdiff1d(J, A)) > 0:
+                A_2 = np.array(LP7(np.setdiff1d(J, A), model, tol, use_abs=True, flux_logger=self._flux_recorder))
+                print(f"Inconsistent irreversible rxns (2nd run): {len(np.setdiff1d(np.setdiff1d(J, A), A_2))}")
+                A = np.union1d(A, A_2)
 
-            A = np.union1d(A, A_2)
             if stopping_callback is not None:
                 reach_stop_crit = False
                 for cb in stopping_callback:
@@ -169,7 +170,7 @@ class FASTCC(ConsistencyTester):
                             if singleton:
                                 new_removed = Ji
                                 J = np.setdiff1d(J, Ji)
-                                tqdm.write(f"Remove inconsistent reaction: {Ji}")
+                                tqdm.write(f"Removed inconsistent reaction: {Ji}")
                                 pbar.update(1)
                             else:
                                 singleton = True

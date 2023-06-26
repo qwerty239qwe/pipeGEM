@@ -217,7 +217,8 @@ def _prune_model(model,
         for r in removed_rxns:
             model.reactions.get_by_id(r).bounds = (0, 0)
         all_removed_rxn_ids.extend(removed_rxns)
-
+    all_removed_rxn_ids = np.array(list(set(all_removed_rxn_ids)))
+    model.remove_reactions(all_removed_rxn_ids)
     return model, all_removed_rxn_ids
 
 
