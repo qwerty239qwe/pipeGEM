@@ -1,6 +1,6 @@
 import string
 from pathlib import Path
-from typing import Union, Dict, List
+from typing import Union, Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -215,12 +215,12 @@ class ComponentComparisonPlotter(BasePlotter):
                   scale=1,
                   cbar_label='Jaccard Index',
                   cmap='magma',
-                  row_groups: pd.DataFrame | None = None,
-                  row_color_palette: list[str] | str | dict[str, str] = "deep",
-                  row_color_order: dict[str, list[str]] | None = None,
-                  col_groups: pd.DataFrame | None = None,
-                  col_color_palette: list[str] | str | dict[str, str] = "deep",
-                  col_color_order: dict[str, list[str]] | None = None,
+                  row_groups: Optional[pd.DataFrame] = None,
+                  row_color_palette: Union[List[str], str, Dict[str, str]] = "deep",
+                  row_color_order: Optional[Dict[str, List[str]]] = None,
+                  col_groups: Optional[pd.DataFrame] = None,
+                  col_color_palette: Union[List[str], str, Dict[str, str]] = "deep",
+                  col_color_order: Optional[Dict[str, List[str]]] = None,
                   palette_replacement: str = "Spectral",
                   *args,
                   **kwargs):
