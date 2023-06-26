@@ -34,7 +34,7 @@ def calc_expr_score(data,
 
 def calc_corr_score(model, expr_scores) -> dict:
     s = create_stoichiometric_matrix(model)
-    con_mat = s.T @ s
+    con_mat = s.T @ s  # R x R
     con_mat[con_mat != 0] = 1
     con_mat = con_mat - np.eye(con_mat.shape[0])
     edges = con_mat.sum(axis=1)
@@ -42,7 +42,9 @@ def calc_corr_score(model, expr_scores) -> dict:
     expr_mat = np.tile(np.array([expr_scores[r.id] for r in model.reactions]),
                        (con_mat.shape[0], 1))
     con_mat = con_mat * expr_mat / edge_mat
-    return dict(zip([r.id for r in model.reactions], con_mat.sum(axis=0)))
+    con_mat[~np.isfinite(con_mat)] = 0
+    print(con_mat[~np.isfinite(con_mat)])
+    return dict(zip([r.id for r in model.reactions], con_mat.sum(axis=1)))
 
 
 def get_score_df(model,

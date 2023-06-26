@@ -23,3 +23,4 @@ def test_mCADRE(ecoli_core, ecoli_core_data):
                                       protected_rxns=["BIOMASS_Ecoli_core_w_GAM"])
     print("Kept: ", len(result.result_model.reactions))
     print("Removed: ", len(result.removed_rxn_ids))
+    result.save("./mCADRE")
