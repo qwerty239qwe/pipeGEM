@@ -5,7 +5,7 @@ from cobra.flux_analysis.parsimonious import pfba
 import numpy as np
 
 from pipeGEM.utils import select_rxns_from_model
-from pipeGEM.utils.transform import exp_x
+from pipeGEM.utils.transform import exp_x, functions
 from pipeGEM.analysis import EFluxAnalysis
 
 
@@ -18,7 +18,7 @@ def apply_EFlux(model: cobra.Model,
                 flux_threshold: float = 1e-6,
                 remove_zero_fluxes: bool = False,
                 return_fluxes: bool = True,
-                transform: Callable = exp_x) -> EFluxAnalysis:
+                transform: Union[Callable, str] = exp_x) -> EFluxAnalysis:
     """
     Applies the EFlux algorithm to a metabolic model, using gene expression data
     to constrain reaction fluxes. The EFlux method scales gene expression values
@@ -68,6 +68,12 @@ def apply_EFlux(model: cobra.Model,
     min_exp = min(exps) if len(exps) != 0 else min_lb
     print(f"Max expression: {max_exp} | Min expression: {min_exp}")
     assert max_exp > 0, "max_exp should be a positive number, all expression values might be zeros"
+    if isinstance(transform, str):
+        if transform in functions:
+            transform = functions[transform]
+        else:
+            transform = getattr(np, transform)
+
     trans_min_exp = transform(min_exp)
     denominator = transform(max_exp) - trans_min_exp
     if not np.isfinite(denominator):

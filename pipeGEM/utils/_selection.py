@@ -18,7 +18,16 @@ def get_objective_rxn(model, attr="id") -> List[Any]:
 
 
 def get_subsystems(model):
-    return list(set([rxn.subsystem for rxn in model.reactions]))
+    all_subs = []
+    for rxn in model.reactions:
+        if rxn.subsystem is None:
+            continue
+        if isinstance(rxn.subsystem, str):
+            all_subs.append(rxn.subsystem)
+        else:
+            all_subs.extend(list(rxn.subsystem))
+
+    return list(set(all_subs))
 
 
 def get_rxns_in_subsystem(model, subsystem, attr="id") -> list:
@@ -103,8 +112,8 @@ def get_organic_exs(model,
 
 
 def get_not_met_exs(model,
-                     mets: List[str],
-                     except_rxns) -> List[cobra.Reaction]:
+                    mets: List[str],
+                    except_rxns) -> List[cobra.Reaction]:
     ex_rxns = model.exchanges + model.sinks + model.demands
     to_ko_ids = list(set([r.id for r in ex_rxns]) - set([r.id
                                                          for r in model.exchanges

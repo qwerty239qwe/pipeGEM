@@ -1,0 +1,19 @@
+integrator_name = "EFlux"
+saved_path = ""
+protected_rxns = []
+max_ub = 1000
+min_lb = 1e-6
+min_score = -1e3
+flux_threshold = 1e-6
+remove_zero_fluxes = true
+return_fluxes = true
+
+[precompute]
+    [precompute.model]
+        cobra_model_path = nan
+        model_name_tag = "human1"
+    [precompute.tasks]
+        task_result_path = nan
+    [precompute.threshold]
+        threshold_result_path = nan
+        type = "rFASTCORMICS"

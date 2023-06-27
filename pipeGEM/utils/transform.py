@@ -1,3 +1,4 @@
+from collections import namedtuple
 import numpy as np
 
 
@@ -12,3 +13,9 @@ def mod_log10(x, coef=1001) -> float:
 def exp_x(x, coef=1, a=1.1):
     return a ** x - coef
 
+
+functions = {
+            "sigmoid": sigmoid,
+            "mod_log10": mod_log10,
+            "exp_x": exp_x
+}

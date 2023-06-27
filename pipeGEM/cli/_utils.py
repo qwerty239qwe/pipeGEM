@@ -323,7 +323,7 @@ def _fa_with_data(multi_model_conf,
         if not Path(file_saved_path).parent.is_dir():
             Path(file_saved_path).parent.mkdir(parents=True)
 
-        int_result.flux_result.to_csv(file_saved_path)
+        int_result.save(file_saved_path)
 
 
 def do_flux_analysis(fa_configs,
