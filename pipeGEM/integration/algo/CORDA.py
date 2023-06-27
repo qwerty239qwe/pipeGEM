@@ -25,7 +25,8 @@ class CORDABuilder:
                  upper_bound=1e6,
                  support_flux_value=1,
                  threshold=1e-6,
-                 skip_last_step=True):
+                 skip_last_step=True,
+                 rxn_scaling_coefs=None):
         self._model = model
         self._conf_scores = conf_scores
         self._n = n_iters if np.isfinite(n_iters) else len(model.reactions)
@@ -33,7 +34,8 @@ class CORDABuilder:
         self._pf = penalty_factor
         self._pif = penalty_increase_factor
         self._upper_bound = upper_bound
-        self._sf = support_flux_value
+        self._sf = support_flux_value if rxn_scaling_coefs is None else \
+            {k: v * support_flux_value for k, v in rxn_scaling_coefs.items()}
         self._infeasible_rxns = []
         self._threshold = threshold
         self._mocks = mocks if mocks is not None else []
@@ -79,7 +81,8 @@ class CORDABuilder:
                 continue
             old_bounds = (var.lb, var.ub)
             var.ub = self._upper_bound
-            var.lb = max(self._sf, var.lb)
+            min_f = self._sf[var_id] if isinstance(self._sf, dict) else self._sf
+            var.lb = max(min_f, var.lb)
             cur_penalty = {self._model.variables[k]: v for k, v in penalty_dic.items()}
             all_support_vars_for_v = set()
             for i in range(n_iters):
@@ -140,9 +143,13 @@ class CORDABuilder:
             if 0 < self._conf_scores[v.name] < 3:
                 self._model.objective.set_linear_coefficients({v: 1})
                 sol = self._model.solver.optimize()
-                if sol == "optimal" and self._model.objective.value > self._sf:
+                min_f = self._sf[v.name] if isinstance(self._sf, dict) else self._sf
+                if sol == "optimal" and self._model.objective.value > min_f:
                     sol = self._model.solver.primal_values
-                    to_change = [vi for vi in sol if sol[vi] > self._sf and 0 < self._conf_scores[vi] < 3]
+                    if isinstance(self._sf, dict):
+                        to_change = [vi for vi in sol if sol[vi] > self._sf[vi] and 0 < self._conf_scores[vi] < 3]
+                    else:
+                        to_change = [vi for vi in sol if sol[vi] > min_f and 0 < self._conf_scores[vi] < 3]
                     for vi in to_change:
                         self._conf_scores[vi] = 3
             self._model.objective.set_linear_coefficients({v: 0})
@@ -227,6 +234,7 @@ def apply_CORDA(model,
                 protected_rxns=None,
                 predefined_threshold = None,
                 threshold_kws = None,
+                rxn_scaling_coefs=None,
                 discrete_strategy_name: str = "linear",
                 n_iters=np.inf,
                 penalty_factor=100,
@@ -239,6 +247,7 @@ def apply_CORDA(model,
                 skip_last_step=True,
                 ) -> CORDA_Analysis:
     mocks = []
+    threshold_kws = threshold_kws or {}
     threshold_dic = parse_predefined_threshold(predefined_threshold,
                                                gene_data=data.gene_data,
                                                **threshold_kws)
@@ -270,6 +279,13 @@ def apply_CORDA(model,
 
     var_conf_scores = {r: conf for r, conf in conf_scores.items()}
     var_conf_scores.update({model.reactions.get_by_id(r).reverse_id: conf for r, conf in conf_scores.items()})
+    if rxn_scaling_coefs is not None:
+        var_rxn_scaling_coefs = {model.reactions.get_by_id(r).id: coef
+                                 for r, coef in rxn_scaling_coefs.items()}
+        var_rxn_scaling_coefs.update({model.reactions.get_by_id(r).reverse_id: coef
+                                      for r, coef in rxn_scaling_coefs.items()})
+    else:
+        var_rxn_scaling_coefs = None
 
     # init corda builder and build the model
     corda_builder = CORDABuilder(model,
@@ -281,7 +297,8 @@ def apply_CORDA(model,
                                  upper_bound=upper_bound,
                                  support_flux_value=support_flux_value,
                                  threshold=threshold,
-                                 skip_last_step=skip_last_step
+                                 skip_last_step=skip_last_step,
+                                 rxn_scaling_coefs=var_rxn_scaling_coefs
                                  )
     result_model = corda_builder.build(keep_if_support=keep_if_support)
     result_model.objective.set_linear_coefficients(obj_coefs)

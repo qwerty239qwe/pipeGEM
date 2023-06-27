@@ -1,0 +1,23 @@
+integrator_name = "CORDA"
+saved_path = ""
+protected_rxns = []
+discrete_strategy_name = "linear"
+n_iters = 5
+penalty_factor = 100
+penalty_increase_factor = 1.1
+keep_if_support = 5
+met_prod = nan
+upper_bound = 1e6
+threshold = 1e-6
+support_flux_value = 1e-6
+skip_last_step = true
+
+[precompute]
+    [precompute.model]
+        cobra_model_path = nan
+        model_name_tag = "human1"
+    [precompute.tasks]
+        task_result_path = nan
+    [precompute.threshold]
+        threshold_result_path = nan
+        type = "rFASTCORMICS"

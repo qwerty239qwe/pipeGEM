@@ -79,3 +79,8 @@ class PairwiseTestResult(BaseAnalysis):
 
     def plot(self, method, **kwargs):
         pass
+
+
+class MultiGroupComparisonTestResult(BaseAnalysis):
+    def __init__(self, log):
+        super().__init__(log=log)

@@ -5,7 +5,8 @@ from scipy import stats
 import numpy as np
 import itertools
 from functools import reduce, partial
-from pipeGEM.analysis.results import NormalityTestResult, VarHomogeneityTestResult, PairwiseTestResult
+from pipeGEM.analysis.results import NormalityTestResult, VarHomogeneityTestResult, PairwiseTestResult, \
+    MultiGroupComparisonTestResult
 
 
 DEFAULT_SIGS = [0.05, 0.01, 0.001, 0.0001]
@@ -21,13 +22,20 @@ class NormalityTester(AssumptionTester):
         super(NormalityTester, self).__init__()
 
     @staticmethod
-    def test(data, method="shapiro", **kwargs):
+    def test(data, dv, group=None, method="shapiro", alpha=0.05, **kwargs):
         assert method in ["shapiro", "normaltest", "kstest", "anderson"]
-
-        statistic, pvalue = getattr(stats, method)(data)
+        if group is None:
+            statistic, pvalue = getattr(stats, method)(data[dv])
+            result_df = pd.DataFrame({"statistic": [statistic], "p-value": [pvalue]})
+        else:
+            norm_results = {}
+            for g in data[group].unique():
+                statistic, pvalue = getattr(stats, method)(data[data[group] == g][dv])
+                norm_results[g] = {"statistic": statistic, "p-value": pvalue}
+            result_df = pd.DataFrame(norm_results)
+        result_df["normal"] = (result_df["p-value"] > alpha)
         new_result = NormalityTestResult(log={"method": method})
-        new_result.add_result(dict(pvalue=pvalue,
-                                   statistic=statistic,
+        new_result.add_result(dict(result_df=result_df,
                                    data=data,
                                    **kwargs))  # annotations or factors
         return new_result
@@ -38,19 +46,64 @@ class HomoscedasticityTester(AssumptionTester):
         super(HomoscedasticityTester, self).__init__()
 
     @staticmethod
-    def test(data, method="levene", **kwargs):
+    def test(data, dv, group=None, method="levene", alpha=0.05, **kwargs):
         assert method in ["levene", "bartlett"]
-        statistic, pvalue = getattr(stats, method)(data)
+        if group is None:
+            input_data = data[dv]
+        else:
+            input_data = data.groupby(group)[dv].to_list()
+        statistic, pvalue = getattr(stats, method)(*input_data)
+        result_df = pd.DataFrame({"statistic": [statistic], "p-value": [pvalue]})
+        result_df["equal_var"] = (result_df["p-value"] > alpha)
         new_result = VarHomogeneityTestResult(log={"method": method})
-        new_result.add_result(dict(pvalue=pvalue,
-                                   statistic=statistic,
-                                   data=data,
+        new_result.add_result(dict(result_df=result_df,
                                    **kwargs))  # annotations or factors
         return new_result
 
 
-class PairwiseTester:
+class StatisticalTest:
     def __init__(self):
+        self._assumption_testers = {"normality": NormalityTester(),
+                                    "var_homogeneity": HomoscedasticityTester()}
+
+    def _test_assumptions(self,
+                          data,
+                          dv,
+                          group,
+                          test_normality=True,
+                          test_homoscedasticity=True,
+                          normality_kws=None,
+                          homoscedasticity_kws=None):
+        test_results = []
+        if test_normality:
+            if normality_kws is None:
+                normality_kws = {}
+            test_results.append(self._assumption_testers["normality"].test(data=data, dv=dv, group=group,
+                                                                           **normality_kws))
+        if test_homoscedasticity:
+            if normality_kws is None:
+                homoscedasticity_kws = {}
+            test_results.append(self._assumption_testers["var_homogeneity"].test(data=data, dv=dv, group=group,
+                                                                                 **homoscedasticity_kws))
+
+        return test_results
+
+    def _to_use_parametric_test(self, data, dv, group, **kwargs):
+        test_results = self._test_assumptions(data, dv, group, **kwargs)
+        equal_var, normal = True, True
+
+        for result in test_results:
+            if isinstance(result, VarHomogeneityTestResult):
+                equal_var = result.result_df["equal_var"].all()
+            elif isinstance(result, NormalityTestResult):
+                normal = result.result_df["normal"].all()
+
+        return (equal_var and normal), test_results
+
+
+class PairwiseTester(StatisticalTest):
+    def __init__(self):
+        super().__init__()
         self._alpha_list = DEFAULT_SIGS
         self.parametric_methods = {"tukey": (pg.pairwise_tukey, "pingouin"),
                                    "dunn": (sp.posthoc_dunn, "scikit_posthocs"),
@@ -67,21 +120,30 @@ class PairwiseTester:
              parametric=False,
              method="mw",
              added_label=None,
+             parametric_params=None,
              **kwargs):
         result_obj = PairwiseTestResult(dict(dep_var=dep_var,
                                              between=between,
                                              parametric=parametric,
                                              method=method,
                                              **kwargs))
+        assump_test_results = None
+        if parametric == "auto":
+            parametric_params = parametric_params or {}
+            parametric, assump_test_results = self._to_use_parametric_test(data=data, dv=dep_var, group=between,
+                                                                           **parametric_params)
+
         method_pool = self.non_parametric_methods if parametric else self.non_parametric_methods
         if method_pool[method][1] == "scikit_posthocs":
+            # TODO: fix
             result = method_pool[method][0](data,
                                             val_col=dep_var,
                                             group_col=between,
                                             **kwargs)
             if added_label is not None:
                 result["label"] = added_label
-            result_obj.add_result(dict(result_df=result))
+            result_obj.add_result(dict(result_df=result,
+                                       assump_test_results=assump_test_results))
         elif method_pool[method][1] == "pingouin":
             result = method_pool[method][0](data,
                                             dv=dep_var,
@@ -90,48 +152,49 @@ class PairwiseTester:
             if added_label is not None:
                 result["label"] = added_label
             result_obj.add_result(dict(result_df=result,
-                                       p_value_col="p-unc"))
+                                       p_value_col="p-unc",
+                                       assump_test_results=assump_test_results))
 
         return result_obj
 
 
-class MultiGroupComparison:
+class MultiGroupComparison(StatisticalTest):
     def __init__(self):
-        self._assumption_testers = {"normality": NormalityTester(),
-                                    "var_homogeneity": HomoscedasticityTester()}
+        super().__init__()
         self._alpha_list = DEFAULT_SIGS
-
-    def test_assumptions(self,
-                         data,
-                         test_normality=True,
-                         test_homoscedasticity=True,
-                         normality_kws=None,
-                         homoscedasticity_kws=None):
-        if test_normality:
-            if normality_kws is None:
-                normality_kws = {}
-            return self._assumption_testers["normality"].test(data=data, **normality_kws)
-        if test_homoscedasticity:
-            if normality_kws is None:
-                homoscedasticity_kws = {}
-            return self._assumption_testers["var_homogeneity"].test(data=data, **homoscedasticity_kws)
 
     def test(self,
              data,
              dep_var,
              between,
              parametric=True,
+             parametric_params=None,
              **kwargs):
+        assump_test_results = None
+        if parametric == "auto":
+            parametric_params = parametric_params or {}
+            parametric, assump_test_results = self._to_use_parametric_test(data=data, dv=dep_var, group=between,
+                                                                           **parametric_params)
+
         if parametric is True:
-            result = pg.anova(data=data,
-                              dv=dep_var,
-                              between=between,
-                              **kwargs)
+            result_df = pg.anova(data=data,
+                                 dv=dep_var,
+                                 between=between,
+                                 **kwargs)
         else:
-            result = pg.kruskal(data=data,
-                                dv=dep_var,
-                                between=between,
-                                **kwargs)
+            result_df = pg.kruskal(data=data,
+                                   dv=dep_var,
+                                   between=between,
+                                   **kwargs)
+
+        result = MultiGroupComparisonTestResult(log=dict(dep_var=dep_var,
+                                                         between=between,
+                                                         parametric=parametric,
+                                                         parametric_params=parametric_params,
+                                                         **kwargs))
+        result.add_result(dict(result_df=result_df,
+                               assump_test_results=assump_test_results))
+        return result
 
 
 def oneway_mkw(data, dv, between, **kwargs):

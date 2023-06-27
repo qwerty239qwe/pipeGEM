@@ -6,9 +6,10 @@ import numpy as np
 
 from pipeGEM.utils import select_rxns_from_model
 from pipeGEM.utils.transform import exp_x, functions
-from pipeGEM.analysis import EFluxAnalysis
+from pipeGEM.analysis import EFluxAnalysis, timing
 
 
+@timing
 def apply_EFlux(model: cobra.Model,
                 rxn_expr_score: Dict[str, float],
                 max_ub: float = 1000,
@@ -60,7 +61,9 @@ def apply_EFlux(model: cobra.Model,
     assert max_ub - min_lb > 0, "max_ub should be larger than min_lb"
     if protected_rxns:
         ignore_rxn_ids = select_rxns_from_model(model, protected_rxns, return_id=True)
-        print(f"Ignoring {ignore_rxn_ids} (no constraints will be applied on them)")
+        print(f"Ignoring {len(ignore_rxn_ids)} reactions ({ignore_rxn_ids[:10]}"
+              f"{'...' if len(ignore_rxn_ids) > 10 else ''}) "
+              f", no constraints will be applied on them")
     else:
         ignore_rxn_ids = []
     exps = [v if v > min_score else min_score for _, v in rxn_expr_score.items() if not np.isnan(v)]
