@@ -10,7 +10,7 @@ from scipy import interpolate
 import cobra
 from optlang.symbolics import Zero
 
-from pipeGEM.analysis import timing, CORDA_Analysis
+from pipeGEM.analysis import timing, CORDA_Analysis, measure_efficacy
 from pipeGEM.integration.utils import parse_predefined_threshold
 
 
@@ -69,7 +69,7 @@ class CORDABuilder:
             eval_vars = [i for i, c in self._conf_scores.items() if c < 0]
             n_sups = pd.DataFrame({"n": np.zeros(shape=(len(eval_vars),))}, index=eval_vars)
 
-        for vi, var_id in enumerate(var_ids):
+        for vi, var_id in tqdm(enumerate(var_ids), desc="Variables to check"):
             if n_iters == 1 and var_id in all_support_vars:
                 continue
 
@@ -110,8 +110,6 @@ class CORDABuilder:
                         cur_penalty[self._model.variables[v]] = cur_penalty[self._model.variables[v]] * self._pif
             all_support_vars |= all_support_vars_for_v
             var.lb, var.ub = old_bounds
-            if vi % 100 == 0:
-                print(f"{vi} / {len(var_ids)}")
         if keep_if_support is None:
             return all_support_vars
         return all_support_vars, set(n_sups.query(f"n >= {keep_if_support}").index)
@@ -177,7 +175,7 @@ class CORDABuilder:
             else:
                 to_remove.append(rxn)
         self._model.remove_reactions(to_remove, remove_orphans=True)
-        return self._model
+        return self._model, np.array(to_remove)
 
 
 def _add_prod_met_rxns(model,
@@ -222,7 +220,15 @@ class LinearDiscreteStrategy(DiscreteStrategy):
 
     def transform(self):
         f = interpolate.interp1d([self._exp, self._nexp], [3, -1], fill_value='extrapolate')
-        return {r: f(v) if np.isfinite(v) else 0 for r, v in self._rxn_scores.items()}
+        res = {}
+        for r, v in self._rxn_scores.items():
+            if np.isfinite(v):
+                res[r] = f(v)
+                if isinstance(res[r], np.ndarray):
+                    res[r] = res[r][()]
+            else:
+                res[r] = 0
+        return res
 
 
 discrete_strategies = {"linear": LinearDiscreteStrategy}
@@ -276,7 +282,8 @@ def apply_CORDA(model,
                 conf_scores[r] = 3
             else:
                 warnings.warn(f"{r} is not in the model")
-
+    core_ids = [r for r, conf in conf_scores.items() if conf >= 3 ]
+    ncore_ids = [r for r, conf in conf_scores.items() if conf < 0]
     var_conf_scores = {r: conf for r, conf in conf_scores.items()}
     var_conf_scores.update({model.reactions.get_by_id(r).reverse_id: conf for r, conf in conf_scores.items()})
     if rxn_scaling_coefs is not None:
@@ -300,7 +307,7 @@ def apply_CORDA(model,
                                  skip_last_step=skip_last_step,
                                  rxn_scaling_coefs=var_rxn_scaling_coefs
                                  )
-    result_model = corda_builder.build(keep_if_support=keep_if_support)
+    result_model, removed_rxn_ids = corda_builder.build(keep_if_support=keep_if_support)
     result_model.objective.set_linear_coefficients(obj_coefs)
     result_model.objective.direction = "max"
     for r in result_model.exchanges:
@@ -314,10 +321,15 @@ def apply_CORDA(model,
                                  "keep_if_support": keep_if_support,
                                  "met_prod": met_prod,
                                  "upper_bound": upper_bound,
-                                 "threshold": threshold,
+                                 "flux_threshold": threshold,
                                  "support_flux_value": support_flux_value})
-
+    algo_efficacy = measure_efficacy(kept_rxn_ids=[r.id for r in result_model.reactions],
+                                     removed_rxn_ids=removed_rxn_ids,
+                                     core_rxn_ids=core_ids,
+                                     non_core_rxn_ids=ncore_ids)
     result.add_result(dict(result_model=result_model,
                            conf_scores=conf_scores,
-                           threshold_analysis=th_result))
+                           threshold_analysis=th_result,
+                           removed_rxn_ids=removed_rxn_ids,
+                           algo_efficacy=algo_efficacy))
     return result

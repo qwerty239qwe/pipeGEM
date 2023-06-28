@@ -150,11 +150,12 @@ class BaseAnalysis:
             if result_types[k] == "Analysis":
                 v.save(parent_dir / self._result_folder_name / k)
                 continue
-
+            print(f"Saving {k}..")
             file_manager = self._fmanagers[result_types[k]]()
             kws = {} if k not in self._result_saving_params else {k: v for k, v in self._result_saving_params[k].items()
                                                                   if k not in ["fm_name"]}
             file_manager.write(v, parent_dir / self._result_folder_name / k, **kws)
+            print(f"{k} is saved as a {result_types[k]}")
         save_toml_file(parent_dir / self._result_folder_name / "other_values.toml", singular_values)
 
     def save(self,

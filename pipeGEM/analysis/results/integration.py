@@ -1,6 +1,28 @@
 import pandas as pd
-
+import numpy as np
 from ._base import *
+
+
+def measure_efficacy(kept_rxn_ids,
+                     removed_rxn_ids,
+                     core_rxn_ids,
+                     non_core_rxn_ids,
+                     method="F1_score"):
+    FP = len(set(kept_rxn_ids) & set(non_core_rxn_ids))
+    TP = len(set(kept_rxn_ids) & set(core_rxn_ids))
+    TN = len(set(removed_rxn_ids) & set(non_core_rxn_ids))
+    FN = len(set(removed_rxn_ids) & set(core_rxn_ids))
+    print(TP, TN, FP, FN)
+    if method == "MCC":
+        return (TN * TP - FN * FP) / np.sqrt((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+    if method == "F1_score":
+        return 2 * (precision * recall) / (precision + recall)
+    if method == "precision":
+        return precision
+    if method == "recall":
+        return recall
 
 
 class EFluxAnalysis(BaseAnalysis):
@@ -179,8 +201,8 @@ class CORDA_Analysis(BaseAnalysis):
         A dict storing parameters used to perform this analysis
     """
     def __init__(self, log):
-
         super().__init__(log)
+        self._result_saving_params["removed_rxn_ids"] = {"fm_name": "NDArrayStr"}
 
 
 class MBA_Analysis(BaseAnalysis):
