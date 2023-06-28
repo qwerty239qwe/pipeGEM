@@ -34,17 +34,26 @@ class PairwiseTestResult(BaseAnalysis):
     @classmethod
     def aggregate(cls, results, log=None):
         new_log = {} if log is None else log
+        p_value_col_name = results[0].p_value_col
         p_val_col = list(set([result.p_value_col for result in results]))
         assert len(p_val_col) == 1, "P-value column should be the same across the analyses, " \
-                               "please make sure concatenated analyses use the same method."
+                                    "please make sure concatenated analyses use the same method."
         result_df = pd.concat([result.result_df for result in results], axis=0)
         result_df["adjusted_p_value"] = bh_adjust(result_df[p_val_col[0]])
         result_df = result_df.reset_index(drop=True)
-        new_obj = cls(new_log)
+        new_obj = cls({**dict(p_value_col=p_value_col_name), **new_log})
         new_obj.add_result(dict(result_df=result_df))
         return new_obj
 
-    def mark_sig(self, query, key="sig"):
+    def mark_sig(self,
+                 use_default=True,
+                 query=None,
+                 key="sig"):
+        if use_default:
+            multicomp_p_val_col_name = self.log["multicomp_log"]["p_value_col"]
+            pw_p_val_col_name = self.p_value_col
+            query = f"{multicomp_p_val_col_name} < 0.05 and {pw_p_val_col_name} < 0.05"
+
         sel_index = self._result["result_df"].query(query).index
         new_ser = pd.Series(data=[False for _ in range(self._result["result_df"].shape[0])],
                             index=self._result["result_df"].index)
@@ -80,7 +89,30 @@ class PairwiseTestResult(BaseAnalysis):
     def plot(self, method, **kwargs):
         pass
 
+    def merge_multicomp_result(self, multicomp_result, on="label", suffixes=("_pairwise", "_multicomp")):
+        self._log.update({"multicomp_log": multicomp_result.log,
+                          "multicomp_merge_on": on,
+                          "multicomp_pairwise_suffix": suffixes[0],
+                          "multicomp_multicomp_suffix": suffixes[1]})
+
+        new_result_df = pd.merge(self._result["result_df"], multicomp_result.result_df,
+                                 on=on, suffixes=suffixes)
+        self.add_result(dict(result_df=new_result_df))
+
 
 class MultiGroupComparisonTestResult(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log=log)
+
+    @classmethod
+    def aggregate(cls, results, log=None):
+        new_log = {} if log is None else log
+        p_value_col_name = results[0].p_value_col
+        p_val_col = list(set([result.p_value_col for result in results]))
+        assert len(p_val_col) == 1, "P-value column should be the same across the analyses, " \
+                                    "please make sure concatenated analyses use the same method."
+        result_df = pd.concat([result.result_df for result in results], axis=0)
+        result_df = result_df.reset_index(drop=True)
+        new_obj = cls({**dict(p_value_col=p_value_col_name), **new_log})
+        new_obj.add_result(dict(result_df=result_df))
+        return new_obj

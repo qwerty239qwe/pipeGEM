@@ -32,7 +32,7 @@ class NormalityTester(AssumptionTester):
             for g in data[group].unique():
                 statistic, pvalue = getattr(stats, method)(data[data[group] == g][dv])
                 norm_results[g] = {"statistic": statistic, "p-value": pvalue}
-            result_df = pd.DataFrame(norm_results)
+            result_df = pd.DataFrame(norm_results).T
         result_df["normal"] = (result_df["p-value"] > alpha)
         new_result = NormalityTestResult(log={"method": method})
         new_result.add_result(dict(result_df=result_df,
@@ -51,7 +51,7 @@ class HomoscedasticityTester(AssumptionTester):
         if group is None:
             input_data = data[dv]
         else:
-            input_data = data.groupby(group)[dv].to_list()
+            input_data = data.groupby(group)[dv].apply(list)
         statistic, pvalue = getattr(stats, method)(*input_data)
         result_df = pd.DataFrame({"statistic": [statistic], "p-value": [pvalue]})
         result_df["equal_var"] = (result_df["p-value"] > alpha)
@@ -81,7 +81,7 @@ class StatisticalTest:
             test_results.append(self._assumption_testers["normality"].test(data=data, dv=dv, group=group,
                                                                            **normality_kws))
         if test_homoscedasticity:
-            if normality_kws is None:
+            if homoscedasticity_kws is None:
                 homoscedasticity_kws = {}
             test_results.append(self._assumption_testers["var_homogeneity"].test(data=data, dv=dv, group=group,
                                                                                  **homoscedasticity_kws))
@@ -169,8 +169,16 @@ class MultiGroupComparison(StatisticalTest):
              between,
              parametric=True,
              parametric_params=None,
+             added_label=None,
              **kwargs):
         assump_test_results = None
+        result = MultiGroupComparisonTestResult(log=dict(dep_var=dep_var,
+                                                         between=between,
+                                                         parametric=parametric,
+                                                         parametric_params=parametric_params,
+                                                         added_label=added_label,
+                                                         **kwargs))
+
         if parametric == "auto":
             parametric_params = parametric_params or {}
             parametric, assump_test_results = self._to_use_parametric_test(data=data, dv=dep_var, group=between,
@@ -186,14 +194,13 @@ class MultiGroupComparison(StatisticalTest):
                                    dv=dep_var,
                                    between=between,
                                    **kwargs)
+        if added_label is not None:
+            result_df["label"] = added_label
 
-        result = MultiGroupComparisonTestResult(log=dict(dep_var=dep_var,
-                                                         between=between,
-                                                         parametric=parametric,
-                                                         parametric_params=parametric_params,
-                                                         **kwargs))
         result.add_result(dict(result_df=result_df,
-                               assump_test_results=assump_test_results))
+                               assump_test_results=assump_test_results,
+                               inferred_parametric=parametric,
+                               p_value_col="p-unc"))
         return result
 
 

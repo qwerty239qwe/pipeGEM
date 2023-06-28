@@ -4,6 +4,34 @@ import pandas as pd
 from typing import List, Optional, Tuple, Union
 
 
+def plot_data_cat(long_data: pd.DataFrame,
+                  id_col,
+                  val_col,
+                  ids,
+                  group_col=None,
+                  vertical=True,
+                  kind: str = "bar",
+                  palette: Union[str] = "deep",
+                  log_scale=False,
+                  ):
+    if vertical:
+        x, y = id_col, val_col
+    else:
+        x, y = val_col, id_col
+    facet = sns.catplot(data=long_data[long_data[id_col].isin(ids)],
+                        x=x,
+                        y=y,
+                        hue=group_col,
+                        kind=kind,
+                        palette=palette,)
+    if log_scale:
+        if vertical:
+            facet.set(yscale="log")
+        else:
+            facet.set(xscale="log")
+    return facet
+
+
 def plot_model_components(comp_df: pd.DataFrame,
                           order: List[str],
                           group: str = "group",

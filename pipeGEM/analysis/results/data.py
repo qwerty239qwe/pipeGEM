@@ -5,6 +5,7 @@ from .corr import CorrelationAnalysis
 from .dim_reduction import PCA_Analysis, EmbeddingAnalysis
 from pipeGEM.analysis._dim_reduction import prepare_PCA_dfs, prepare_embedding_dfs
 from pipeGEM.analysis._threshold import threshold_finders
+from pipeGEM.plotting import DataCatPlotter
 
 
 class DataAggregation(BaseAnalysis):
@@ -13,6 +14,33 @@ class DataAggregation(BaseAnalysis):
 
     def __getitem__(self, item):
         return self._result["agg_data"][item]
+
+    def plot(self,
+             ids,
+             vertical,
+             value_name="value",
+             id_name="model",
+             hue=None,
+             dpi=150,
+             prefix="",
+             *args,
+             **kwargs):
+        long_data = self._result["agg_data"].reset_index().rename(
+            columns={"index": id_name}).melt(
+            value_name=value_name)
+        if hue is not None:
+            long_data = long_data.merge(self._result["group_annotation"], left_on=id_name, right_index=True)
+            if hue not in long_data.columns:
+                raise KeyError(f"{hue} is not in group_annotation, "
+                               f"possible choices: {self._result['group_annotation'].columns}")
+
+        pltr = DataCatPlotter(dpi=dpi, prefix=prefix)
+        pltr.plot(data=long_data,
+                  ids=ids,
+                  vertical=vertical,
+                  id_col=self.log["prop"],
+                  value_col=value_name,
+                  hue=hue)
 
     def find_local_threshold(self, group_name=None, **kwargs):
         tf = threshold_finders.create("local")

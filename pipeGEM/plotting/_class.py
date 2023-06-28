@@ -8,7 +8,7 @@ from ._flux import plot_fba, plot_fva, plot_sampling_df
 from .curve import plot_rFastCormic_thresholds, plot_percentile_thresholds
 from .heatmap import plot_heatmap
 from .scatter import plot_PCA, plot_embedding
-from .categorical import plot_model_components, plot_local_threshold_boxplot
+from .categorical import plot_model_components, plot_local_threshold_boxplot, plot_data_cat
 
 
 class BasePlotter:
@@ -310,3 +310,27 @@ class CorrelationPlotter(BasePlotter):
                             cbar_label=cbar_label,
                             cmap=cmap,
                             **kwargs)
+
+
+class DataCatPlotter(BasePlotter):
+    def __init__(self, dpi=150, prefix="data_"):
+        super().__init__(dpi, prefix)
+
+    def plot_func(self,
+                  data,
+                  id_col,
+                  value_col,
+                  hue,
+                  ids,
+                  vertical,
+                  *args,
+                  **kwargs):
+
+        return plot_data_cat(data,
+                             id_col=id_col,
+                             val_col=value_col,
+                             group_col=hue,
+                             ids=ids,
+                             vertical=vertical,
+                             *args,
+                             **kwargs)

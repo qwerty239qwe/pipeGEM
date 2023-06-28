@@ -32,10 +32,10 @@ def plot_fba(flux_df: pd.DataFrame,
         print("Use index as the reaction IDs")
     flux_df = flux_df.loc[flux_df["Reaction"].isin(rxn_ids), [c for c in flux_df.columns if c != "reduced_costs"]]
     if filter_all_zeros:
-        n_all_zeros_rxn = flux_df.query(f"fluxes < {threshold}").shape[0]
+        n_all_zeros_rxn = flux_df.query(f"abs(fluxes) < {threshold}").shape[0]
         if verbosity > 0:
             print(f"Found reactions contain zeros fluxes: {n_all_zeros_rxn} rxns were removed from the plot")
-        flux_df = flux_df.query(f"fluxes > {threshold}")
+        flux_df = flux_df.query(f"abs(fluxes) > {threshold}")
 
     flux_df = flux_df.reset_index().rename(columns={"fluxes": f'Flux {flux_unit}'})
     x_var = "Reaction" if vertical else f'Flux {flux_unit}'

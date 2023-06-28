@@ -1,16 +1,16 @@
 import pandas as pd
 import numpy as np
+import pingouin
 from tqdm import tqdm
 import warnings
-
 from typing import Optional, Union, List
+
 from ._base import *
 from pipeGEM.plotting import FBAPlotter, FVAPlotter, SamplingPlotter, HeatmapPlotter
 from pipeGEM.analysis._dim_reduction import prepare_PCA_dfs, prepare_embedding_dfs
 from .corr import CorrelationAnalysis
 from .dim_reduction import PCA_Analysis, EmbeddingAnalysis
-
-from .stat import PairwiseTestResult
+from .stat import PairwiseTestResult, MultiGroupComparisonTestResult
 
 
 class NotAggregatedError(Exception):
@@ -93,6 +93,59 @@ class FluxAnalysis(BaseAnalysis):
         new = cls(log={"categorical": cat_log, **log})
         new.add_result({**kwargs, **dict(flux_df=new_df)})
         return new
+
+    def _sel_data_for_diff_test(self, data, rxn_id, between):
+        raise NotImplementedError()
+
+    def diff_test(self,
+                  between,
+                  parametric="auto",
+                  parametric_params=None,
+                  method="mw",
+                  label_str_format="{reaction}",
+                  save_p_val=True) -> PairwiseTestResult:
+        from pipeGEM.analysis._stat import PairwiseTester, MultiGroupComparison
+        if between not in self._result["flux_df"].columns:
+            raise KeyError(f"{between} is not in the categorical features. \n"
+                           f"Possible features are {list(self.log['categorical'])}")
+        assert parametric in ["auto", True, False]
+        all_rxns = [i for i in self.result["flux_df"].columns if i not in self.log["categorical"]]
+        all_res, all_mulcom_res = [], []
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            for r in tqdm(all_rxns):
+                data_to_be_analyzed = self._sel_data_for_diff_test(data=self.result["flux_df"],
+                                                                   rxn_id=r, between=between)
+                inferred_parametric = parametric
+                if len(self.result["flux_df"][between].unique()) > 2:
+                    mulcom_res = MultiGroupComparison().test(data_to_be_analyzed,
+                                                             dep_var=r,
+                                                             between=between,
+                                                             parametric=parametric,
+                                                             parametric_params=parametric_params,
+                                                             added_label=label_str_format.format(reaction=r))
+                    inferred_parametric = mulcom_res.inferred_parametric
+                    all_mulcom_res.append(mulcom_res)
+
+                test_res = PairwiseTester().test(data=data_to_be_analyzed,
+                                                 dep_var=r,
+                                                 between=between,
+                                                 parametric=inferred_parametric,
+                                                 method=method,
+                                                 added_label=label_str_format.format(reaction=r))
+                all_res.append(test_res)
+
+        result = PairwiseTestResult.aggregate(results=all_res,
+                                              log=dict(label_str_format=label_str_format,
+                                                       between=between,
+                                                       parametric=parametric, ))
+        if len(all_mulcom_res) > 0:
+            multcomp_result = MultiGroupComparisonTestResult.aggregate(results=all_mulcom_res)
+            result.merge_multicomp_result(multcomp_result, on="label")
+
+        if save_p_val:
+            self._diff_test_result = result
+        return result
 
     def plot(self, **kwargs):
         raise NotImplementedError()
@@ -205,38 +258,8 @@ class FBA_Analysis(FluxAnalysis):
         result.add_result(dict(correlation_result=corr_result))
         return result
 
-    def diff_test(self,
-                  between,
-                  parametric="auto",
-                  method="mw",
-                  label_str_format="{reaction}",
-                  save_p_val: bool = True) -> PairwiseTestResult:
-        from pipeGEM.analysis._stat import PairwiseTester
-        if between not in self._result["flux_df"].columns:
-            raise KeyError(f"{between} is not in the categorical features. \n"
-                           f"Possible features are {list(self.log['categorical'])}")
-        assert parametric in ["auto", True, False]
-        all_rxns = self.result["flux_df"]["Reaction"].unique()
-
-        all_res = []
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            for r in all_rxns:
-                test_res = PairwiseTester().test(data=self.result["flux_df"].query(f"Reaction == '{r}'"),
-                                                 dep_var="fluxes",
-                                                 between=between,
-                                                 parametric=parametric,
-                                                 method=method,
-                                                 added_label=label_str_format.format(reaction=r))
-                all_res.append(test_res)
-        result = PairwiseTestResult.aggregate(results=all_res,
-                                              log=dict(label_str_format=label_str_format,
-                                                       between=between,
-                                                       parametric=parametric,))
-        if save_p_val:
-            self._diff_test_result = result
-        return result
-
+    def _sel_data_for_diff_test(self, data, rxn_id, between):
+        return data.query(f"Reaction == '{rxn_id}'")
 
 
 class FVA_Analysis(FluxAnalysis):
@@ -347,36 +370,9 @@ class SamplingAnalysis(FluxAnalysis):
                   *args,
                   **kwargs)
 
-    def diff_test(self,
-                  between,
-                  parametric="auto",
-                  method="mw",
-                  label_str_format="{reaction}",
-                  save_p_val=True) -> PairwiseTestResult:
-        from pipeGEM.analysis._stat import PairwiseTester
-        if between not in self._result["flux_df"].columns:
-            raise KeyError(f"{between} is not in the categorical features. \n"
-                           f"Possible features are {list(self.log['categorical'])}")
-        assert parametric in ["auto", True, False]
-        all_rxns = [i for i in self.result["flux_df"].columns if i not in self.log["categorical"]]
-        all_res = []
-
-        for r in tqdm(all_rxns):
-            sel_col = [between, r] if isinstance(between, str) else between + [r]
-            test_res = PairwiseTester().test(data=self.result["flux_df"].loc[:, sel_col],
-                                             dep_var=r,
-                                             between=between,
-                                             parametric=parametric,
-                                             method=method,
-                                             added_label=label_str_format.format(reaction=r))
-            all_res.append(test_res)
-        result = PairwiseTestResult.aggregate(results=all_res,
-                                              log=dict(label_str_format=label_str_format,
-                                                       between=between,
-                                                       parametric=parametric,))
-        if save_p_val:
-            self._diff_test_result = result
-        return result
+    def _sel_data_for_diff_test(self, data, rxn_id, between):
+        sel_col = [between, rxn_id] if isinstance(between, str) else between + [rxn_id]
+        return data.loc[:, sel_col]
 
 
 def combine(analyses, method, log, **kwargs):
