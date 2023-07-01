@@ -1,6 +1,4 @@
 import pandas as pd
-import tomlkit
-import numpy as np
 from pathlib import Path
 import scanpy as sc
 import anndata as ad

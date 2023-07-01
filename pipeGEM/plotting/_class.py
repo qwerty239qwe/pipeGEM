@@ -48,10 +48,10 @@ class BasePlotter:
             file_name, file_path = Path(prefix + str(file_name)), Path("./")
 
         if g is None:
-            plt.close()
+            #plt.close()
             plt.savefig(file_path / file_name, dpi=dpi, bbox_inches='tight')
         else:
-            plt.close(g)
+            #plt.close(g)
             g.savefig(file_path / file_name, dpi=dpi, bbox_inches='tight')
 
     def plot(self, *args, **kwargs):

@@ -19,7 +19,8 @@ class DataAggregation(BaseAnalysis):
              ids,
              vertical,
              value_name="value",
-             id_name="model",
+             id_name="reaction",
+             var_name="model",
              hue=None,
              dpi=150,
              prefix="",
@@ -27,9 +28,11 @@ class DataAggregation(BaseAnalysis):
              **kwargs):
         long_data = self._result["agg_data"].reset_index().rename(
             columns={"index": id_name}).melt(
+            id_vars=[id_name],
+            var_name=var_name,
             value_name=value_name)
         if hue is not None:
-            long_data = long_data.merge(self._result["group_annotation"], left_on=id_name, right_index=True)
+            long_data = long_data.merge(self._result["group_annotation"], left_on=var_name, right_index=True, how="outer")
             if hue not in long_data.columns:
                 raise KeyError(f"{hue} is not in group_annotation, "
                                f"possible choices: {self._result['group_annotation'].columns}")
@@ -38,9 +41,12 @@ class DataAggregation(BaseAnalysis):
         pltr.plot(data=long_data,
                   ids=ids,
                   vertical=vertical,
-                  id_col=self.log["prop"],
+                  id_col=id_name,
                   value_col=value_name,
-                  hue=hue)
+                  hue=hue,
+                  *args,
+                  **kwargs
+                  )
 
     def find_local_threshold(self, group_name=None, **kwargs):
         tf = threshold_finders.create("local")

@@ -308,6 +308,8 @@ def _fa_with_data(multi_model_conf,
     # task_result = TaskAnalysis.load(file_path=prec_tasks_path)
     task_supp_rxns = {}
     for g_name, g_data in gene_data_dic.items():
+
+
         model = _load_exist_model(model_path_struct, g_name, model_type)
         task_supp_rxns[g_name] = map_data(data_name=g_name,
                                           gene_data=g_data,
@@ -317,9 +319,12 @@ def _fa_with_data(multi_model_conf,
                                                     th_result=th_result[g_name]
                                                     if isinstance(th_result, dict) else th_result,
                                                     protected_rxns=task_supp_rxns[g_name])
+        file_saved_path = saved_path.format(g_name)
+        if Path(file_saved_path).is_dir():
+            continue
+
         int_result = model.integrate_gene_data(data_name=g_name,
                                                **int_c)
-        file_saved_path = saved_path.format(g_name)
         if not Path(file_saved_path).parent.is_dir():
             Path(file_saved_path).parent.mkdir(parents=True)
 

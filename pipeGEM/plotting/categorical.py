@@ -29,7 +29,7 @@ def plot_data_cat(long_data: pd.DataFrame,
             facet.set(yscale="log")
         else:
             facet.set(xscale="log")
-    return facet
+    return {"g": facet}
 
 
 def plot_model_components(comp_df: pd.DataFrame,

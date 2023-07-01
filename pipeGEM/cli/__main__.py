@@ -2,13 +2,12 @@ import argparse
 from pathlib import Path
 from typing import Union, Dict
 
-from ._io import load_medium, load_threshold_analysis, load_gene_data
-from ._doc import get_help_doc
-from ._utils import preprocess_model, find_threshold, map_data, \
+from pipeGEM.utils import parse_toml_file
+from pipeGEM.cli._io import load_medium, load_threshold_analysis, load_gene_data
+from pipeGEM.cli._doc import get_help_doc
+from pipeGEM.cli._utils import preprocess_model, find_threshold, map_data, \
     read_configs, generate_template_configs, run_integration_pipeline, do_model_comparison, \
     do_flux_analysis
-
-from pipeGEM.utils import parse_toml_file
 
 
 # TODO: do_flux_analysis, do_pathway_analysis
