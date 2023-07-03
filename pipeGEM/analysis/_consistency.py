@@ -67,7 +67,10 @@ class NumInequalityStoppingCriteria(StoppingCriteria):
         self.cons_lb = cons_lb
 
     def _update_var_num(self, new_vars, lbs, n_ubs):
-        return {k: Variable(k, ub=len(v) - n_ubs.get(k, 0), lb=lbs.get(k, 0)) for k, v in new_vars.items()}
+        return {k: Variable(k,
+                            ub=len(v),
+                            lb=lbs.get(k, 0))
+                for k, v in new_vars.items()}
 
     def check(self, removed, kept) -> bool:
         for k, v in self.var.items():

@@ -7,7 +7,7 @@ from cobra.exceptions import OptimizationError
 
 from pipeGEM.analysis.tasks import Task, TaskContainer, TaskHandler
 from pipeGEM.analysis import consistency_testers, timing, mCADRE_Analysis, \
-    NumInequalityStoppingCriteria, IsInSetStoppingCriteria
+    NumInequalityStoppingCriteria, IsInSetStoppingCriteria, measure_efficacy
 from pipeGEM.integration.utils import parse_predefined_threshold
 from tqdm import tqdm
 
@@ -284,6 +284,13 @@ def apply_mCADRE(model,
                                                  consistency_test_method="FASTCC",
                                                  tolerance=tol,
                                                  rxn_scaling_coefs=rxn_scaling_coefs)
+    non_core_ids = [r.id for r in model.reactions if r.id not in core_rxns]
+
+    eff_score = measure_efficacy(kept_rxn_ids=[r.id for r in result_model.reactions],
+                                 removed_rxn_ids=removed_rxn_ids,
+                                 core_rxn_ids=core_rxns,
+                                 non_core_rxn_ids=non_core_ids)
+
     result = mCADRE_Analysis(log=dict(exp_cutoff=exp_cutoff,
                                       absent_value=absent_value,
                                       absent_value_indicator=absent_value_indicator,
@@ -298,5 +305,6 @@ def apply_mCADRE(model,
                            score_df=score_df,
                            salvage_test_result=salvage_test_result,
                            func_test_result=func_test_result,
-                           threshold_analysis=th_result))
+                           threshold_analysis=th_result,
+                           algo_efficacy=eff_score))
     return result
