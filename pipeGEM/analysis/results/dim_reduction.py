@@ -8,9 +8,17 @@ class PCA_Analysis(BaseAnalysis):
 
     def plot(self,
              dpi=150,
-             color_by="group_name",
+             color_by="default",
              prefix="Dim_reduction_",
              **kwargs):
+        if color_by == "default":
+            if "group_annotation" not in self.result:
+                color_by = None
+            elif "group_name" in self.result["group_annotation"].columns:
+                color_by = "group_name"
+            else:
+                color_by = None
+
         if color_by is None:
             groups = {m: [m] for m in self.result["group_annotation"].index.to_list()}
         else:
@@ -20,7 +28,7 @@ class PCA_Analysis(BaseAnalysis):
         pltr = DimReductionPlotter(dpi, prefix)
         pltr.plot(result_dic=self._result,
                   groups=groups,
-                  method=self._log["method"],
+                  method=self._log["dr_method"],
                   **kwargs)
 
 

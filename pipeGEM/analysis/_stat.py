@@ -30,11 +30,16 @@ class NormalityTester(AssumptionTester):
         else:
             norm_results = {}
             for g in data[group].unique():
+                print(g)
                 statistic, pvalue = getattr(stats, method)(data[data[group] == g][dv])
+                print(statistic)
                 norm_results[g] = {"statistic": statistic, "p-value": pvalue}
             result_df = pd.DataFrame(norm_results).T
+        print(result_df)
         result_df["normal"] = (result_df["p-value"] > alpha)
-        new_result = NormalityTestResult(log={"method": method})
+        new_result = NormalityTestResult(log={"method": method,
+                                              "group": group,
+                                              "alpha": alpha})
         new_result.add_result(dict(result_df=result_df,
                                    data=data,
                                    **kwargs))  # annotations or factors

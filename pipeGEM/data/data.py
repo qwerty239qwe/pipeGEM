@@ -363,7 +363,8 @@ class MediumData(BaseData):
         time_hr = time_hr * self._u.hour
         for k in model.exchanges + model.sinks + model.demands:
             if k.id not in self.rxn_dict:
-                if all(["C" not in m.formula for m in k.metabolites]):
+                if all([m.formula is not None for m in k.metabolites]) and \
+                        all(["C" not in m.formula for m in k.metabolites]):
                     print(k.id, " is an inorganic exchange reaction (not constrained)")
                 elif all([c < 0 for m, c in k.metabolites.items()]):
                     k.lower_bound = 0

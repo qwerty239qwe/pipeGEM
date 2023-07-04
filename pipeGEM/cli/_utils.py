@@ -103,6 +103,14 @@ def find_threshold(gene_data: Union[GeneData, Dict[str, GeneData]],
     if th_name != "local":
         result = {}
         for g_name, data in gene_data.items():
+            if (Path(threshold_config["saved_path"]) / g_name).is_dir():
+                if th_name == "rFASTCORMICS":
+                    result[g_name] = rFASTCORMICSThresholdAnalysis.load(
+                        str(Path(threshold_config["saved_path"]) / g_name))
+                elif th_name == "percentile":
+                    result[g_name] = PercentileThresholdAnalysis.load(
+                        str(Path(threshold_config["saved_path"]) / g_name))
+                continue
             th = data.get_threshold(**threshold_config["params"])
             th.save(Path(threshold_config["saved_path"]) / g_name)
             result[g_name] = th
@@ -110,6 +118,9 @@ def find_threshold(gene_data: Union[GeneData, Dict[str, GeneData]],
                 th.plot(file_name=(plot_op_path / g_name).with_suffix(".png"),
                         dpi=450)
     else:
+        if Path(threshold_config["saved_path"]).is_dir():
+            return LocalThresholdAnalysis.load(threshold_config["saved_path"])
+
         assert isinstance(gene_data, dict)
         if threshold_config["group"]["group_file_name"] is not None:
             grps = pd.read_csv(threshold_config["group"]["group_file_name"])

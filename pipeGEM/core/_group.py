@@ -228,16 +228,11 @@ class Group(GEMComposite):
         """
         results = []
         for name, c in self._group.items():
-            if c.__class__ == self.__class__:
-                result = c.do_flux_analysis(method=method, aggregate_method=aggregate_method,
-                                            solver=solver, **kwargs)
-            else:
-                result = c.do_flux_analysis(method=method, solver=solver, **kwargs)
-                if group_by is None:
-                    result.add_categorical(c.name_tag, col_name="model")
-                else:
-                    result.add_categorical(self._group_annotation[c.name_tag][group_by],
-                                           col_name=group_by)
+            result = c.do_flux_analysis(method=method, solver=solver, **kwargs)
+            result.add_categorical(c.name_tag, col_name="model")
+            for ftr_name, ftr in self._group_annotation[c.name_tag].items():
+                result.add_categorical(ftr,
+                                       col_name=ftr_name)
             results.append(result)
         gp_annot = pd.DataFrame({group_by: self.annotation[group_by].unique()},
                                 index=self.annotation[group_by].unique()) if group_by is not None else self.annotation
@@ -478,7 +473,7 @@ class Group(GEMComposite):
                                                                     incremental=incremental,
                                                                     **kwargs)
         result = PCA_Analysis(log={"group_name_tag": self.name_tag,
-                                   "method": "PCA"})
+                                   "dr_method": "PCA"})
         result.add_result({"PC": pca_fitted_df,
                            "exp_var": pca_expvar_df,
                            "components": pca_comp_df,

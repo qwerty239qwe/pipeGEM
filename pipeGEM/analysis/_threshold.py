@@ -367,7 +367,7 @@ class LocalThreshold(RankBased):
             groups = pd.Series(["exp_th" for _ in range(len(samples))], index=samples)
         group_list = groups.unique()
 
-        arr[~np.isfinite(arr)] = np.nan
+        arr = np.nan_to_num(arr, posinf=np.nan, neginf=np.nan)
         exp_ths = pd.DataFrame({grp: np.nanpercentile(arr[:, samples.isin(groups[groups == grp].index)], q=p, axis=1)
                                 for grp in group_list}, index=genes)
         global_on_dic, global_off_dic = {}, {}

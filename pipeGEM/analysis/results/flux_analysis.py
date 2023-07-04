@@ -97,6 +97,9 @@ class FluxAnalysis(BaseAnalysis):
     def _sel_data_for_diff_test(self, data, rxn_id, between):
         raise NotImplementedError()
 
+    def _sel_rxns_for_diff_test(self):
+        raise NotImplementedError()
+
     def diff_test(self,
                   between,
                   parametric="auto",
@@ -109,7 +112,7 @@ class FluxAnalysis(BaseAnalysis):
             raise KeyError(f"{between} is not in the categorical features. \n"
                            f"Possible features are {list(self.log['categorical'])}")
         assert parametric in ["auto", True, False]
-        all_rxns = [i for i in self.result["flux_df"].columns if i not in self.log["categorical"]]
+        all_rxns = self._sel_rxns_for_diff_test()
         all_res, all_mulcom_res = [], []
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -173,7 +176,9 @@ class FBA_Analysis(FluxAnalysis):
              *args,
              **kwargs):
         pltr = FBAPlotter(dpi, prefix)
-        pltr.plot(flux_df=self._df,
+        pltr.plot(flux_df=self._result["flux_df"].merge(self.group_annotation,
+                                                        right_index=True,
+                                                        left_on="model"),
                   *args,
                   **kwargs)
 
@@ -215,7 +220,7 @@ class FBA_Analysis(FluxAnalysis):
         dim_log = {**kwargs, **self.log} if self.log["group_by"] == "model" else \
             {"group": {self.log["group_by"]: flux_df.index},
              **kwargs, **{k: v for k, v in self.log.items() if k != "group"}}
-        dim_log.update({"method": method})
+        dim_log.update({"dr_method": method})
         if method == "PCA":
             final_df, exp_var_df, component_df = prepare_PCA_dfs(flux_df.T,
                                                                  **kwargs)
@@ -260,6 +265,9 @@ class FBA_Analysis(FluxAnalysis):
 
     def _sel_data_for_diff_test(self, data, rxn_id, between):
         return data.query(f"Reaction == '{rxn_id}'")
+
+    def _sel_rxns_for_diff_test(self):
+        return self.result["flux_df"]["Reaction"].to_list()
 
 
 class FVA_Analysis(FluxAnalysis):
@@ -373,6 +381,9 @@ class SamplingAnalysis(FluxAnalysis):
     def _sel_data_for_diff_test(self, data, rxn_id, between):
         sel_col = [between, rxn_id] if isinstance(between, str) else between + [rxn_id]
         return data.loc[:, sel_col]
+
+    def _sel_rxns_for_diff_test(self):
+        return [c for c in self.result["flux_df"].columns if c not in self.log["categorical"]]
 
 
 def combine(analyses, method, log, **kwargs):

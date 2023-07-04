@@ -40,7 +40,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',
     "sphinx.ext.autosummary",
-    'nbsphinx'
+    "myst_nb"
 ]
 
 nbsphinx_execute = 'never'
