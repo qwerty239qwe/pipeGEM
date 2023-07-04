@@ -176,9 +176,16 @@ class FBA_Analysis(FluxAnalysis):
              *args,
              **kwargs):
         pltr = FBAPlotter(dpi, prefix)
-        pltr.plot(flux_df=self._result["flux_df"].merge(self.group_annotation,
-                                                        right_index=True,
-                                                        left_on="model"),
+        to_be_annot = [c for c in self.group_annotation.columns
+                       if c not in self._result["flux_df"].columns]
+        if len(to_be_annot) > 0:
+            to_be_plot = self._result["flux_df"].merge(self.group_annotation[to_be_annot],
+                                                       right_index=True,
+                                                       left_on="model")
+        else:
+            to_be_plot = self._result["flux_df"]
+
+        pltr.plot(flux_df=to_be_plot,
                   *args,
                   **kwargs)
 
@@ -264,7 +271,10 @@ class FBA_Analysis(FluxAnalysis):
         return result
 
     def _sel_data_for_diff_test(self, data, rxn_id, between):
-        return data.query(f"Reaction == '{rxn_id}'")
+        rxn_f = data.query(f"Reaction == '{rxn_id}'")
+        rxn_f = rxn_f.rename(columns={"fluxes": rxn_id})
+        rxn_f = rxn_f.loc[:, [rxn_id, between]]
+        return rxn_f
 
     def _sel_rxns_for_diff_test(self):
         return self.result["flux_df"]["Reaction"].to_list()
