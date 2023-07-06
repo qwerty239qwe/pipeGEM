@@ -146,6 +146,9 @@ def plot_sampling_catplot(flux_df,
             sig_df = sig_df[sig_df[stat_analysis_rxn_id_col] == rxn_id]
             sig_df = sig_df[((sig_df["A"] == group_order[ia]) & (sig_df["B"] == group_order[ib]) |
                              (sig_df["B"] == group_order[ia]) & (sig_df["A"] == group_order[ib]))]
+            if sig_df.shape[0] == 0:
+                raise ValueError(f"Cannot find the comparison: {group_order[ia]} vs {group_order[ib]}",
+                                 "Changing the group_by according to the original analysis might solve the problem.")
 
             n_stars = sum([sig_df["adjusted_p_value"].values[0] < alpha for alpha in star_notation_cutoffs])
             if n_stars < 1:

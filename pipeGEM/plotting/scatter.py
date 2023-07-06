@@ -423,3 +423,12 @@ def plot_Eflux_scatter(r_exp, r_bound):
                     x_label='Expression value',
                     y_label='Upper bound', with_legend=False)
     plt.show()
+
+
+def plot_volcano(data,
+                 x,
+                 y,
+                 thresholds,
+                 log_y=True,
+                 palette: str = "deep",):
+    pass
