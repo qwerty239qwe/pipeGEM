@@ -120,7 +120,9 @@ class FluxAnalysis(BaseAnalysis):
                 data_to_be_analyzed = self._sel_data_for_diff_test(data=self.result["flux_df"],
                                                                    rxn_id=r, between=between)
                 inferred_parametric = parametric
-                if len(self.result["flux_df"][between].unique()) > 2:
+                gb_data = data_to_be_analyzed.groupby(between)
+
+                if gb_data.count().query(f"{r} > 2").shape[0] >= 3:
                     mulcom_res = MultiGroupComparison().test(data_to_be_analyzed,
                                                              dep_var=r,
                                                              between=between,
@@ -129,15 +131,14 @@ class FluxAnalysis(BaseAnalysis):
                                                              added_label=label_str_format.format(reaction=r))
                     inferred_parametric = mulcom_res.inferred_parametric
                     all_mulcom_res.append(mulcom_res)
-
-                test_res = PairwiseTester().test(data=data_to_be_analyzed,
-                                                 dep_var=r,
-                                                 between=between,
-                                                 parametric=inferred_parametric,
-                                                 method=method,
-                                                 added_label=label_str_format.format(reaction=r))
-                all_res.append(test_res)
-
+                if gb_data.count().query(f"{r} > 2").shape[0] >= 2:
+                    test_res = PairwiseTester().test(data=data_to_be_analyzed,
+                                                     dep_var=r,
+                                                     between=between,
+                                                     parametric=inferred_parametric,
+                                                     method=method,
+                                                     added_label=label_str_format.format(reaction=r))
+                    all_res.append(test_res)
         result = PairwiseTestResult.aggregate(results=all_res,
                                               log=dict(label_str_format=label_str_format,
                                                        between=between,

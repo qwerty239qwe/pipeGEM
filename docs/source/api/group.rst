@@ -55,5 +55,5 @@ Flux Analysis
 .. autosummary::
    .. toctree:: pipeGEM/
 
-   Model.do_flux_analysis
-   Model.do_ko_analysis
+   Group.do_flux_analysis
+   Group.do_ko_analysis

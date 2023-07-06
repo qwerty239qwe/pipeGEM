@@ -64,24 +64,25 @@ def plot_fva(fva_df: pd.DataFrame,
              rxn_ids: Union[List[str], Dict[str, str]],
              fig_title: str = None,
              filter_all_zeros: bool = True,
-             model_hue: bool = False,
+             color_by: bool = "model",
              threshold: float = 1e-6,
              vertical: bool = True,
              name_format: str = "{method}_result.png",
              verbosity: int = 0,
              **kwargs
              ):
-    fva_df = fva_df.loc[rxn_ids, :]
+    fva_df = fva_df.loc[fva_df["Reaction"].isin(rxn_ids), :]
     if filter_all_zeros:
         fva_df = filter_fva_df(fva_df=fva_df, threshold=threshold, verbosity=verbosity)
     ready_df = prep_fva_plotting_data(fva_df)
     fig, ax = plt.subplots()
     sns.boxplot(data=ready_df,
-                x="Reactions" if vertical else "Flux",
-                y="Flux" if vertical else "Reactions",
-                hue="name" if model_hue else None,
+                x="Reaction" if vertical else "Flux",
+                y="Flux" if vertical else "Reaction",
+                hue=color_by,
                 ax=ax,
                 whis=10,
+                width=0.6,
                 linewidth=0)
     ax.set_title(fig_title)
     plot_kws = {"g": fig}

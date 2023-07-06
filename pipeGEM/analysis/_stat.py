@@ -1,3 +1,5 @@
+import warnings
+
 import pandas as pd
 import scikit_posthocs as sp
 import pingouin as pg
@@ -30,12 +32,13 @@ class NormalityTester(AssumptionTester):
         else:
             norm_results = {}
             for g in data[group].unique():
-                print(g)
+                if len(data[data[group] == g][dv]) < 3:
+                    warnings.warn("Number of samples is less than 3, skipping normality test")
+                    norm_results[g] = {"statistic": 0, "p-value": 1}
+                    continue
                 statistic, pvalue = getattr(stats, method)(data[data[group] == g][dv])
-                print(statistic)
                 norm_results[g] = {"statistic": statistic, "p-value": pvalue}
             result_df = pd.DataFrame(norm_results).T
-        print(result_df)
         result_df["normal"] = (result_df["p-value"] > alpha)
         new_result = NormalityTestResult(log={"method": method,
                                               "group": group,
@@ -57,7 +60,10 @@ class HomoscedasticityTester(AssumptionTester):
             input_data = data[dv]
         else:
             input_data = data.groupby(group)[dv].apply(list)
-        statistic, pvalue = getattr(stats, method)(*input_data)
+        if len(input_data) >= 2:
+            statistic, pvalue = getattr(stats, method)(*input_data)
+        else:
+            statistic, pvalue = 0, 1
         result_df = pd.DataFrame({"statistic": [statistic], "p-value": [pvalue]})
         result_df["equal_var"] = (result_df["p-value"] > alpha)
         new_result = VarHomogeneityTestResult(log={"method": method})

@@ -126,7 +126,21 @@ class GeneData(BaseData):
         """
         self.rxn_mapper = RxnMapper(self, model, **kwargs)
 
-    def transformed_rxn_scores(self, func):
+    def transformed_rxn_scores(self, func) -> dict:
+        """
+        Get the transformed reaction activity scores.
+
+        Parameters
+        ----------
+        func: callable
+            Function used to transform the reaction score
+
+        Returns
+        -------
+        transformed_rxn_scores: dict
+            A dict contains reaction ids as keys and transformed reaction scores as values.
+
+        """
         return {k: func(v) for k, v in self.rxn_scores.items()}
 
     @property
@@ -194,7 +208,24 @@ class GeneData(BaseData):
     def apply(self, func):
         return {k: func(v) for k, v in self.rxn_mapper.rxn_scores.items()}
 
-    def get_threshold(self, name, transform=True, **kwargs):
+    def get_threshold(self,
+                      name: str,
+                      transform=True,
+                      **kwargs):
+        """
+        Calculate thresholds for classifying expressed and non-expressed reactions.
+
+        Parameters
+        ----------
+        name: str
+            Thresholding method
+        transform
+        kwargs
+
+        Returns
+        -------
+
+        """
         tf = threshold_finders.create(name)
         print("transform:", transform)
         return tf.find_threshold({gn: self.data_transform(gv) if transform else gv

@@ -111,11 +111,11 @@ class FVAPlotter(BasePlotter):
         super(FVAPlotter, self).__init__(dpi, prefix)
 
     def plot_func(self,
-                  fva_df: pd.DataFrame,
+                  flux_df: pd.DataFrame,
                   rxn_ids: Union[List[str], Dict[str, str]],
                   **kwargs
                   ):
-        return plot_fva(fva_df=fva_df,
+        return plot_fva(fva_df=flux_df,
                         rxn_ids=rxn_ids,
                         **kwargs)
 
