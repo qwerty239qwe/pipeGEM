@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from pipeGEM.utils import get_rxn_set, flip_direction
-from pipeGEM.analysis import find_sparse_mode, FASTCOREAnalysis, timing
+from pipeGEM.analysis import find_sparse_mode, FASTCOREAnalysis, timing, measure_efficacy
 
 
 @timing
@@ -99,7 +99,14 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
 
     result = FASTCOREAnalysis(log={"epsilon": epsilon,})
 
+    algo_efficacy = measure_efficacy(kept_rxn_ids=list(A),
+                                     removed_rxn_ids=rxns_to_remove,
+                                     core_rxn_ids=list(C),
+                                     non_core_rxn_ids=list(P))
+
     result.add_result(dict(result_model=output_model,
                            removed_rxn_ids=rxns_to_remove,
-                           kept_rxn_ids=A))
+                           kept_rxn_ids=A,
+                           algo_efficacy=algo_efficacy))
+
     return result

@@ -26,7 +26,7 @@ copyright = '2023, Yu-Te Lin'
 author = 'Yu-Te Lin'
 
 # The full version, including alpha/beta/rc tags
-release = '0.1.0-beta'
+release = '0.1.0'
 
 
 # -- General configuration ---------------------------------------------------

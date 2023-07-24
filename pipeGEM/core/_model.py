@@ -27,9 +27,14 @@ class Model(GEMComposite):
     ----------
     name_tag: optional, str
         The name of this object, it will be used in a pg.Group object.
-        If None, the model will be named 'Unnamed_model'
+        If None, the model will be named 'Unnamed_model'.
     model: optional, cobra.Model
-        A cobra model analyzed in this object
+        A cobra model analyzed in this object.
+    gene_data_factor_df: pd.DataFrame, default = None
+        A long table containing the names and factors of gene data that are going to be added to this model.
+        This annotation table are used in the aggregated_gene_data method.
+    kwargs: dict
+        Additional annotation for this model. Annotations are fetchable using Model.annotation.
 
     """
     def __init__(self,
@@ -110,7 +115,7 @@ class Model(GEMComposite):
                 subs[r.subsystem] = [r.id]
         return subs
 
-    def get_rxn_info(self, attrs):
+    def get_rxn_info(self, attrs) -> pd.DataFrame:
         return pd.DataFrame([{attr: getattr(r, attr) for attr in attrs}
                              for r in self._model.reactions],
                             index=[r.id for r in self._model.reactions])
@@ -311,6 +316,7 @@ class Model(GEMComposite):
         activated_tasks = self.get_activated_tasks(data_name, task_analysis,
                                                    score_threshold=score_threshold,
                                                    **kwargs)
+        print(f"Found {len(activated_tasks)} activated tasks by mapping {data_name} to this model.")
         return list(set(chain(*[task_analysis.get_task_support_rxns(task_id=task_id,
                                                                     include_supps=include_supp_rxns)
                                 for task_id in activated_tasks])))
@@ -402,6 +408,7 @@ class Model(GEMComposite):
 
         Returns
         -------
+        None
 
         """
         path = Path(file_name)
@@ -412,7 +419,26 @@ class Model(GEMComposite):
                        dic=additional)
 
     @classmethod
-    def load_model(cls, file_name):
+    def load_model(cls,
+                   file_name: str):
+        """
+        Load a pipeGEM model from a model file (json, sbml, mat..) and a toml file storing the metadata of the model
+
+        Parameters
+        ----------
+        file_name: str
+            Model file name.
+            In the same directory, here should be a toml file having the same file name and a .toml suffix
+            For example, a valid model file called 'model.json' is stored in a folder called 'folder'.
+            Then the files in the folder should be:
+            folder
+            |- model.json
+            |- model.toml
+            ...
+        Returns
+        -------
+        model: pipeGEM.Model
+        """
         model_pth = Path(file_name)
         add_ = parse_toml_file(Path(model_pth.stem).with_suffix(".toml"))
         model = load_model(file_name)

@@ -233,6 +233,10 @@ def run_integration_pipeline(gene_data_conf,
                                        integration_conf=integration_conf)
     task_supp_rxns = {}
     for g_name, g_data in gene_data_dic.items():
+        if (Path(integration_conf["saved_path"]) / g_name).is_dir():
+            print(f"{g_name} is already there. Skipping it")
+            continue
+
         task_supp_rxns[g_name] = map_data(data_name=g_name,
                                           gene_data=g_data,
                                           model=model,
@@ -265,7 +269,7 @@ def do_model_comparison(comparison_configs):
         print(factors.head())
     grp = Group(model_dic, name_tag="group", factors=factors)
     print(grp.get_info())
-    Path(comparison_configs["output_dir"]).mkdir(parents=True)
+    Path(comparison_configs["output_dir"]).mkdir(parents=True, exist_ok=True)
     root = Path(comparison_configs["output_dir"])
     #  number of comp
     num_comp = grp.compare(method="num",
@@ -337,7 +341,7 @@ def _fa_with_data(multi_model_conf,
         int_result = model.integrate_gene_data(data_name=g_name,
                                                **int_c)
         if not Path(file_saved_path).parent.is_dir():
-            Path(file_saved_path).parent.mkdir(parents=True)
+            Path(file_saved_path).parent.mkdir(parents=True, exist_ok=True)
 
         int_result.save(file_saved_path)
 
