@@ -177,12 +177,16 @@ class FBA_Analysis(FluxAnalysis):
              *args,
              **kwargs):
         pltr = FBAPlotter(dpi, prefix)
-        to_be_annot = [c for c in self.group_annotation.columns
-                       if c not in self._result["flux_df"].columns]
-        if len(to_be_annot) > 0:
-            to_be_plot = self._result["flux_df"].merge(self.group_annotation[to_be_annot],
-                                                       right_index=True,
-                                                       left_on="model")
+
+        if "group_annotation" in self._result:
+            to_be_annot = [c for c in self.group_annotation.columns
+                           if c not in self._result["flux_df"].columns]
+            if len(to_be_annot) > 0:
+                to_be_plot = self._result["flux_df"].merge(self.group_annotation[to_be_annot],
+                                                           right_index=True,
+                                                           left_on="model")
+            else:
+                to_be_plot = self._result["flux_df"]
         else:
             to_be_plot = self._result["flux_df"]
 

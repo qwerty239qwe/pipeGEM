@@ -30,7 +30,10 @@ dependencies = [
     "optlang",
     "networkx",
     "zeep",
-    "pint"
+    "pint",
+    "pingouin",
+    "scanpy",
+    "tomlkit"
 ]
 requires-python = ">=3.8"
 
@@ -49,6 +52,8 @@ doc = [
     "sphinx-issues",
     "sphinx-design",
     "pydata_sphinx_theme",
+    "myst-nb",
+    "ipywidgets"
 ]
 
 [project.urls]

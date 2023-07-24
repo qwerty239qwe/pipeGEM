@@ -9,8 +9,38 @@ class HyperGeometricTester:
 
 
 def hypergeometric_test(data: pd.DataFrame,
-                        pathway_col,
-                        sig_col):
+                        pathway_col: str,
+                        sig_col: str) -> pd.DataFrame:
+    """
+    The function uses the hypergeometric test to determine if certain pathways have a significantly
+    higher number of significant reactions compared to what would be expected by chance.
+
+    Parameters
+    ----------
+    data: pd.DataFrame
+        A pandas DataFrame containing the data used for the test.
+        It should have two columns: pathway_col indicating the pathway each reaction is categorized into,
+        and sig_col, a boolean column indicating whether the differential test of the reaction is significant (True)
+        or not (False).
+    pathway_col: str
+        A string specifying the name of the column in the DataFrame that indicates the pathway each reaction belongs to.
+    sig_col: str
+        A string specifying the name of the boolean column in the DataFrame that indicates
+        whether a particular reaction is significant (True) or not (False) in the differential test.
+
+    Returns
+    -------
+    result_df: pd.DataFrame
+    The function returns a pandas DataFrame named result_df, which contains the following columns:
+    `pval`: The raw p-values of the hypergeometric tests for each pathway.
+    `padj`: The Benjamini-Hochberg (BH)-adjusted p-values of the hypergeometric tests for each pathway.
+        The BH adjustment is a method to control the false discovery rate (FDR).
+    `BgRatio`: The ratio of the number of reactions in a specific pathway to the total number of reactions in the dataset.
+        This indicates the proportion of reactions in a pathway relative to the whole dataset.
+    `SigRatio`: The ratio of the number of significant reactions in a specific pathway
+        to the total number of significant reactions in the dataset.
+        This shows the proportion of significant reactions in a pathway relative to the total number of significant reactions.
+    """
     n_sigs = data[sig_col].astype(int).sum()
     n_pop = data.shape[0]
     cnt_pop_pathway = data.groupby(pathway_col).count().iloc[:, 0].to_dict()
