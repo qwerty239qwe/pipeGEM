@@ -12,8 +12,7 @@ def hypergeometric_test(data: pd.DataFrame,
                         pathway_col: str,
                         sig_col: str) -> pd.DataFrame:
     """
-    The function uses the hypergeometric test to determine if certain pathways have a significantly
-    higher number of significant reactions compared to what would be expected by chance.
+    Perform hypergeometric test on the given data.
 
     Parameters
     ----------

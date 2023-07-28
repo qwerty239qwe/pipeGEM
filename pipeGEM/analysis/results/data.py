@@ -9,6 +9,14 @@ from pipeGEM.plotting import DataCatPlotter
 
 
 class DataAggregation(BaseAnalysis):
+    """
+    Aggregated GeneData that helps to perform local thresholding, correlation, and dimensionality reduction analysis.
+
+    Parameters
+    -----------
+    log: dict
+        A dict storing parameters used to perform this analysis
+    """
     def __init__(self, log):
         super().__init__(log)
 

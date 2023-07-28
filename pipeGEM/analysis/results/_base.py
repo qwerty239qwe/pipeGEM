@@ -94,10 +94,10 @@ class BaseAnalysis:
         return self._result[item]
 
     @property
-    def result(self):
+    def result(self) -> dict:
         return self._result
 
-    def add_result(self, result):
+    def add_result(self, result) -> None:
         self._result.update(result)
 
     def add_running_time(self, t):
@@ -159,7 +159,7 @@ class BaseAnalysis:
         save_toml_file(parent_dir / self._result_folder_name / "other_values.toml", singular_values)
 
     def save(self,
-             file_path):
+             file_path: str):
         saved_dir = Path(file_path)
         saved_dir.mkdir(parents=True)
         print(f"Created a folder {file_path} to store the result")
