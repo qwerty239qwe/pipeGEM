@@ -35,7 +35,7 @@ class CORDABuilder:
         self._pif = penalty_increase_factor
         self._upper_bound = upper_bound
         self._sf = support_flux_value if rxn_scaling_coefs is None else \
-            {k: v * support_flux_value for k, v in rxn_scaling_coefs.items()}
+            {k: support_flux_value / v for k, v in rxn_scaling_coefs.items()}
         self._infeasible_rxns = []
         self._threshold = threshold
         self._mocks = mocks if mocks is not None else []

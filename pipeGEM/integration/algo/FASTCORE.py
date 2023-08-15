@@ -17,7 +17,7 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
                    epsilon: float,
                    return_model: bool,
                    raise_err: bool = True,
-                   rxn_scaling_coefs=None,) -> FASTCOREAnalysis:
+                   rxn_scaling_coefs: dict = None,) -> FASTCOREAnalysis:
     output_model = None
     if return_model:
         output_model = model.copy()
@@ -29,8 +29,10 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
     irr_rxns = get_rxn_set(model, "irreversible", dtype=np.array)
     backward_rxns = get_rxn_set(model, "backward", dtype=np.array)
     if rxn_scaling_coefs is not None:
-        tol = pd.Series({k: epsilon * v
+        tol = pd.Series({k: epsilon / v
                         for k, v in rxn_scaling_coefs.items()}).sort_index()
+    else:
+        tol = epsilon
 
     with model:
         if len(backward_rxns) > 0:
@@ -39,7 +41,7 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
         J = np.intersect1d(C, irr_rxns)
         P = np.setdiff1d(np.setdiff1d(all_rxns, C), nonP)
         singleJ = None
-        A = np.array(find_sparse_mode(J, P, nonP, model, singleJ, epsilon))
+        A = np.array(find_sparse_mode(J, P, nonP, model, singleJ, tol))
         A.sort()
         invalid_part = np.setdiff1d(J, A)
         track_irrev = False
@@ -51,7 +53,7 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
             n_j = len(J)
             while len(J) > 0:
                 P = np.setdiff1d(P, A)
-                supp = np.array(find_sparse_mode(J, P, nonP, model, singleJ, epsilon))
+                supp = np.array(find_sparse_mode(J, P, nonP, model, singleJ, tol))
                 A = np.union1d(A, supp)
                 if len(np.intersect1d(J, A)) > 0:
                     J = np.setdiff1d(J, A)
@@ -97,7 +99,7 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
     if output_model is not None:
         output_model.remove_reactions(list(rxns_to_remove), remove_orphans=True)
 
-    result = FASTCOREAnalysis(log={"epsilon": epsilon,})
+    result = FASTCOREAnalysis(log={"epsilon": tol,})
 
     algo_efficacy = measure_efficacy(kept_rxn_ids=list(A),
                                      removed_rxn_ids=rxns_to_remove,

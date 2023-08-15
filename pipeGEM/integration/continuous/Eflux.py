@@ -19,7 +19,8 @@ def apply_EFlux(model: cobra.Model,
                 flux_threshold: float = 1e-6,
                 remove_zero_fluxes: bool = False,
                 return_fluxes: bool = True,
-                transform: Union[Callable, str] = exp_x) -> EFluxAnalysis:
+                transform: Union[Callable, str] = exp_x,
+                rxn_scaling_coefs: Dict[str, float] = None) -> EFluxAnalysis:
     """
     Applies the EFlux algorithm to a metabolic model, using gene expression data
     to constrain reaction fluxes. The EFlux method scales gene expression values
@@ -91,10 +92,11 @@ def apply_EFlux(model: cobra.Model,
     model = model.copy()
     for r in model.reactions:
         if r not in model.exchanges and r.id not in ignore_rxn_ids:
-            if not np.isnan(trans_rxn_exp_dict[r.id]) and (-trans_rxn_exp_dict[r.id] > r.lower_bound):
-                r.lower_bound = -trans_rxn_exp_dict[r.id]
-            if not np.isnan(trans_rxn_exp_dict[r.id]) and (trans_rxn_exp_dict[r.id] < r.upper_bound):
-                r.upper_bound = trans_rxn_exp_dict[r.id]
+            coef = rxn_scaling_coefs[r.id] if r.id in rxn_scaling_coefs else 1
+            if not np.isnan(trans_rxn_exp_dict[r.id]) and (-trans_rxn_exp_dict[r.id] / coef > r.lower_bound):
+                r.lower_bound = -trans_rxn_exp_dict[r.id] / coef
+            if not np.isnan(trans_rxn_exp_dict[r.id]) and (trans_rxn_exp_dict[r.id] / coef < r.upper_bound):
+                r.upper_bound = trans_rxn_exp_dict[r.id] / coef
         r_bounds_dict[r.id] = r.bounds
     sol = pfba(model)
     flux_df = sol.to_frame()

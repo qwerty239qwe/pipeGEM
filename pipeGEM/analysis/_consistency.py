@@ -111,7 +111,7 @@ class FASTCC(ConsistencyTester):
         tol_ = tol
         consistent_model = None
         if rxn_scaling_coefs is not None:
-            tol = pd.Series({k: tol * v
+            tol = pd.Series({k: tol / v
                              for k, v in rxn_scaling_coefs.items()}).sort_index()
         if return_model:
             consistent_model = self.model.copy()

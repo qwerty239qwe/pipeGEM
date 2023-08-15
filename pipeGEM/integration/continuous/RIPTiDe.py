@@ -1,9 +1,10 @@
-from typing import Dict
+from typing import Dict, Optional, List
 
 import cobra
-
 from cobra.util import fix_objective_as_constraint
 import numpy as np
+import pandas as pd
+
 from pipeGEM.analysis import modified_pfba, add_mod_pfba, RIPTiDePruningAnalysis, RIPTiDeSamplingAnalysis, flux_analyzers, timing
 
 
@@ -15,6 +16,7 @@ def apply_RIPTiDe_pruning(model,
                           threshold: float = 1e-6,
                           protected_rxns = None,
                           max_inconsistency_score = 1e3,
+                          rxn_scaling_coefs: Dict[str, float] = None,
                           **kwargs
                           ):
     if protected_rxns is None:
@@ -22,24 +24,27 @@ def apply_RIPTiDe_pruning(model,
     rxn_expr_score = {k: v if -max_inconsistency_score < v < max_inconsistency_score else max_inconsistency_score
                       if v > max_inconsistency_score else -max_inconsistency_score
                       for k, v in rxn_expr_score.items() if not np.isnan(v)}
-
+    rxn_scaling_coefs = {r.id: 1 for r in model.reactions} if rxn_scaling_coefs is None else rxn_scaling_coefs
     max_gw = max_gw or max([i for i in rxn_expr_score.values() if not np.isnan(i)])
     if np.isnan(max_gw):
         raise ValueError("max_gw cannot be NaN")
     min_gw = min([i for i in rxn_expr_score.values() if np.isfinite(i)])
     print(f"Max RAL: {max_gw}, Min RAL: {min_gw}")
-    obj_dict = {r_id: (max_gw - r_exp) / (max_gw - min_gw) if (max_gw + min_gw - r_exp) < max_inconsistency_score else 1
+    obj_dict = {r_id: (max_gw - r_exp) * rxn_scaling_coefs[r_id] / (max_gw - min_gw)
+                if (max_gw + min_gw - r_exp) < max_inconsistency_score else rxn_scaling_coefs[r_id]
                 for r_id, r_exp in rxn_expr_score.items() if not (np.isnan(r_exp) or r_id in protected_rxns)}
 
     if not all([0 <= v <= 1 for _, v in obj_dict.items()]):
         raise ValueError(f"Some of the obj values are invalid, {[v for _, v in obj_dict.items() if not (0 <= v <= 1)]}")
     sol_df = modified_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac).to_frame()
-    rxn_to_remove = list(set(sol_df[abs(sol_df["fluxes"]) < threshold].index.to_list()) - set(protected_rxns))
+    rxn_to_remove = list(set(sol_df[abs(sol_df["fluxes"]).sort_index() <
+                                    threshold / pd.Series(rxn_scaling_coefs).sort_index()].index.to_list()) -
+                         set(protected_rxns))
     output_model = model.copy()
     output_model.remove_reactions(rxn_to_remove, remove_orphans=True)
     result = RIPTiDePruningAnalysis(log={"name": model.name, "max_gw": max_gw, "obj_frac": obj_frac,
                                          "threshold": threshold})
-    result.add_result(dict(result_model= output_model,
+    result.add_result(dict(result_model=output_model,
                            removed_rxn_ids=rxn_to_remove,
                            obj_dict=obj_dict))
     return result
@@ -49,15 +54,16 @@ def apply_RIPTiDe_pruning(model,
 def apply_RIPTiDe_sampling(model,
                            rxn_expr_score: Dict[str, float],
                            max_gw: float = None,
-                           max_inconsistency_score = 1e3,
+                           max_inconsistency_score: float = 1e3,
                            obj_frac: float = 0.8,
                            sampling_obj_frac: float = 0.05,
                            do_sampling: bool = False,
-                           solver = "gurobi",
+                           solver: str = "gurobi",
                            sampling_method: str = "gapsplit",
-                           protected_rxns = None,
+                           protected_rxns: Optional[List[str]] = None,
                            sampling_n: int = 500,
                            keep_context: bool = False,
+                           rxn_scaling_coefs: Dict[str, float] = None,
                            **kwargs
                            ):
     rxn_expr_score = {k: v if -max_inconsistency_score < v < max_inconsistency_score else max_inconsistency_score
@@ -65,13 +71,14 @@ def apply_RIPTiDe_sampling(model,
                       for k, v in rxn_expr_score.items() if not np.isnan(v)}
     max_gw = max_gw or np.nanmax(list(rxn_expr_score.values()))
     min_gw = np.nanmin(list(rxn_expr_score.values()))
+    rxn_scaling_coefs = {r.id: 1 for r in model.reactions} if rxn_scaling_coefs is None else rxn_scaling_coefs
     print(f"Max RAL: {max_gw}, Min RAL: {min_gw}")
     protected_rxns = protected_rxns or []
     if max_gw < max(rxn_expr_score.values()):
         raise ValueError("max_gw must be greater than or equal to the max rxn score")
-    obj_dict = {r_id: (r_exp - min_gw) / (max_gw - min_gw)
+    obj_dict = {r_id: (r_exp - min_gw) * rxn_scaling_coefs[r_id] / (max_gw - min_gw)
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)}
-    obj_dict.update({r.id: 1
+    obj_dict.update({r.id: rxn_scaling_coefs[r.id]
                      for r in model.reactions if r.id not in obj_dict or r.id in protected_rxns})  # same as the smallest weight
     assert all([1 >= i >= 0 for i in list(obj_dict.values())])
 
