@@ -203,7 +203,8 @@ def _integration_get_thres(gene_data, threshold_config, integration_conf):
 
 def _preprocess_int_configs(integration_conf,
                             th_result,
-                            protected_rxns):
+                            protected_rxns,
+                            rxn_s_factors):
     integration_conf = {k: v for k, v in integration_conf.items()}
     saved_path = integration_conf.pop("saved_path")
     int_name = integration_conf.pop("integrator_name")
@@ -216,6 +217,7 @@ def _preprocess_int_configs(integration_conf,
         integration_conf["predefined_threshold"] = th_result
 
     integration_conf["protected_rxns"] = integration_conf.get("protected_rxns", []) + protected_rxns
+    integration_conf["rxn_scaling_coefs"] = rxn_s_factors
     return integration_conf, saved_path
 
 
@@ -244,7 +246,8 @@ def run_integration_pipeline(gene_data_conf,
         int_c, saved_path = _preprocess_int_configs(integration_conf=integration_conf,
                                                     th_result=th_result[g_name]
                                                         if isinstance(th_result, dict) else th_result,
-                                                    protected_rxns=task_supp_rxns[g_name])
+                                                    protected_rxns=task_supp_rxns[g_name],
+                                                    rxn_s_factors=rxn_s_factors)
         int_result = model.integrate_gene_data(data_name=g_name,
                                                **int_c)
         int_result.save(Path(saved_path) / g_name)

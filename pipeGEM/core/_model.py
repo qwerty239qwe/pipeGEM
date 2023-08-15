@@ -358,6 +358,9 @@ class Model(GEMComposite):
                             data_name,
                             integrator="GIMME",
                             integrator_init_kwargs=None,
+                            rxn_scaling_coefs=None,
+                            predefined_threshold=None,
+                            protected_rxns=None,
                             **kwargs):
         """
         Integrate gene data with this model.
@@ -389,6 +392,9 @@ class Model(GEMComposite):
             integrator = integrator_factory.create(integrator, **integrator_init_kwargs)
         return integrator.integrate(data=self._gene_data[data_name],
                                     model=self._model,
+                                    rxn_scaling_coefs=rxn_scaling_coefs,
+                                    predefined_threshold=predefined_threshold,
+                                    protected_rxns=protected_rxns,
                                     **kwargs)
 
     def get_RAS(self, data_name, method="mean"):

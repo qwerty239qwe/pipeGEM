@@ -20,7 +20,8 @@ def apply_GIMME(model: cobra.Model,
                 max_inconsistency_score = 1e3,
                 return_fluxes: bool = True,
                 keep_context: bool = False,
-                rxn_scaling_coefs: dict = None
+                rxn_scaling_coefs: dict = None,
+                predefined_threshold=None
                 ):
     """
     GIMME implementation

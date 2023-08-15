@@ -20,7 +20,8 @@ def apply_EFlux(model: cobra.Model,
                 remove_zero_fluxes: bool = False,
                 return_fluxes: bool = True,
                 transform: Union[Callable, str] = exp_x,
-                rxn_scaling_coefs: Dict[str, float] = None) -> EFluxAnalysis:
+                rxn_scaling_coefs: Dict[str, float] = None,
+                predefined_threshold=None) -> EFluxAnalysis:
     """
     Applies the EFlux algorithm to a metabolic model, using gene expression data
     to constrain reaction fluxes. The EFlux method scales gene expression values
@@ -67,6 +68,10 @@ def apply_EFlux(model: cobra.Model,
               f", no constraints will be applied on them")
     else:
         ignore_rxn_ids = []
+
+    if rxn_scaling_coefs is not None:
+        print("Identified rxn_scaling_coefs, will use it to adjust flux values")
+    rxn_scaling_coefs = {r.id: 1 for r in model.reactions} if rxn_scaling_coefs is None else rxn_scaling_coefs
     exps = [v if v > min_score else min_score for _, v in rxn_expr_score.items() if not np.isnan(v)]
     max_exp = max(exps) if len(exps) != 0 else max_ub
     min_exp = min(exps) if len(exps) != 0 else min_lb
