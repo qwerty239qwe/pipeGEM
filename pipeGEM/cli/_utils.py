@@ -62,6 +62,7 @@ def preprocess_model(model_conf):
     else:
         rescaled_result = model.check_model_scale(method=model_conf["rescale"]["method"],
                                                   n_iter=model_conf["rescale"]["n_iter"])
+        #Path(model_conf["rescale"]["saved_path"]).mkdir(exist_ok=True)
         rescaled_result.save(model_conf["rescale"]["saved_path"])
 
     # consistency
@@ -74,6 +75,7 @@ def preprocess_model(model_conf):
         cons_result = cons_tester.analyze(**model_conf["consistency"]["params"])
     # model.remove_reactions(cons_result.removed_rxn_ids)
     # cons_result.add_result(dict(consistent_model=model))
+    #Path(model_conf["consistency"]["saved_path"]).mkdir(exist_ok=True)
     cons_result.save(model_conf["consistency"]["saved_path"])
     model = cons_result.consistent_model
 
@@ -85,6 +87,7 @@ def preprocess_model(model_conf):
     task_result = model.test_tasks(name="default",
                                    met_scaling_coefs=rescaled_result.met_scaling_factor,
                                    **tt_params)
+    #Path(model_conf["functionality_test"]["saved_path"]).mkdir(exist_ok=True)
     task_result.save(model_conf["functionality_test"]["saved_path"])
     return model, task_result
 
@@ -324,10 +327,13 @@ def _fa_with_data(multi_model_conf,
                                        integration_conf=integration_conf)
     # prec_tasks_path = integration_conf["precompute"]["tasks"]["task_result_path"]
     # task_result = TaskAnalysis.load(file_path=prec_tasks_path)
+    if "rxn_scaling_factor" in integration_conf["precompute"] and \
+        (integration_conf["precompute"]["rxn_scaling_factor"]["file_path"] is not None):
+        rxn_s_factors = parse_toml_file(integration_conf["precompute"]["rxn_scaling_factor"]["file_path"])
+    else:
+        rxn_s_factors = None
     task_supp_rxns = {}
     for g_name, g_data in gene_data_dic.items():
-
-
         model = _load_exist_model(model_path_struct, g_name, model_type)
         task_supp_rxns[g_name] = map_data(data_name=g_name,
                                           gene_data=g_data,
@@ -336,7 +342,8 @@ def _fa_with_data(multi_model_conf,
         int_c, saved_path = _preprocess_int_configs(integration_conf=integration_conf,
                                                     th_result=th_result[g_name]
                                                     if isinstance(th_result, dict) else th_result,
-                                                    protected_rxns=task_supp_rxns[g_name])
+                                                    protected_rxns=task_supp_rxns[g_name],
+                                                    rxn_s_factors=rxn_s_factors)
         file_saved_path = saved_path.format(g_name)
         if Path(file_saved_path).is_dir():
             continue

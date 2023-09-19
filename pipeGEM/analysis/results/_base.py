@@ -4,6 +4,7 @@ from textwrap import dedent
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from pipeGEM.utils import save_toml_file, parse_toml_file, ObjectFactory, \
     save_model, load_model
@@ -180,7 +181,8 @@ class BaseAnalysis:
                 result_types[k] = f"{module_name}.{v.__class__.__name__}"
 
         save_toml_file(saved_dir / "analysis_params.toml", {"running_time": self._running_time,
-                                                            "log": self.log,
+                                                            "log": {k: v if not isinstance(v, pd.Series) else v.to_dict()
+                                                                    for k, v in self.log.items()},
                                                             "result_types": result_types})
         self._save_results(parent_dir=saved_dir, result_types=result_types)
 

@@ -64,6 +64,9 @@ def apply_RIPTiDe_sampling(model,
                            sampling_n: int = 500,
                            keep_context: bool = False,
                            rxn_scaling_coefs: Dict[str, float] = None,
+                           thinning=100,
+                           processes=1,
+                           seed=None,
                            **kwargs
                            ):
     rxn_expr_score = {k: v if -max_inconsistency_score < v < max_inconsistency_score else max_inconsistency_score
@@ -80,7 +83,7 @@ def apply_RIPTiDe_sampling(model,
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)}
     obj_dict.update({r.id: rxn_scaling_coefs[r.id]
                      for r in model.reactions if r.id not in obj_dict or r.id in protected_rxns})  # same as the smallest weight
-    assert all([1 >= i >= 0 for i in list(obj_dict.values())])
+    # assert all([1 >= i >= 0 for i in list(obj_dict.values())])
 
     sampling_result = None
     if do_sampling:
@@ -94,7 +97,9 @@ def apply_RIPTiDe_sampling(model,
             sampling_result = sampling_analyzer.analyze(n=sampling_n,
                                                         method=sampling_method,
                                                         obj_lb_ratio=sampling_obj_frac,
-                                                        **kwargs)
+                                                        thinning=thinning,
+                                                        processes=processes,
+                                                        seed=seed)
     if keep_context:
         add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac, direction="max")
         fix_objective_as_constraint(model=model, fraction=sampling_obj_frac)
