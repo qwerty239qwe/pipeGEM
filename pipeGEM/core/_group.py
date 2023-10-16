@@ -230,9 +230,10 @@ class Group(GEMComposite):
         for name, c in self._group.items():
             result = c.do_flux_analysis(method=method, solver=solver, **kwargs)
             result.add_categorical(c.name_tag, col_name="model")
-            for ftr_name, ftr in self._group_annotation[c.name_tag].items():
-                result.add_categorical(ftr,
-                                       col_name=ftr_name)
+            if c.name_tag in self._group_annotation:
+                for ftr_name, ftr in self._group_annotation[c.name_tag].items():
+                    result.add_categorical(ftr,
+                                           col_name=ftr_name)
             results.append(result)
         gp_annot = pd.DataFrame({group_by: self.annotation[group_by].unique()},
                                 index=self.annotation[group_by].unique()) if group_by is not None else self.annotation

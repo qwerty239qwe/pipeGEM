@@ -59,7 +59,8 @@ def test_group_get_flux(group):
     fba_result = group.do_flux_analysis(method="FBA", solver="glpk")
     sampling_result = group.do_flux_analysis(method="sampling", solver="glpk", n=10)
     print(sampling_result.result)
-    assert isinstance(fba_result.result, pd.DataFrame)
+    assert isinstance(fba_result.result, dict)
+    assert isinstance(fba_result.result["flux_df"], pd.DataFrame)
     assert isinstance(sampling_result.result, dict)
 
 
