@@ -77,7 +77,7 @@ def plot_percentile_thresholds(data: Union[pd.DataFrame, pd.Series],
     n_needed_colors = 1 if isinstance(exp_th, float) else len(exp_th)
 
     colors = handle_colors(palette=palatte,
-                           switch_when_exceed=1+n_needed_colors)
+                           n_colors_used=1+n_needed_colors)
     ax = sns.histplot(data=data,
                       ax=ax,
                       kde=True,

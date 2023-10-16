@@ -155,7 +155,7 @@ def plot_embedding(embedding_df: pd.DataFrame,
         if k in kwargs:
             del kwargs[k]
     colors = handle_colors(palette=palette,
-                           switch_when_exceed=len(groups))
+                           n_colors_used=len(groups))
     fig, ax = plt.subplots(figsize=figsize)
     if sheet_file_name is not None:
         embedding_df.to_csv(sheet_file_name)
@@ -218,7 +218,7 @@ def plot_2D_PCA_score(pca_df,
         A dictionary of keyword arguments to be passed to the plotting function.
     """
     colors = handle_colors(palette=palette,
-                           switch_when_exceed=len(groups))
+                           n_colors_used=len(groups))
     fig, ax = plt.subplots(figsize=(7, 7))
     if features is None:
         for i, (group_name, model_names) in enumerate(groups.items()):
@@ -276,7 +276,7 @@ def plot_3D_PCA_score(pca_df: pd.DataFrame,
 
     """
     colors = handle_colors(palette=palette,
-                           switch_when_exceed=len(groups))
+                           n_colors_used=len(groups))
     fig = plt.figure(figsize=(7, 7))
     ax = fig.add_subplot(111, projection="3d")
     for i, (group_name, model_names) in enumerate(groups.items()):

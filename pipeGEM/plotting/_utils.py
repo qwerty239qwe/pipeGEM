@@ -130,12 +130,13 @@ def draw_significance(ax, x_pos_list, y_pos_list, num_stars):
 
 def handle_colors(palette: str = "deep",
                   alt_palette: str = "Spectral",
-                  switch_when_exceed: int = 10,
+                  n_colors_used: int = 10,
                   warn_when_switch=True):
     colors = sns.color_palette(palette, n_colors=sns.palettes.QUAL_PALETTE_SIZES[palette])
-    if len(colors) < switch_when_exceed:
+    if len(colors) < n_colors_used:
         if warn_when_switch:
             warnings.warn(f"{palette} contains less colors ({sns.palettes.QUAL_PALETTE_SIZES[palette]})"
-                          f" than the number of groups ({switch_when_exceed}). Palette has been changed to Spectral.")
-        colors = sns.color_palette(alt_palette, n_colors=len(colors))
+                          f" than the number of groups ({n_colors_used}). "
+                          f"Palette has been changed to {alt_palette}.")
+        colors = sns.color_palette(alt_palette, n_colors=n_colors_used)
     return colors

@@ -22,8 +22,8 @@ def test_UMAP(pFBA_result):
 
 
 def test_corr(pFBA_result):
-    corr_result = pFBA_result.corr("treatments")
+    corr_result = pFBA_result.corr(group_by="treatments")
     corr_result.plot()
 
-    corr_result = pFBA_result.corr("reaction")
+    corr_result = pFBA_result.corr(rxn_corr=True)
     corr_result.plot()

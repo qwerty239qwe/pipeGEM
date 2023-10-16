@@ -8,7 +8,7 @@ import seaborn as sns
 from ._utils import save_fig, _get_subsystem_ticks
 
 
-def _parse_one_axis_colors(groups,
+def _parse_one_axis_colors(groups: pd.DataFrame,
                            color_palette: Union[List[str], str, Dict[str, str]] = "deep",
                            palette_replacement = "Spectral",
                            color_order: Dict[str, List[str]] = None
