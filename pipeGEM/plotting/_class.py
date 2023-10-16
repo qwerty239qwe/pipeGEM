@@ -84,7 +84,7 @@ class BasePlotter:
         raise NotImplementedError("This class should be inherited")
 
     def add_style(self):
-        plt.style.use("seaborn")
+        plt.style.use("seaborn-v0_8-darkgrid")
 
 
 class FBAPlotter(BasePlotter):
