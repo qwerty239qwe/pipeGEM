@@ -1,4 +1,5 @@
 import numpy as np
+import scipy
 
 from pipeGEM.utils import ObjectFactory, save_model, load_model, load_pg_model, save_toml_file, parse_toml_file
 import pandas as pd
@@ -128,6 +129,25 @@ class NDArrayFloatFileManager(BaseFileManager):
         return arr
 
 
+class SparseArrayFloatFileManager(BaseFileManager):
+    def __init__(self):
+        super(SparseArrayFloatFileManager, self).__init__(np.ndarray,
+                                                          default_suffix=".npz")
+
+    def write(self, obj, file_name, **kwargs):
+        if "suffix" in kwargs:
+            suffix = kwargs.pop("suffix")
+        else:
+            suffix = self.suffix
+        scipy.sparse.save_npz(str(Path(file_name).with_suffix(suffix)),
+                              obj,
+                              **kwargs)
+
+    def read(self, file_name, **kwargs):
+        arr = scipy.sparse.load_npz(file_name)
+        return arr
+
+
 class DictFileManager(BaseFileManager):
     def __init__(self):
         super(DictFileManager, self).__init__(dict,
@@ -175,5 +195,6 @@ fmanagers.register("cobra.Model", CobraModelFileManager)
 fmanagers.register("pipeGEM.Model", PGModelFileManager)
 fmanagers.register("numpy.NDArrayStr", NDArrayStrFileManager)
 fmanagers.register("numpy.NDArrayFloat", NDArrayFloatFileManager)
+fmanagers.register("scipy.SparseArrayFloat", SparseArrayFloatFileManager)
 fmanagers.register("python.dict", DictFileManager)
 fmanagers.register("python.set", SetFileManager)

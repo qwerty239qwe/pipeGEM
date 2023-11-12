@@ -22,7 +22,9 @@ def _parse_one_axis_colors(groups: pd.DataFrame,
         for rcol, rval in g_vals.items():
             palette_ = sns.color_palette(color_palette
                                          if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[color_palette]
-                                         else palette_replacement)
+                                         else palette_replacement,
+                                         n_colors=None
+                                         if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[color_palette] else len(rval))
             color_maps[rcol] = dict(zip(rval, palette_[:len(rval)]))
 
     elif isinstance(color_palette, list):
@@ -31,7 +33,9 @@ def _parse_one_axis_colors(groups: pd.DataFrame,
         for cp, (rcol, rval) in zip(color_palette, g_vals.items()):
             palette_ = sns.color_palette(cp
                                          if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[cp]
-                                         else palette_replacement)
+                                         else palette_replacement,
+                                         n_colors=None
+                                         if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[color_palette] else len(rval))
             color_maps[rcol] = dict(zip(rval, palette_[:len(rval)]))
     elif isinstance(color_palette, dict):
         assert all([isinstance(c, str) for c in color_palette]), "Keys in the color_palette should be strings"
@@ -40,7 +44,10 @@ def _parse_one_axis_colors(groups: pd.DataFrame,
         for rcol, rval in g_vals.items():
             palette_ = sns.color_palette(color_palette[rcol]
                                          if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[color_palette[rcol]]
-                                         else palette_replacement)
+                                         else palette_replacement,
+                                         n_colors=None
+                                         if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[color_palette] else len(rval)
+                                         )
             color_maps[rcol] = dict(zip(rval, palette_[:len(rval)]))
 
     colors = groups.copy()

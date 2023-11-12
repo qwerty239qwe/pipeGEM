@@ -52,7 +52,7 @@ def test_check_model_scale_geometric_mean(ecoli_core):
 
 def test_check_model_scale_arithmetic(ecoli_core):
     mod = Model(model=ecoli_core, name_tag="ecoli")
-    print(mod.optimize())
+    #print(mod.optimize())
     print(mod.reactions.BIOMASS_Ecoli_core_w_GAM)
 
     # let's mess this around
@@ -62,10 +62,20 @@ def test_check_model_scale_arithmetic(ecoli_core):
     #     print(f"add 99999 {mod.metabolites[0].id} to {r.id}")
     #     r.add_metabolites({mod.metabolites[0]: 99999})
     rescale_result = mod.check_model_scale(method="arithmetic", n_iter=5)
-    print(abs(rescale_result.rescaled_A).max())
     print(abs(rescale_result.diff_A).max())
     print(mod.optimize())
 
-    print(rescale_result.rescaled_model.reactions[0], rescale_result.rescaled_model.reactions[0].lower_bound, rescale_result.rescaled_model.reactions[0].upper_bound)
+    print(rescale_result.rescaled_model.reactions[0],
+          rescale_result.rescaled_model.reactions[0].lower_bound,
+          rescale_result.rescaled_model.reactions[0].upper_bound)
     print(rescale_result.rescaled_model.optimize())
     print(rescale_result.rescaled_model.reactions.BIOMASS_Ecoli_core_w_GAM)
+
+    reversed_rescaled = rescale_result.reverse_scaling(rescale_result.rescaled_model)
+    assert reversed_rescaled.reactions[0].lower_bound == mod.reactions[0].lower_bound, \
+        reversed_rescaled.reactions[0].bounds
+    print(mod.reactions[0].lower_bound)
+
+    assert reversed_rescaled.reactions[0].upper_bound == mod.reactions[0].upper_bound, \
+        reversed_rescaled.reactions[0].bounds
+    print(mod.reactions[0].upper_bound, )

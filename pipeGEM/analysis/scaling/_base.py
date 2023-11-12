@@ -1,8 +1,15 @@
 from pipeGEM.utils import ObjectFactory
-from pipeGEM.analysis import ModelScalingResult
+from pipeGEM.analysis import ModelScalingResult, timing
 from cobra.util.array import create_stoichiometric_matrix
 import numpy as np
 import numpy.ma as ma
+from scipy.sparse import csc_matrix, lil_matrix
+from scipy import sparse
+from tqdm import tqdm
+
+
+def get_decimals(x):
+    return len(str(float(x)).split(".")[1])
 
 
 class ModelScalerCollection(ObjectFactory):
@@ -13,8 +20,9 @@ class ModelScalerCollection(ObjectFactory):
 class ModelScaler:
     def __init__(self):
         super().__init__()
-        self._rescaled_A = None
         self._diff_A = None
+        self._decimals = None
+        self._old_A = None
         self.m_ind = None
         self.r_ind = None
         self.cons_scale_diags = None
@@ -50,6 +58,7 @@ class ModelScaler:
         arr = create_stoichiometric_matrix(model)
         old_arr = arr.copy()
         row_psc, col_psc = self.calc_coef_scale_diff(arr)
+        print("Before rescaling:")
         print(f"Problematic rows (metabolite coefficients): {row_psc}")
         print(f"Problematic cols (metabolite coefficients): {col_psc}")
         self.m_ind = model.metabolites.index
@@ -57,30 +66,36 @@ class ModelScaler:
         self.cons_scale_diags = np.ones(shape=(len(model.reactions,)))
         self.mets_scale_diags = np.ones(shape=(len(model.metabolites, )))
 
-        for _ in range(n_iter):
+        for _ in tqdm(range(n_iter)):
             arr = self.one_operation(arr)
             if self.reach_stop_crit(arr):
-                print("Reached stopping criterion")
+                print("Reached stop criterion")
                 break
         row_psc, col_psc = self.calc_coef_scale_diff(arr)
+        print("After rescaling:")
         print(f"Problematic rows (metabolite coefficients): {row_psc}")
         print(f"Problematic cols (reaction coefficients): {col_psc}")
-        self._rescaled_A = arr
-        self._diff_A = self._rescaled_A - old_arr
+        self._diff_A = csc_matrix(arr - old_arr)
+        self._old_A = csc_matrix(old_arr)
+        self._decimals = lil_matrix(np.zeros(shape=self._diff_A.shape), dtype=int)
 
+    @timing
     def rescale_model(self, model, n_iter):
         new_mod = model.copy()
         self.get_rescale_factor(new_mod, n_iter)
         rxn_index = {self.r_ind(r): r.id for r in new_mod.reactions}
-        met_index = {self.m_ind(m): m for m in new_mod.metabolites}
+        met_index = {self.m_ind(m): m.id for m in new_mod.metabolites}
 
         met_scaling_factor = {}
         rxn_scaling_factor = {}
         for i, m in met_index.items():
-            met_scaling_factor[m.id] = self.mets_scale_diags[i]
+            met_scaling_factor[m] = self.mets_scale_diags[i]
 
         for i, r_id in rxn_index.items():
-            involved_met_ids = np.where(self._diff_A[:, i] != 0)[0]  # met index
+            involved_met_ids = sparse.find(self._diff_A[:, i] != 0)[0]  # met index
+            for mi in involved_met_ids:
+                self._decimals[mi, i] = get_decimals(self._old_A[mi, i])
+
             new_mod.reactions.get_by_id(r_id).add_metabolites({
                 met_index[mi]: self._diff_A[mi, i]
                 for mi in involved_met_ids
@@ -92,7 +107,9 @@ class ModelScaler:
                                              method=self.__class__.__name__))
         result.add_result(dict(rescaled_model=new_mod,
                                diff_A=self._diff_A,
-                               rescaled_A=self._rescaled_A,
+                               decimals=self._decimals,
                                met_scaling_factor=met_scaling_factor,
-                               rxn_scaling_factor=rxn_scaling_factor))
+                               rxn_scaling_factor=rxn_scaling_factor,
+                               rxn_index=rxn_index,
+                               met_index=met_index))
         return result

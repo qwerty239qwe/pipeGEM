@@ -100,7 +100,7 @@ def get_organic_exs(model,
     for r in ex_rxns:
         if r.id in except_rxns:
             continue
-        if any([m.id not in except_mets for m in r.metabolites]):
+        if any([m.id in except_mets for m in r.metabolites]):
             continue
         if any(["C" in m.formula and "H" in m.formula for m in r.metabolites]) or \
                 any(["C" in m.formula and "R" in m.formula for m in r.metabolites]) or \
