@@ -107,7 +107,7 @@ class ModelScaler:
                                              method=self.__class__.__name__))
         result.add_result(dict(rescaled_model=new_mod,
                                diff_A=self._diff_A,
-                               decimals=self._decimals,
+                               decimals=csc_matrix(self._decimals),
                                met_scaling_factor=met_scaling_factor,
                                rxn_scaling_factor=rxn_scaling_factor,
                                rxn_index=rxn_index,
