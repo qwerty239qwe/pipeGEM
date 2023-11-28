@@ -86,12 +86,18 @@ class ModelScaler:
         rxn_index = {self.r_ind(r): r.id for r in new_mod.reactions}
         met_index = {self.m_ind(m): m.id for m in new_mod.metabolites}
 
+        rxn_index = [rxn_index[i] if i in rxn_index else None for i in range(max(rxn_index.keys())+1)]
+        met_index = [met_index[i] if i in met_index else None for i in range(max(met_index.keys())+1)]
+
         met_scaling_factor = {}
         rxn_scaling_factor = {}
-        for i, m in met_index.items():
+        for i, m in enumerate(met_index):
             met_scaling_factor[m] = self.mets_scale_diags[i]
 
-        for i, r_id in rxn_index.items():
+        for i, r_id in enumerate(rxn_index):
+            if r_id is None:
+                continue
+
             involved_met_ids = sparse.find(self._diff_A[:, i] != 0)[0]  # met index
             for mi in involved_met_ids:
                 self._decimals[mi, i] = get_decimals(self._old_A[mi, i])

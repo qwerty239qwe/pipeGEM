@@ -182,7 +182,7 @@ def load_model(model_file_path: str) -> cobra.Model:
 def load_pg_model(file_name):
     import pipeGEM
     model_pth = Path(file_name)
-    add_ = parse_toml_file(Path(model_pth.stem).with_suffix(".toml"))
+    add_ = parse_toml_file(model_pth.with_name(f"{model_pth.stem}_annotations.toml"))
     model = load_model(file_name)
     name = add_.pop("name_tag")
     return pipeGEM.Model(name_tag=name, model=model, **add_)

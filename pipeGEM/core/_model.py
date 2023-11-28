@@ -421,7 +421,7 @@ class Model(GEMComposite):
         save_model(self._model, str(path))
         additional = self.annotation
         additional.update({"name_tag": self.name_tag})
-        save_toml_file(file_name=Path(path.stem).with_suffix(".toml"),
+        save_toml_file(file_name=path.with_name(f"{path.stem}_annotations.toml"),
                        dic=additional)
 
     @classmethod
@@ -446,7 +446,7 @@ class Model(GEMComposite):
         model: pipeGEM.Model
         """
         model_pth = Path(file_name)
-        add_ = parse_toml_file(Path(model_pth.stem).with_suffix(".toml"))
+        add_ = parse_toml_file(model_pth.with_name(f"{model_pth.stem}_annotations.toml"))
         model = load_model(file_name)
         name = add_.pop("name_tag")
         return cls(name_tag=name, model=model, **add_)

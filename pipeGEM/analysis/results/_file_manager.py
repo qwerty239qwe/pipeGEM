@@ -183,6 +183,24 @@ class SetFileManager(BaseFileManager):
         return set(parse_toml_file(file_name)["set"])
 
 
+class ListFileManager(BaseFileManager):
+    def __init__(self):
+        super(ListFileManager, self).__init__(dict,
+                                              default_suffix=".toml")
+
+    def write(self, obj, file_name, **kwargs):
+        if "suffix" in kwargs:
+            suffix = kwargs.pop("suffix")
+        else:
+            suffix = self.suffix
+
+        save_toml_file(str(Path(file_name).with_suffix(suffix)),
+                       {"list": obj})
+
+    def read(self, file_name, **kwargs):
+        return set(parse_toml_file(file_name)["list"])
+
+
 class FileManagers(ObjectFactory):
     def __init__(self):
         super().__init__()
@@ -198,3 +216,4 @@ fmanagers.register("numpy.NDArrayFloat", NDArrayFloatFileManager)
 fmanagers.register("scipy.SparseArrayFloat", SparseArrayFloatFileManager)
 fmanagers.register("python.dict", DictFileManager)
 fmanagers.register("python.set", SetFileManager)
+fmanagers.register("python.list", ListFileManager)
