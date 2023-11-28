@@ -384,7 +384,7 @@ class MediumData(BaseData):
     def apply(self,
               model,
               cell_dgw=1e-12,
-              n_cells_per_l = 1e6,
+              n_cells_per_l = 1e9,
               time_hr=96,
               flux_unit="mmol/g/hr",
               threshold=1e-6
