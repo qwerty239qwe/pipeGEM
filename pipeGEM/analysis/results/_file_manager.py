@@ -198,7 +198,7 @@ class ListFileManager(BaseFileManager):
                        {"list": obj})
 
     def read(self, file_name, **kwargs):
-        return set(parse_toml_file(file_name)["list"])
+        return parse_toml_file(file_name)["list"]
 
 
 class FileManagers(ObjectFactory):
