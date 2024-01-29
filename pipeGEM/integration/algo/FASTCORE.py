@@ -16,12 +16,13 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
                    model: cobra.Model,
                    epsilon: float,
                    return_model: bool,
+                   copy_model: bool = True,
                    raise_err: bool = True,
                    rxn_scaling_coefs: dict = None,
                    calc_efficacy: bool = True) -> FASTCOREAnalysis:
     output_model = None
     if return_model:
-        output_model = model.copy()
+        output_model = model.copy() if copy_model else model
     if not isinstance(C, np.ndarray):
         C = np.array(list(C))
     if not isinstance(nonP, np.ndarray):

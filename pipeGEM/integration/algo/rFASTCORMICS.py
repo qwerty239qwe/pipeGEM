@@ -29,6 +29,7 @@ def apply_rFASTCORMICS(model,
         cons_result = consistency_tester.analyze(tol=threshold, rxn_scaling_coefs=rxn_scaling_coefs)
         model = cons_result.consistent_model
 
+    model = model.copy()
     rxn_in_model = set([r.id for r in model.reactions])
     protected_rxns = protected_rxns if protected_rxns is not None else []
     non_core_rxns = (set([r for r, c in rxn_scores.items() if c < non_exp_th]) - set(protected_rxns)) & rxn_in_model
@@ -52,17 +53,14 @@ def apply_rFASTCORMICS(model,
                                    model=model,
                                    epsilon=threshold,
                                    return_model=True,
+                                   copy_model=False,
                                    raise_err=FASTCORE_raise_error,
                                    rxn_scaling_coefs=rxn_scaling_coefs,
                                    calc_efficacy=calc_efficacy)
 
-        n_ex_bounds_changed = 0
         for r in pr_result.result_model.exchanges:
             if r.id in old_exchange_bounds:
                 pr_result.result_model.reactions.get_by_id(r.id).bounds = old_exchange_bounds[r.id]
-                n_ex_bounds_changed += 1
-
-        print(f"Reset the bounds of {n_ex_bounds_changed} loosed exchange reactions.")
 
         pr_result_obj.add_result(dict(fastcore_result=pr_result,
                                       core_rxns=core_rxns,
@@ -94,6 +92,7 @@ def apply_rFASTCORMICS(model,
                                    model=model,
                                    epsilon=threshold,
                                    return_model=True,
+                                   copy_model=False,
                                    rxn_scaling_coefs=rxn_scaling_coefs)
         pr_result_obj.add_result(dict(fastcore_result=pr_result,
                                       core_rxns=core_rxns,
