@@ -100,14 +100,16 @@ def plot_sampling_displot(flux_df,
                           kind,
                           group_by,
                           vertical,
-                          stat_analysis=None):
+                          stat_analysis=None,
+                          **kwargs):
     xy_val = {"x": rxn_id if vertical else None,
               "y": rxn_id if not vertical else None}
     facet = sns.displot(data=flux_df,
                         x=xy_val["x"],
                         y=xy_val["y"],
                         kind=kind,
-                        hue=group_by)
+                        hue=group_by,
+                        **kwargs)
     if stat_analysis is not None:
         pass
 
@@ -122,7 +124,8 @@ def plot_sampling_catplot(flux_df,
                           vertical,
                           stat_analysis=None,
                           stat_analysis_rxn_id_col="label",
-                          star_notation_cutoffs=None):
+                          star_notation_cutoffs=None,
+                          **kwargs):
     xy_val = {"x": rxn_id if not vertical else group_by,
               "y": rxn_id if vertical else group_by}
     if group_order is None:
@@ -134,7 +137,8 @@ def plot_sampling_catplot(flux_df,
                         kind=kind,
                         hue=group_by,
                         dodge=False,
-                        order=group_order)
+                        order=group_order,
+                        **kwargs)
     if stat_analysis is not None:
         if star_notation_cutoffs is None:
             star_notation_cutoffs = [0.05,] + [10**(-i) for i in range(2, 5)]
@@ -189,6 +193,7 @@ def plot_sampling_df(flux_df,
                      vertical=True,
                      plotting_type = "displot",
                      stat_analysis = None,
+                     **kwargs
                      ):
     assert plotting_type in ["displot", "catplot"]
 
@@ -198,7 +203,8 @@ def plot_sampling_df(flux_df,
                                       kind=kind,
                                       group_by=group_by,
                                       vertical=vertical,
-                                      stat_analysis=stat_analysis)
+                                      stat_analysis=stat_analysis,
+                                      **kwargs)
     else:
         facet = plot_sampling_catplot(flux_df=flux_df,
                                       rxn_id=rxn_id,
@@ -206,7 +212,8 @@ def plot_sampling_df(flux_df,
                                       group_by=group_by,
                                       group_order=group_order,
                                       vertical=vertical,
-                                      stat_analysis=stat_analysis)
+                                      stat_analysis=stat_analysis,
+                                      **kwargs)
     fig_kws = {"g": facet.figure}
 
     return fig_kws

@@ -17,7 +17,8 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
                    epsilon: float,
                    return_model: bool,
                    raise_err: bool = True,
-                   rxn_scaling_coefs: dict = None,) -> FASTCOREAnalysis:
+                   rxn_scaling_coefs: dict = None,
+                   calc_efficacy: bool = True) -> FASTCOREAnalysis:
     output_model = None
     if return_model:
         output_model = model.copy()
@@ -100,11 +101,12 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
         output_model.remove_reactions(list(rxns_to_remove), remove_orphans=True)
 
     result = FASTCOREAnalysis(log={"epsilon": tol,})
-
-    algo_efficacy = measure_efficacy(kept_rxn_ids=list(A),
-                                     removed_rxn_ids=rxns_to_remove,
-                                     core_rxn_ids=list(C),
-                                     non_core_rxn_ids=list(P))
+    algo_efficacy = None
+    if calc_efficacy:
+        algo_efficacy = measure_efficacy(kept_rxn_ids=list(A),
+                                         removed_rxn_ids=rxns_to_remove,
+                                         core_rxn_ids=list(C),
+                                         non_core_rxn_ids=list(P))
 
     result.add_result(dict(result_model=output_model,
                            removed_rxn_ids=rxns_to_remove,

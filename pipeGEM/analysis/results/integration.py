@@ -12,7 +12,12 @@ def measure_efficacy(kept_rxn_ids,
     TP = len(set(kept_rxn_ids) & set(core_rxn_ids))
     TN = len(set(removed_rxn_ids) & set(non_core_rxn_ids))
     FN = len(set(removed_rxn_ids) & set(core_rxn_ids))
-    print(TP, TN, FP, FN)
+    print("# Kept core reactions:", TP)
+    print("# Removed core reactions:", FN)
+    print("# Kept non-core reactions:", FP)
+    print("# Removed non-core reactions:", TN)
+    print("Percentage of kept core rxns:", TP / (TP+FN))
+    print("Percentage of removed non-core rxns:", TN / (TN + FP))
     if method == "MCC":
         return (TN * TP - FN * FP) / np.sqrt((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))
     precision = TP / (TP + FP)

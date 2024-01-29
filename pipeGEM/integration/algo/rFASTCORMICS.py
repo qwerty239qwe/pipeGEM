@@ -16,7 +16,8 @@ def apply_rFASTCORMICS(model,
                        unpenalized_subsystem = "Transport.*",
                        method: str = "onestep",
                        threshold: float = 1e-6,
-                       FASTCORE_raise_error: bool = False):
+                       FASTCORE_raise_error: bool = False,
+                       calc_efficacy: bool = True):
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
     threshold_dic = parse_predefined_threshold(predefined_threshold,
                                                gene_data=gene_data,
@@ -52,16 +53,23 @@ def apply_rFASTCORMICS(model,
                                    epsilon=threshold,
                                    return_model=True,
                                    raise_err=FASTCORE_raise_error,
-                                   rxn_scaling_coefs=rxn_scaling_coefs)
+                                   rxn_scaling_coefs=rxn_scaling_coefs,
+                                   calc_efficacy=calc_efficacy)
+
+        n_ex_bounds_changed = 0
         for r in pr_result.result_model.exchanges:
             if r.id in old_exchange_bounds:
                 pr_result.result_model.reactions.get_by_id(r.id).bounds = old_exchange_bounds[r.id]
+                n_ex_bounds_changed += 1
+
+        print(f"Reset the bounds of {n_ex_bounds_changed} loosed exchange reactions.")
 
         pr_result_obj.add_result(dict(fastcore_result=pr_result,
                                       core_rxns=core_rxns,
                                       noncore_rxns=non_core_rxns,
                                       nonP_rxns=unpenalized_rxns,
-                                      threshold_analysis=th_result))
+                                      threshold_analysis=th_result,
+                                      algo_efficacy=pr_result.algo_efficacy))
     elif method == "twostep":
         core_rxns = (set([r for r, c in rxn_scores.items() if c > exp_th]) - set(protected_rxns)) & rxn_in_model
 
@@ -70,7 +78,8 @@ def apply_rFASTCORMICS(model,
                                    model=model,
                                    epsilon=threshold,
                                    return_model=False,
-                                   rxn_scaling_coefs=rxn_scaling_coefs)
+                                   rxn_scaling_coefs=rxn_scaling_coefs,
+                                   calc_efficacy=False)
 
         core_rxns |= set(pr_result.rxn_ids)
         unpenalized_rxns = unpenalized_rxns - core_rxns
@@ -90,6 +99,7 @@ def apply_rFASTCORMICS(model,
                                       core_rxns=core_rxns,
                                       noncore_rxns=non_core_rxns,
                                       nonP_rxns=unpenalized_rxns,
-                                      threshold_analysis=th_result))
+                                      threshold_analysis=th_result,
+                                      algo_efficacy=pr_result.algo_efficacy))
 
     return pr_result_obj
