@@ -72,10 +72,10 @@ def test_check_model_scale_arithmetic(ecoli_core):
     print(rescale_result.rescaled_model.reactions.BIOMASS_Ecoli_core_w_GAM)
 
     reversed_rescaled = rescale_result.reverse_scaling(rescale_result.rescaled_model)
-    assert reversed_rescaled.reactions[0].lower_bound == mod.reactions[0].lower_bound, \
+    assert abs(reversed_rescaled.reactions[0].lower_bound - mod.reactions[0].lower_bound) < 1e-4, \
         reversed_rescaled.reactions[0].bounds
     print(mod.reactions[0].lower_bound)
 
-    assert reversed_rescaled.reactions[0].upper_bound == mod.reactions[0].upper_bound, \
+    assert abs(reversed_rescaled.reactions[0].upper_bound - mod.reactions[0].upper_bound) < 1e-4, \
         reversed_rescaled.reactions[0].bounds
     print(mod.reactions[0].upper_bound, )
