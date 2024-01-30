@@ -1,3 +1,4 @@
+import cobra
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
@@ -214,7 +215,7 @@ class FVAConsistencyTester(ConsistencyTester):
                 tol: float,
                 return_model: bool = True,
                 **kwargs) -> FVAConsistencyAnalysis:
-        analyzer = FVA_Analyzer(model=self.model,
+        analyzer = FVA_Analyzer(model=self.model if isinstance(self.model, cobra.Model) else self.model.cobra_model,
                                 solver=self.model.solver)
         fva_result = analyzer.analyze(**kwargs)
         rxns_to_remove = fva_result.flux_df.query(f"minimum >= {-tol} and maximum <= {tol}").index.to_list()

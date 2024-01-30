@@ -42,8 +42,7 @@ SCALINGS = [
     "deBuchetScalerP1",
     "ArithmeticScaler",
     "GeoMeanScaler",
-    "ModelScalingResult",
-    "IsInSetStoppingCriteria"
+    "ModelScalingResult"
 ]
 
 FLUX_ANALYSIS = [
@@ -79,7 +78,8 @@ STATS = [
 CONSISTENCY = [
     "consistency_testers",
     "FastCCAnalysis",
-    "FVAConsistencyAnalysis"
+    "FVAConsistencyAnalysis",
+    "IsInSetStoppingCriteria"
 ]
 
 MAPPING = [
