@@ -253,7 +253,7 @@ class FBA_Analysis(FluxAnalysis):
 
     def corr(self,
              rxn_corr=False,
-             group_by="name",
+             group_by="model",
              **kwargs):
         if group_by not in self._result["flux_df"].columns:
             raise KeyError(f"{group_by} is not in the categorical features. \n"
