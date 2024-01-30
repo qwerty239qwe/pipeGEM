@@ -46,7 +46,7 @@ def test_check_model_scale_geometric_mean(ecoli_core):
     mod = Model(model=ecoli_core, name_tag="ecoli")
     mod.reactions[0].add_metabolites({k: v * 99999 for k, v in mod.reactions[0].metabolites.items()})
     rescale_result = mod.check_model_scale(n_iter=5)
-    print(abs(rescale_result.rescaled_A).max())
+    print(abs(rescale_result.decimals).max())
     print(abs(rescale_result.diff_A).max())
 
 

@@ -1,13 +1,18 @@
-from typing import List, Any
+from typing import List, Any, Union
 from warnings import warn
 from functools import reduce
 import re
 
 import cobra
 
-__all__ = ("get_objective_rxn", "get_subsystems", "get_rxns_in_subsystem", "get_rxn_set",
-           "get_organic_exs", "get_not_met_exs",
-           "get_genes_in_subsystem", "select_rxns_from_model")
+__all__ = ("get_objective_rxn",
+           "get_subsystems",
+           "get_rxns_in_subsystem",
+           "get_rxn_set",
+           "get_organic_exs",
+           "get_not_met_exs",
+           "get_genes_in_subsystem",
+           "select_rxns_from_model")
 
 import numpy as np
 
@@ -30,7 +35,9 @@ def get_subsystems(model):
     return list(set(all_subs))
 
 
-def get_rxns_in_subsystem(model, subsystem, attr="id") -> list:
+def get_rxns_in_subsystem(model: cobra.Model,
+                          subsystem: Union[str, List[str]],
+                          attr: str = "id") -> list:
     rxn_prop = []
     for r in model.reactions:
         if isinstance(r.subsystem, str):
@@ -40,6 +47,8 @@ def get_rxns_in_subsystem(model, subsystem, attr="id") -> list:
             if (isinstance(subsystem, list) and len(set(r.subsystem) & set(subsystem)) > 0) or \
                any([re.match(subsystem, s) for s in r.subsystem]):
                 rxn_prop.append(getattr(r, attr) if attr != "" else r)
+        else:
+            raise TypeError("subsystem needs to be a string of pattern or a list.")
 
     return rxn_prop
 

@@ -13,24 +13,90 @@ from pipeGEM.analysis._consistency import *
 from pipeGEM.analysis.scaling import *
 
 
-__all__ = ("flux_analyzers", "ProblemAnalyzer", "modified_pfba",
-           "add_mod_pfba", "add_norm_constraint",
-           "prepare_PCA_dfs", "prepare_embedding_dfs",
-           "threshold_finders", "consistency_testers",
-           "RxnMapper", "gapsplit",
-           "FASTCOREAnalysis", "FastCCAnalysis",
-           "ComponentNumberAnalysis", "FluxAnalysis", "GIMMEAnalysis",
-           "PCA_Analysis", "EmbeddingAnalysis",
-           "TaskAnalysis", "EFluxAnalysis", "MBA_Analysis", "CORDA_Analysis",
-           "RIPTiDeSamplingAnalysis", "RIPTiDePruningAnalysis",
-           "FBA_Analysis", "FVA_Analysis", "FVAConsistencyAnalysis",
-           "SamplingAnalysis", "INIT_Analysis", "CorrelationAnalysis",
-           "ComponentComparisonAnalysis", "LocalThresholdAnalysis",
-           "PercentileThresholdAnalysis", "rFASTCORMICSThresholdAnalysis",
-           "Single_KO_Analysis", "mCADRE_Analysis", "iMAT_Analysis",
-           "ModelScalingResult",
-           "model_scaler_collection", "L1NormScaler", "L2NormScaler",
-           "deBuchetScalerP2", "deBuchetScalerP1",
-           "ArithmeticScaler", "GeoMeanScaler", "IsInSetStoppingCriteria",
-           "NumInequalityStoppingCriteria", "NormalityTestResult",
-           "VarHomogeneityTestResult", "PairwiseTestResult")
+THRESHOLD = [
+    "threshold_finders",
+    "LocalThresholdAnalysis",
+    "PercentileThresholdAnalysis",
+    "rFASTCORMICSThresholdAnalysis",
+]
+
+INTEGRATIONS = [
+    "rFASTCORMICSAnalysis",
+    "EFluxAnalysis",
+    "MBA_Analysis",
+    "CORDA_Analysis",
+    "mCADRE_Analysis",
+    "iMAT_Analysis",
+    "FASTCOREAnalysis",
+    "GIMMEAnalysis",
+    "RIPTiDeSamplingAnalysis",
+    "RIPTiDePruningAnalysis",
+    "INIT_Analysis"
+]
+
+SCALINGS = [
+    "model_scaler_collection",
+    "L1NormScaler",
+    "L2NormScaler",
+    "deBuchetScalerP2",
+    "deBuchetScalerP1",
+    "ArithmeticScaler",
+    "GeoMeanScaler",
+    "ModelScalingResult",
+    "IsInSetStoppingCriteria"
+]
+
+FLUX_ANALYSIS = [
+    "modified_pfba",
+    "add_mod_pfba",
+    "add_norm_constraint",
+    "flux_analyzers",
+    "FluxAnalysis",
+    "FBA_Analysis",
+    "FVA_Analysis",
+    "FVAConsistencyAnalysis",
+    "SamplingAnalysis",
+]
+
+KO_ANALYSIS = [
+    "Single_KO_Analysis",
+]
+
+DIM_REDUCTIONS = [
+    "PCA_Analysis",
+    "EmbeddingAnalysis",
+    "prepare_PCA_dfs",
+    "prepare_embedding_dfs",
+]
+
+STATS = [
+    "NumInequalityStoppingCriteria",
+    "NormalityTestResult",
+    "VarHomogeneityTestResult",
+    "PairwiseTestResult"
+]
+
+CONSISTENCY = [
+    "consistency_testers",
+    "FastCCAnalysis",
+    "FVAConsistencyAnalysis"
+]
+
+MAPPING = [
+    "RxnMapper",
+]
+
+GROUP_COMP = [
+    "ComponentComparisonAnalysis",
+    "ComponentNumberAnalysis",
+]
+
+__all__ = tuple(
+    THRESHOLD + INTEGRATIONS + FLUX_ANALYSIS + SCALINGS + KO_ANALYSIS + DIM_REDUCTIONS + STATS +
+    CONSISTENCY + MAPPING + GROUP_COMP + [
+           "ProblemAnalyzer",
+           "gapsplit",
+           "TaskAnalysis",
+           "CorrelationAnalysis",
+           ]
+)

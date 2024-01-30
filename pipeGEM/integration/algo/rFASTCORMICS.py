@@ -1,23 +1,50 @@
-from typing import Literal
-from pipeGEM.analysis import rFASTCORMICSAnalysis, timing, FastCCAnalysis, consistency_testers
+from typing import Literal, List, Union, Optional
+
+import cobra
+
+from pipeGEM.analysis import rFASTCORMICSAnalysis, timing, consistency_testers
 from pipeGEM.utils import get_rxns_in_subsystem
 from pipeGEM.integration.algo.FASTCORE import apply_FASTCORE
-from pipeGEM.integration.utils import parse_predefined_threshold
+from pipeGEM.integration.utils import parse_predefined_threshold, analysis_types
 
 
 @timing
-def apply_rFASTCORMICS(model,
+def apply_rFASTCORMICS(model: cobra.Model,
                        data,
-                       protected_rxns,
-                       predefined_threshold = None,
+                       protected_rxns: List[str] = None,
+                       predefined_threshold: Optional[Union[dict, analysis_types]] = None,
                        threshold_kws: dict = None,
                        rxn_scaling_coefs: dict = None,
                        consistent_checking_method: Literal["FASTCC", "FVA"] = "FASTCC",
-                       unpenalized_subsystem = "Transport.*",
+                       unpenalized_subsystem: Union[str, List[str]] = "Transport.*",
                        method: str = "onestep",
                        threshold: float = 1e-6,
                        FASTCORE_raise_error: bool = False,
-                       calc_efficacy: bool = True):
+                       calc_efficacy: bool = True) -> rFASTCORMICSAnalysis:
+    """
+    Apply rFASTCORMICS algorithm on the given model.
+
+    Parameters
+    ----------
+    model: cobra.Model
+        A cobra model
+    data
+    protected_rxns
+    predefined_threshold
+    threshold_kws
+    rxn_scaling_coefs
+    consistent_checking_method
+    unpenalized_subsystem
+    method
+    threshold
+    FASTCORE_raise_error
+    calc_efficacy
+
+    Returns
+    -------
+    analysis_result: rFASTCORMICSAnalysis
+
+    """
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
     threshold_dic = parse_predefined_threshold(predefined_threshold,
                                                gene_data=gene_data,
