@@ -327,7 +327,7 @@ class LocalThreshold(RankBased):
                        global_on_th: Union[int, float] = None,
                        global_off_th: Union[int, float] = None,
                        groups: Union[pd.Series, dict] = None,
-                       **kwargs):
+                       **kwargs) -> LocalThresholdAnalysis:
         """
 
         Parameters
@@ -400,3 +400,6 @@ threshold_finders = ThresholdFinders()
 threshold_finders.register("rFASTCORMICS", rFASTCORMICSThreshold)
 threshold_finders.register("percentile", PercentileThreshold)  # which is also called global threshold in some papers
 threshold_finders.register("local", LocalThreshold)  # LocalT1 and LocalT2
+
+
+ALL_THRESHOLD_METHODS = Union[rFASTCORMICSThreshold, PercentileThreshold, LocalThreshold]

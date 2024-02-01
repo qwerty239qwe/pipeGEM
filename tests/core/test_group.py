@@ -105,7 +105,7 @@ def test_compare_jaccard_gb(group):
 def test_compare_jaccard_gb_with_nan(group):
     sim_comp = group.compare(method="jaccard",
                              group_by="treatment")
-    sim_comp.plot(dpi=150)
+    sim_comp.plot(dpi=150, row_color_by="treatment")
 
 
 def test_compare_num(ecoli_core):

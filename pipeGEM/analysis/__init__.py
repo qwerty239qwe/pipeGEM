@@ -18,6 +18,8 @@ THRESHOLD = [
     "LocalThresholdAnalysis",
     "PercentileThresholdAnalysis",
     "rFASTCORMICSThresholdAnalysis",
+    "ALL_THRESHOLD_METHODS",
+    "ALL_THRESHOLD_ANALYSES"
 ]
 
 INTEGRATIONS = [

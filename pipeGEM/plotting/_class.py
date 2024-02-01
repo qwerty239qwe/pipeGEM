@@ -228,12 +228,12 @@ class ComponentComparisonPlotter(BasePlotter):
         col_color_by = col_color_by if col_color_by is not None else []
 
         if row_groups is not None:
-            row_groups = row_groups[row_color_by]
+            row_groups = row_groups[row_color_by] if len(row_color_by) > 0 else None
             if isinstance(row_groups, pd.Series):
                 row_groups = row_groups.to_frame(row_color_by)
 
         if col_groups is not None:
-            col_groups = col_groups[col_color_by]
+            col_groups = col_groups[col_color_by] if len(col_color_by) > 0 else None
             if isinstance(col_groups, pd.Series):
                 col_groups = col_groups.to_frame(col_color_by)
 

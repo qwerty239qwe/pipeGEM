@@ -183,7 +183,7 @@ class Model(GEMComposite):
                         name,
                         data: Union[MediumData, pd.DataFrame],
                         data_kwargs=None,
-                        **kwargs):
+                        **kwargs) -> None:
         if isinstance(data, pd.DataFrame):
             data_kwargs = {} if data_kwargs is None else data_kwargs
             data = MediumData(data, **data_kwargs)
@@ -199,7 +199,7 @@ class Model(GEMComposite):
     def add_gene_data(self,
                       name_or_prefix: str,
                       data: Union[GeneData, pd.DataFrame, pd.Series, AnnData],
-                      data_kwargs=None,
+                      data_kwargs: dict = None,
                       **kwargs) -> None:
         """
         Add gene data to the internal dictionary of gene data in MyClass.
@@ -398,7 +398,8 @@ class Model(GEMComposite):
                                     **kwargs)
 
     def get_RAS(self, data_name, method="mean"):
-        return self._gene_data[data_name].calc_rxn_score_stat([r.id for r in self._model.reactions])
+        return self._gene_data[data_name].calc_rxn_score_stat([r.id for r in self._model.reactions],
+                                                              method=method)
 
     def save_model(self,
                    file_name: str) -> None:

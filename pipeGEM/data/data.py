@@ -9,7 +9,7 @@ from pint import UnitRegistry
 
 from ._base import BaseData
 from pipeGEM.analysis import RxnMapper
-from pipeGEM.analysis import threshold_finders
+from pipeGEM.analysis import threshold_finders, ALL_THRESHOLD_ANALYSES
 from pipeGEM.analysis import DataAggregation
 
 HPA_scores = {'High': 20,
@@ -144,7 +144,7 @@ class GeneData(BaseData):
         return {k: func(v) for k, v in self.rxn_scores.items()}
 
     @property
-    def transformed_gene_data(self):
+    def transformed_gene_data(self) -> Dict[str, float]:
         return {k: self.data_transform(v) for k, v in self.gene_data.items()}
 
     @property
@@ -191,7 +191,7 @@ class GeneData(BaseData):
                             ignore_na=True,
                             na_value=0,
                             return_if_all_na=-1,
-                            method="mean"):
+                            method="mean") -> float:
         scores = np.array([v for k, v in self.rxn_scores.items() if k in rxn_ids])
         if all([np.isnan(i) for i in scores]):
             return return_if_all_na
@@ -210,17 +210,19 @@ class GeneData(BaseData):
 
     def get_threshold(self,
                       name: str,
-                      transform=True,
-                      **kwargs):
+                      transform: bool = True,
+                      **kwargs) -> ALL_THRESHOLD_ANALYSES:
         """
         Calculate thresholds for classifying expressed and non-expressed reactions.
 
         Parameters
         ----------
         name: str
-            Thresholding method
-        transform
-        kwargs
+            Thresholding method applied on the gene data.
+        transform: bool
+            To transform the data before finding thresholds (if True) or not (if False).
+        kwargs: dict
+            Keyword arguments for applying thresholding methods.
 
         Returns
         -------
@@ -236,7 +238,7 @@ class GeneData(BaseData):
                                transform: bool = True,
                                method: Literal["binary", "ratio", "diff", "rdiff"] = "binary",
                                group: str = None,
-                               **kwargs):
+                               **kwargs) -> None:
         """
         Assign local threshold result to this object.
         This will change the gene data based on the passed method.
@@ -278,11 +280,41 @@ class GeneData(BaseData):
 
     @classmethod
     def aggregate(cls,
-                  data,
-                  method="concat",
-                  prop="data",
-                  absent_expression=0,
+                  data: Dict[str, Dict[str, Union[Dict[str, 'GeneData'], 'GeneData']]],
+                  method: str = "concat",
+                  prop: Literal["data", "score"] = "data",
+                  absent_expression: float = 0,
                   group_annotation: pd.DataFrame = None) -> DataAggregation:
+        """
+        Aggregate data from multiple sources.
+
+        Parameters
+        ----------
+        data (Dict[str, Dict[str, Union[Dict[str, Any], pd.DataFrame]]]):
+            A dictionary containing data to aggregate.
+            Outer keys represent different sources, and inner keys represent different datasets within each source.
+            Values can either be dictionaries containing 'gene_data' and 'rxn_scores', or Pandas DataFrames.
+        method (str, optional):
+            The method to use for aggregation. Defaults to "concat".
+        prop (Literal["data", "score"], optional):
+            The property to aggregate. Should be either "data" or "score". Defaults to "data".
+        absent_expression (float, optional):
+            Value to fill NaN entries with. Defaults to 0.
+        group_annotation (pd.DataFrame, optional):
+            DataFrame containing group annotations. Defaults to None.
+
+
+        Returns
+        -------
+        aggregated_data (DataAggregation):
+            An object containing the aggregated data along with relevant metadata.
+
+        Raises
+        -------
+        AssertionError: If `prop` is not either "data" or "score".
+        ValueError: If `group_annotation` does not match the aggregated data.
+
+        """
         assert prop in ["data", "score"], "prop should be either data or score"
         obj_prop = {"data": "gene_data", "score": "rxn_scores"}
 
@@ -319,7 +351,7 @@ def _data_parse_group_models(data_group) -> dict:
     return group_struct
 
 
-def find_local_threshold(data_df, **kwargs):
+def find_local_threshold(data_df, **kwargs) -> ALL_THRESHOLD_ANALYSES:
     tf = threshold_finders.create("local")
     return tf.find_threshold(data_df, **kwargs)
 

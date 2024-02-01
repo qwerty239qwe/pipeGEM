@@ -105,3 +105,6 @@ class LocalThresholdAnalysis(BaseAnalysis):
                   global_off_th=self._result["global_off_th"],
                   group_dic=self._get_group_dic(),
                   )
+
+
+ALL_THRESHOLD_ANALYSES = Union[rFASTCORMICSThresholdAnalysis, PercentileThresholdAnalysis, LocalThresholdAnalysis, ]
