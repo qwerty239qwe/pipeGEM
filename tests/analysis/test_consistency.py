@@ -37,10 +37,10 @@ def test_FVA_pg_model(ecoli_core):
 
 
 def test_method_return_the_same_result(ecoli_core):
-    fva = consistency_testers["FVA"](model=Model(model=ecoli_core, name_tag="ecoli")).analyze(tol=1e-6,
-                                                                                              return_model=True)
-    fastcc = consistency_testers["FASTCC"](model=Model(model=ecoli_core, name_tag="ecoli")).analyze(tol=1e-6,
-                                                                                                    return_model=True)
+    model = Model(model=ecoli_core, name_tag="ecoli")
+
+    fva = consistency_testers["FVA"](model=model).analyze(tol=1e-6, return_model=True)
+    fastcc = consistency_testers["FASTCC"](model=model).analyze(tol=1e-6, return_model=True)
     fva_r = set([r.id for r in fva.consistent_model.reactions])
     fastcc_r = set([r.id for r in fastcc.consistent_model.reactions])
     assert len(fva_r) == len(fastcc_r)

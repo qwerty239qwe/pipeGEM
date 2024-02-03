@@ -217,7 +217,9 @@ class FVAConsistencyTester(ConsistencyTester):
                 **kwargs) -> FVAConsistencyAnalysis:
         analyzer = FVA_Analyzer(model=self.model if isinstance(self.model, cobra.Model) else self.model.cobra_model,
                                 solver=self.model.solver)
-        fva_result = analyzer.analyze(**kwargs)
+        fva_result = analyzer.analyze(fraction_of_optimum=0,
+                                      is_loopless=False,
+                                      **kwargs)
         rxns_to_remove = fva_result.flux_df.query(f"minimum >= {-tol} and maximum <= {tol}").index.to_list()
         consistent_model = None
         if return_model:
