@@ -416,7 +416,7 @@ class Group(GEMComposite):
         result = ComponentComparisonAnalysis(log={"components": components,
                                                   "group_by": group_by})
 
-        if group_by is None:
+        if group_by is not None:
             gb_df = self.annotation.groupby(group_by).apply(lambda x: list(x.index)).to_frame().reset_index()
             gb_df.index = gb_df[group_by]
         else:

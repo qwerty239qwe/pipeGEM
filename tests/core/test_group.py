@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib
 import cobra
 import pytest
 
@@ -109,6 +110,7 @@ def test_compare_jaccard_gb_with_nan(group):
 
 
 def test_compare_num(ecoli_core):
+    print(matplotlib.get_backend())
     m1 = ecoli_core
     g = Group(group={"ecoli_g1": {"e11": m1, "e12": m1, "e13": m1},
                      "ecoli_g2": {"e21": m1, "e22": m1}},
