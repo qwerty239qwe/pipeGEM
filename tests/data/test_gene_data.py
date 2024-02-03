@@ -25,7 +25,7 @@ def test_add_data_model_human(Human_GEM, Human_GEM_data):
                          data_transform=lambda x: np.log2(x),
                          absent_expression=-np.inf)
     pmod.add_gene_data(data_name, gene_data)
-    assert pmod.gene_data[data_name].rxn_scores
+    assert isinstance(pmod.gene_data[data_name].rxn_scores, dict)
 
 
 def test_find_percentile_threshold(ecoli_core_data):
