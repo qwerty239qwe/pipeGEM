@@ -1,3 +1,5 @@
+import numpy as np
+import pandas as pd
 import pytest
 import cobra
 from pipeGEM.data.synthesis import get_syn_gene_data
@@ -6,6 +8,7 @@ from pipeGEM import Group
 from pipeGEM.utils import random_perturb, load_model
 from pipeGEM.analysis.tasks import Task, TaskContainer
 from pipeGEM.analysis import FBA_Analysis
+from pandas.api.types import is_numeric_dtype
 
 
 @pytest.fixture(scope="session")
@@ -57,8 +60,13 @@ def pFBA_result(ecoli_core) -> FBA_Analysis:
                name_tag="G2",
                treatments={"e11": "A", "e12": "B", "e21": "B", "e22": "A"})
     pFBA_result = g2.do_flux_analysis(method="FBA",
-                                      solver="glpk",
-                                      group_by="treatments")
+                                      solver="glpk",)
+    flux_df = pFBA_result.flux_df
+    num_cols = [c for c in flux_df.columns if is_numeric_dtype(c)]
+    noise = pd.DataFrame(data=np.random.random(size=(flux_df.shape[0], len(num_cols))),
+                         index=flux_df.index,
+                         columns=num_cols)
+    pFBA_result._result["flux_df"].loc[:, num_cols] += noise
     yield pFBA_result
 
 

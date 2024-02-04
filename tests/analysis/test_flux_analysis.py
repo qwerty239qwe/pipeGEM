@@ -13,7 +13,7 @@ def test_PCA(pFBA_result):
 
 def test_TSNE(pFBA_result):
     tsne = pFBA_result.dim_reduction(method="TSNE", n_components=2)
-    tsne.plot(dpi=150, color_by="treatments")
+    tsne.plot(dpi=150)
 
 
 def test_UMAP(pFBA_result):
