@@ -208,12 +208,18 @@ class FBA_Analysis(FluxAnalysis):
         data = self._result["flux_df"].copy()
 
         if rxn_group_by is not None:
-            data["rxn_group_by"] = data.index.map(self._log["rxn_annotations"][rxn_group_by]).astype("category")
-
-        if sample_group_by is not None:
-            data = data.groupby(sample_group_by)
-            data["fluxes"].apply(getattr(np, group_by_agg_method)
-                       if isinstance(group_by_agg_method, str) else group_by_agg_method)
+            if isinstance(rxn_group_by, list):
+                for rg in rxn_group_by:
+                    data[rg] = data["Reaction"].map(self._log["rxn_annotations"][rg]).astype("category")
+            else:
+                data[rxn_group_by] = data["Reaction"].map(self._log["rxn_annotations"][rxn_group_by]).astype("category")
+        rxn_index_name = rxn_group_by if rxn_group_by is not None else "Reaction"
+        sample_col_name = sample_group_by if sample_group_by is not None else "model"
+        data = pd.pivot_table(data=data.drop(columns=["reduced_costs"]),
+                              index=rxn_index_name,
+                              columns=sample_col_name,
+                              aggfunc=group_by_agg_method).fillna(0)
+        data.columns = data.columns.droplevel(0)
         pltr.plot(result=data,
                   *args,
                   **kwargs)

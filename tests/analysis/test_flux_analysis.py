@@ -27,5 +27,11 @@ def test_corr(pFBA_result):
     corr_result = pFBA_result.corr(group_by="treatments")
     corr_result.plot()
 
+
+def test_corr_rxn_corr(pFBA_result):
     corr_result = pFBA_result.corr(group_by="model",rxn_corr=True)
     corr_result.plot()
+
+
+def test_flux_plot_heatmap_default(pFBA_result):
+    pFBA_result.plot_heatmap()

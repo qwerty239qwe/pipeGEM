@@ -125,7 +125,6 @@ def plot_heatmap(data: Union[pd.DataFrame, np.ndarray],
                                            col_color_palette=col_color_palette,
                                            col_color_order=col_color_order,
                                            palette_replacement=palette_replacement)
-    print(row_colors)
     cluster_grid = sns.clustermap(data,
                                   figsize=figsize,
                                   cbar_kws=cbar_kw,

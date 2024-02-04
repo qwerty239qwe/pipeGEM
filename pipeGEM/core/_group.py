@@ -1,4 +1,4 @@
-from typing import List, Union, Optional, Tuple
+from typing import List, Union, Optional, Tuple, Literal
 from functools import reduce
 import itertools
 from warnings import warn
@@ -10,7 +10,8 @@ from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, man
 
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
-from pipeGEM.analysis import ComponentComparisonAnalysis, ComponentNumberAnalysis, prepare_PCA_dfs, PCA_Analysis
+from pipeGEM.analysis import ComponentComparisonAnalysis, \
+    ComponentNumberAnalysis, prepare_PCA_dfs, PCA_Analysis, FBA_Analysis
 from pipeGEM.data import GeneData
 from pipeGEM.plotting import plot_clustermap
 from pipeGEM.utils import is_iter, calc_jaccard_index
@@ -489,12 +490,13 @@ class Group(GEMComposite):
         return result
 
     def compare(self,
-                models=None,
-                group_by="group_name",
-                method: str = "jaccard",
+                models: Optional[Union[str, list, np.ndarray]] = None,
+                group_by: str = "group_name",
+                method: Literal["jaccard", "PCA", "num"] = "jaccard",
                 **kwargs
                 ):
-        assert method in ["jaccard", "PCA", "num"]
+        if method not in ["jaccard", "PCA", "num"]:
+            raise ValueError("Method should be 'jaccard', 'PCA', or 'num'")
 
         models: Group = self[models] if models is not None else self
         if method == "jaccard":
@@ -502,46 +504,4 @@ class Group(GEMComposite):
         elif method == "num":
             return self._compare_component_num(models=models, group_by=group_by, **kwargs)
         elif method == "PCA":
-            return self._compare_component_PCA(models=models, group_by=group_by, **kwargs)  #TODO
-
-
-
-    def plot_flux_heatmap(self,
-                          method,
-                          constr,
-                          similarity="cosine",
-                          rxn_ids="all",
-                          rxn_index=None,
-                          subsystems=None,
-                          tags: Union[str, List[str]] = "all",
-                          get_model_level=True,
-                          aggregation_method="mean",
-                          fig_size=(10, 10),
-                          file_name=None,
-                          **kwargs
-                          ):
-
-        similarity_method = {'cosine': cosine_similarity,
-                             'euclidean': lambda x: 1 - euclidean_distances(x) / np.amax(euclidean_distances(x)),
-                             'manhattan': lambda x: 1 - manhattan_distances(x) / np.amax(manhattan_distances(x))}
-        # rxn_ids = rxn_ids if rxn_ids is not None else []
-        # rxn_ids += self._check_rxn_id(self.tget(tags if tags != "all" else None)[0], rxn_index, subsystems)
-        fluxes = self._process_flux(method, constr, tags, get_model_level, aggregation_method)
-        if method in ["FBA", "pFBA"]:
-            model_names = fluxes["fluxes"]["model"] if not get_model_level else fluxes["fluxes"]["group"]
-            comp_info = dict(zip(fluxes["fluxes"]["model"], fluxes["fluxes"]["group"])) \
-                        if not get_model_level else fluxes["fluxes"]["group"]
-            data = fluxes["fluxes"].drop(columns=["model", "group"] if get_model_level else ["group"]).fillna(0).values
-        else:
-            raise ValueError()
-        data = pd.DataFrame(data=similarity_method[similarity](data),
-                            columns=model_names,
-                            index=model_names)
-        plot_clustermap(data=data,
-                        cbar_label=f'{similarity} similarity',
-                        cmap='magma',
-                        square=True,
-                        fig_size=fig_size,
-                        file_name=file_name,
-                        **kwargs
-                        )
+            return self._compare_component_PCA(models=models, group_by=group_by, **kwargs)

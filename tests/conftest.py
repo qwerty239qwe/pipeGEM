@@ -5,6 +5,7 @@ from pipeGEM.data.fetching import load_remote_model
 from pipeGEM import Group
 from pipeGEM.utils import random_perturb, load_model
 from pipeGEM.analysis.tasks import Task, TaskContainer
+from pipeGEM.analysis import FBA_Analysis
 
 
 @pytest.fixture(scope="session")
@@ -49,7 +50,7 @@ def group(ecoli_core):
 
 
 @pytest.fixture(scope="session")
-def pFBA_result(ecoli_core):
+def pFBA_result(ecoli_core) -> FBA_Analysis:
     m1 = ecoli_core
     g2 = Group({"ecoli_g1": {"e11": m1, "e12": random_perturb(m1.copy())},
                 "ecoli_g2": {"e21": random_perturb(m1.copy()), "e22": m1}},
