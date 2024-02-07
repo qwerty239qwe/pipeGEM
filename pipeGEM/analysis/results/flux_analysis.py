@@ -3,6 +3,7 @@ import numpy as np
 import pingouin
 from tqdm import tqdm
 import warnings
+import re
 from typing import Optional, Union, List
 
 from ._base import *
@@ -11,6 +12,12 @@ from pipeGEM.analysis._dim_reduction import prepare_PCA_dfs, prepare_embedding_d
 from .corr import CorrelationAnalysis
 from .dim_reduction import PCA_Analysis, EmbeddingAnalysis
 from .stat import PairwiseTestResult, MultiGroupComparisonTestResult
+
+
+def separate_operands(input_string) -> List[str]:
+    # Split the string using regular expression to capture operands and other substrings
+    separated_list = re.findall(r'[+-/*\^]|[^+-/*\^]+', input_string)
+    return separated_list
 
 
 class NotAggregatedError(Exception):
@@ -359,6 +366,81 @@ class SamplingAnalysis(FluxAnalysis):
     def __init__(self, log):
         super(SamplingAnalysis, self).__init__(log)
         self._result_loading_params["flux_df"] = {"index_col": 0}
+
+    def rename(self, **kwargs) -> None:
+        self._result["flux_df"]: pd.DataFrame = self._result["flux_df"].rename(**kwargs)
+
+    def __getitem__(self, item) -> "SamplingAnalysis":
+        new_analysis = self.__class__(log={k: v for k, v in self.log.items()})
+        cat_cols = list(self.log["categorical"])
+        if isinstance(item, str):
+            item = [item]
+        new_analysis.add_result({"flux_df": self.flux_df.loc[:, item+cat_cols]})
+        return new_analysis
+
+    def __add__(self, other):
+        new_analysis = self.__class__(log={k: v for k, v in self.log.items()})
+        cat_cols = list(self.log["categorical"])
+        if not self.flux_df[self.log["categorical"]].equals(other.flux_df[self.log["categorical"]]):
+            raise ValueError("Adding two SamplingAnalysis with different categorical data."
+                             "Please check if the two sampling analysis are generated from the same model/group.")
+
+        if isinstance(other, type(self)):
+            this_num = self.flux_df.drop(columns=cat_cols)
+            other_num = other.flux_df.drop(columns=list(other.log["categorical"]))
+            sum_num = this_num + other_num
+        else:
+            sum_num = self.flux_df.drop(columns=cat_cols) + other
+
+        new_analysis.add_result({"flux_df": pd.concat([sum_num,
+                                                      self.flux_df[self.log["categorical"]]], axis=1)})
+        return new_analysis
+
+    def __neg__(self):
+        new_analysis = self.__class__(log={k: v for k, v in self.log.items()})
+        cat_cols = list(self.log["categorical"])
+        num_df = -self.flux_df.drop(columns=cat_cols)
+
+        new_analysis.add_result({"flux_df": pd.concat([num_df, self.flux_df[cat_cols]], axis=1)})
+        return new_analysis
+
+    def __sub__(self, other):
+        return self.__add__(-other)
+
+    def operate(self, operation: str):
+        operands = ["+", "-", "*", "/", "^"]
+        pd_ops = {"+": "add", "-": "sub", "*": "mul", "/": "div", "^": "pow"}
+        if any([op in c for c in self._result["flux_df"].columns for op in operands]):
+            raise AttributeError("Please remove special characters: ['+', '-', '*', '/', '^'] in the columns of flux_df.",
+                                 "Consider using result.rename(columns={'problematic_col': 'good_col'}) to solve this issue.")
+        returned_series = pd.Series(data=0, index=self._result["flux_df"].index)
+        new_col = None
+        if "=" in operation:
+            new_col, operation = operation.split("=")
+
+        substrs = separate_operands(operation)
+        if "-" == substrs[0]:
+            substrs = ["0"] + substrs
+        mem_op = None
+        for i, substr in enumerate(substrs):
+            if substr in operands:
+                mem_op = substr
+            elif substr in self._result["flux_df"]:
+                if mem_op is None:
+                    returned_series = self._result["flux_df"][substr]
+                else:
+                    getattr(returned_series, pd_ops[mem_op])(self._result["flux_df"][substr])
+            else:
+                try:
+                    num = float(substr)
+                    getattr(returned_series, pd_ops[mem_op])(num)
+                except ValueError:
+                    raise ValueError(f"substring {substr} is neither a column name in the flux df nor a number")
+        if new_col is not None:
+            self._result["flux_df"][new_col] = returned_series
+            return
+
+        return returned_series
 
     @classmethod
     def aggregate(cls,

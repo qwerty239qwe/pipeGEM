@@ -7,7 +7,7 @@ from pipeGEM.data.fetching import load_remote_model
 from pipeGEM import Group
 from pipeGEM.utils import random_perturb, load_model
 from pipeGEM.analysis.tasks import Task, TaskContainer
-from pipeGEM.analysis import FBA_Analysis
+from pipeGEM.analysis import FBA_Analysis, SamplingAnalysis
 from pandas.api.types import is_numeric_dtype
 
 
@@ -49,7 +49,7 @@ def group(ecoli_core):
                     "ecoli_g2": {"m21": random_perturb(ecoli_core, on_structure=False, constr_ratio=0.7, random_state=3),
                                  "m22": random_perturb(ecoli_core, on_structure=False, constr_ratio=0.7, random_state=4)},
                     "ecoli_g3": {"m3": ecoli_core}}, name_tag="G2",
-                    treatment={"m111": "a", "m112": "b", "m12": "b"})
+                 treatment={"m111": "a", "m112": "b", "m12": "b", "m21": "b", "m22": "a"})
 
 
 @pytest.fixture(scope="session")
@@ -68,6 +68,13 @@ def pFBA_result(ecoli_core) -> FBA_Analysis:
                          columns=num_cols)
     pFBA_result._result["flux_df"].loc[:, num_cols] += noise
     yield pFBA_result
+
+
+@pytest.fixture(scope="session")
+def sampling_result(group) -> SamplingAnalysis:
+    sampling_result = group.do_flux_analysis(method="sampling",
+                                          solver="glpk",)
+    yield sampling_result
 
 
 @pytest.fixture(scope="session")
