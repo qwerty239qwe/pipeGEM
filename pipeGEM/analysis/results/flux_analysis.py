@@ -428,11 +428,11 @@ class SamplingAnalysis(FluxAnalysis):
                 if mem_op is None:
                     returned_series = self._result["flux_df"][substr]
                 else:
-                    getattr(returned_series, pd_ops[mem_op])(self._result["flux_df"][substr])
+                    returned_series = getattr(returned_series, pd_ops[mem_op])(self._result["flux_df"][substr])
             else:
                 try:
                     num = float(substr)
-                    getattr(returned_series, pd_ops[mem_op])(num)
+                    returned_series = getattr(returned_series, pd_ops[mem_op])(num)
                 except ValueError:
                     raise ValueError(f"substring {substr} is neither a column name in the flux df nor a number")
         if new_col is not None:
