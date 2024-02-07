@@ -73,7 +73,8 @@ def pFBA_result(ecoli_core) -> FBA_Analysis:
 @pytest.fixture(scope="session")
 def sampling_result(group) -> SamplingAnalysis:
     sampling_result = group.do_flux_analysis(method="sampling",
-                                          solver="glpk",)
+                                             solver="glpk",
+                                             n=100)
     yield sampling_result
 
 

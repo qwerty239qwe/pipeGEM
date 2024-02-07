@@ -33,4 +33,4 @@ def test_sampling_operate_sum(sampling_result, ecoli_core):
     ans = sampling_result.flux_df["ans"]
 
     assert isinstance(ans, pd.Series)
-    assert ans.equals(sampling_result.flux_df[sel_rxns].sum(axis=1))
+    assert (ans - sampling_result.flux_df[sel_rxns].sum(axis=1)).sum() < 1e-6

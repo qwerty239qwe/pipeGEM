@@ -381,7 +381,7 @@ class SamplingAnalysis(FluxAnalysis):
     def __add__(self, other):
         new_analysis = self.__class__(log={k: v for k, v in self.log.items()})
         cat_cols = list(self.log["categorical"])
-        if not self.flux_df[self.log["categorical"]].equals(other.flux_df[self.log["categorical"]]):
+        if not self.flux_df[cat_cols].equals(other.flux_df[cat_cols]):
             raise ValueError("Adding two SamplingAnalysis with different categorical data."
                              "Please check if the two sampling analysis are generated from the same model/group.")
 
@@ -393,7 +393,7 @@ class SamplingAnalysis(FluxAnalysis):
             sum_num = self.flux_df.drop(columns=cat_cols) + other
 
         new_analysis.add_result({"flux_df": pd.concat([sum_num,
-                                                      self.flux_df[self.log["categorical"]]], axis=1)})
+                                                      self.flux_df[cat_cols]], axis=1)})
         return new_analysis
 
     def __neg__(self):
