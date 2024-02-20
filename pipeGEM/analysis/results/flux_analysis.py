@@ -193,7 +193,7 @@ class FluxAnalysis(BaseAnalysis):
                                                   data=self.result["flux_df"])
                     gathered_results.append(result)
 
-        all_res, all_mulcom_res = [dr for mr, dr in gathered_results if mr is not None], [mr for mr, dr in gathered_results if mr is not None]
+        all_res, all_mulcom_res = [dr for mr, dr in gathered_results if dr is not None], [mr for mr, dr in gathered_results if mr is not None]
         result = PairwiseTestResult.aggregate(results=all_res,
                                               log=dict(label_str_format=label_str_format,
                                                        between=between,
