@@ -12,6 +12,8 @@ from pipeGEM.analysis._dim_reduction import prepare_PCA_dfs, prepare_embedding_d
 from .corr import CorrelationAnalysis
 from .dim_reduction import PCA_Analysis, EmbeddingAnalysis
 from .stat import PairwiseTestResult, MultiGroupComparisonTestResult
+from dask.distributed import Client
+from dask.distributed import progress
 
 
 def separate_operands(input_string) -> List[str]:
@@ -26,6 +28,7 @@ class NotAggregatedError(Exception):
 
 class FluxAnalysis(BaseAnalysis):
     def __init__(self, log):
+
         super(FluxAnalysis, self).__init__(log)
 
     def add_categorical(self,
@@ -107,45 +110,90 @@ class FluxAnalysis(BaseAnalysis):
     def _sel_rxns_for_diff_test(self):
         raise NotImplementedError()
 
+    def _diff_test_iter(self,
+                        r,
+                        between,
+                        parametric,
+                        parametric_params,
+                        method,
+                        label_str_format,
+                        data):
+        from pipeGEM.analysis._stat import PairwiseTester, MultiGroupComparison
+
+        data_to_be_analyzed = self._sel_data_for_diff_test(data=data,
+                                                           rxn_id=r,
+                                                           between=between)
+
+        inferred_parametric = parametric
+        gb_data = data_to_be_analyzed.groupby(between)
+        mulcom_res, test_res = None, None
+
+        if gb_data.count().query(f"{r} > 2").shape[0] >= 3:
+            mulcom_res = MultiGroupComparison().test(data_to_be_analyzed,
+                                                     dep_var=r,
+                                                     between=between,
+                                                     parametric=parametric,
+                                                     parametric_params=parametric_params,
+                                                     added_label=label_str_format.format(reaction=r))
+            inferred_parametric = mulcom_res.inferred_parametric
+
+        if gb_data.count().query(f"{r} > 2").shape[0] >= 2:
+            test_res = PairwiseTester().test(data=data_to_be_analyzed,
+                                             dep_var=r,
+                                             between=between,
+                                             parametric=inferred_parametric,
+                                             method=method,
+                                             added_label=label_str_format.format(reaction=r))
+
+        return mulcom_res, test_res
+
     def diff_test(self,
                   between,
                   parametric="auto",
                   parametric_params=None,
                   method="mw",
                   label_str_format="{reaction}",
-                  save_p_val=True) -> PairwiseTestResult:
-        from pipeGEM.analysis._stat import PairwiseTester, MultiGroupComparison
+                  save_p_val=True,
+                  do_parallel=False,
+                  **kwargs) -> PairwiseTestResult:
+
         if between not in self._result["flux_df"].columns:
             raise KeyError(f"{between} is not in the categorical features. \n"
                            f"Possible features are {list(self.log['categorical'])}")
         assert parametric in ["auto", True, False]
         all_rxns = self._sel_rxns_for_diff_test()
-        all_res, all_mulcom_res = [], []
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            for r in tqdm(all_rxns):
-                data_to_be_analyzed = self._sel_data_for_diff_test(data=self.result["flux_df"],
-                                                                   rxn_id=r, between=between)
-                inferred_parametric = parametric
-                gb_data = data_to_be_analyzed.groupby(between)
 
-                if gb_data.count().query(f"{r} > 2").shape[0] >= 3:
-                    mulcom_res = MultiGroupComparison().test(data_to_be_analyzed,
-                                                             dep_var=r,
-                                                             between=between,
-                                                             parametric=parametric,
-                                                             parametric_params=parametric_params,
-                                                             added_label=label_str_format.format(reaction=r))
-                    inferred_parametric = mulcom_res.inferred_parametric
-                    all_mulcom_res.append(mulcom_res)
-                if gb_data.count().query(f"{r} > 2").shape[0] >= 2:
-                    test_res = PairwiseTester().test(data=data_to_be_analyzed,
-                                                     dep_var=r,
-                                                     between=between,
-                                                     parametric=inferred_parametric,
-                                                     method=method,
-                                                     added_label=label_str_format.format(reaction=r))
-                    all_res.append(test_res)
+        if do_parallel:
+            client = Client(**kwargs)
+            futures = []
+            remote_data = client.scatter(self.result["flux_df"])
+            for r in all_rxns:
+                future = client.submit(self._diff_test_iter,
+                                       r,
+                                       between,
+                                       parametric,
+                                       parametric_params,
+                                       method,
+                                       label_str_format,
+                                       remote_data)
+                futures.append(future)
+            gathered_results = client.gather(futures)
+            progress(gathered_results)
+        else:
+            gathered_results = []
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                for r in tqdm(all_rxns):
+                    result = self._diff_test_iter(r=r,
+                                                  between=between,
+                                                  parametric=parametric,
+                                                  parametric_params=parametric_params,
+                                                  method=method,
+                                                  label_str_format=label_str_format,
+                                                  data=self.result["flux_df"])
+                    gathered_results.append(result)
+
+        all_res, all_mulcom_res = [dr for mr, dr in gathered_results if mr is not None], [mr for mr, dr in gathered_results if mr is not None]
         result = PairwiseTestResult.aggregate(results=all_res,
                                               log=dict(label_str_format=label_str_format,
                                                        between=between,

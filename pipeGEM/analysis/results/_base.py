@@ -92,7 +92,9 @@ class BaseAnalysis:
     def __getattr__(self, item):
         if item in self.__dict__:
             return self.__dict__[item]
-        return self._result[item]
+        if item in self._result:
+            return self._result[item]
+        return self.__getattribute__(item)
 
     @property
     def result(self) -> dict:
