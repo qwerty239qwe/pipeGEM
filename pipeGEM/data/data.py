@@ -1,5 +1,5 @@
 import warnings
-from typing import Dict, Union, Literal, List
+from typing import Dict, Union, Literal, List, Optional
 from pathlib import Path
 
 import anndata as ad
@@ -454,3 +454,18 @@ class MediumData(BaseData):
             csv_kw = csv_kw or {}
             data = pd.read_csv(file_name, **csv_kw)
         return cls(data, **kwargs)
+
+
+class EnzymeData(BaseData):
+    def __init__(self,
+                 data: Union[pd.DataFrame],
+                 gene_id_col: Optional[str] = None,
+                 mw_col: str = "MW",
+                 kcat_col: str = "Kcat",
+                 prot_seq_col: str = "Sequence",
+                 gene_id_index: bool = True):
+        super().__init__("genes")
+        self._enzyme_df = data.copy()
+        if gene_id_col is not None:
+            self._enzyme_df.index = self._enzyme_df[gene_id_col]
+
