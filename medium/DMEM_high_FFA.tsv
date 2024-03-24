@@ -33,7 +33,7 @@ L-Threonine	0.448707186	thr_L	MAM02993
 L-Tryptophan	0.044168054	trp_L	MAM03089
 L-Tyrosine disodium salt dihydrate	0.213607474	tyr_L	MAM03101
 L-Valine	0.451131029	val_L	MAM03135
-Linoleic Acid (18:2)	0.000149786	lnlc	MAM02387
+Linoleic Acid	0.000149786	lnlc	MAM02387
 Lipoic Acid	0.000508968	lipoate	MAM02394
 Magnesium Chloride (anhyd.)	0.300808739	cl	MAM01442
 Magnesium Sulfate (MgSO4) (anhyd.)	0.405748941	so4	MAM02946
@@ -51,11 +51,12 @@ Thiamine hydrochloride	0.006433442	thm	MAM02982
 Thymidine	0.001506832	thymd	MAM02996
 Vitamin B	0.089063	-	MAM01361
 Zinc sulfate (ZnSO4.7H2O)	0.00267658	zn2	MAM03157
-PE-LD	0.1		MAM02685
-TAG-VLDL	0.1		MAM02959
+PE-LD	1		MAM02685
+TAG-VLDL	1		MAM02959
 alpha-tocotrienol	0.1		MAM01330
 gamma-tocopherol	0.1		MAM01935
 gamma-tocotrienol	0.1		MAM01938
 O2	10	o2	MAM02630
 retinol	0.1		MAM02834
 ascorbate	0.1		MAM01368
+free fatty acid pool    1   MAM10005

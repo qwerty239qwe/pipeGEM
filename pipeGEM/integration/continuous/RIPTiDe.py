@@ -64,11 +64,15 @@ def apply_RIPTiDe_sampling(model,
                            sampling_n: int = 500,
                            keep_context: bool = False,
                            rxn_scaling_coefs: Dict[str, float] = None,
+                           discard_inf_score=True,
                            thinning=100,
                            processes=1,
                            seed=None,
                            **kwargs
                            ):
+    if discard_inf_score:
+        rxn_expr_score = {k: v if np.isfinite(v) else np.nan for k, v in rxn_expr_score.items()}
+
     rxn_expr_score = {k: v if -max_inconsistency_score < v < max_inconsistency_score else max_inconsistency_score
                       if v > max_inconsistency_score else -max_inconsistency_score
                       for k, v in rxn_expr_score.items() if not np.isnan(v)}

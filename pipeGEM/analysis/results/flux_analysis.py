@@ -214,11 +214,7 @@ class FBA_Analysis(FluxAnalysis):
     """
     FBA analysis result.
 
-    flux_df: pd.DataFrame
-        A frame having Reaction ID index and a column containing fluxes.
-
-
-    Parameters
+    Attributes
     ----------
     log
     """
