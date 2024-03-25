@@ -21,7 +21,8 @@ since you have used the gapsplit function to sample fluxes
 @usage_warning(to_cite="gapsplit", usage="sampling fluxes")
 def gapsplit(
         model, n, max_tries=None,
-        primary='sequential', primary_tol=0.001,
+        primary='sequential',
+        primary_tol=0.001,
         secondary_frac=0.05,
         fva=None,
         min_range=1e-5,

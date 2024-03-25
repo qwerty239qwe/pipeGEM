@@ -24,6 +24,14 @@ class GeneDataIntegrator:
         raise NotImplementedError()
 
 
+class EnzymeDataIntegrator:
+    def __init__(self):
+        pass
+
+    def integrate(self, model, data, **kwargs):
+        raise NotImplementedError()
+
+
 class RemovableGeneDataIntegrator(GeneDataIntegrator):
     def __init__(self):
         super(RemovableGeneDataIntegrator, self).__init__()

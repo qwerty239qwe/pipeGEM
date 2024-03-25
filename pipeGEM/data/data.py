@@ -463,6 +463,8 @@ class EnzymeData(BaseData):
                  mw_col: str = "MW",
                  kcat_col: str = "Kcat",
                  prot_seq_col: str = "Sequence",
+                 abundance_col: str = "abundance",
+                 ec_num_col: str = "EC",
                  gene_id_index: bool = True):
         super().__init__("genes")
         self._enzyme_df = data.copy()
