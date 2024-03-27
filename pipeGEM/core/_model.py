@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Dict, List
+from typing import Union, Dict, List, Optional
 from copy import deepcopy, copy
 from itertools import chain
 
@@ -13,7 +13,7 @@ from anndata import AnnData
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.utils import save_model, load_model, check_rxn_scales, save_toml_file, parse_toml_file
 from pipeGEM.analysis import model_scaler_collection
-from pipeGEM.data import GeneData, MediumData
+from pipeGEM.data import GeneData, MediumData, EnzymeData, MetaboliteData
 from pipeGEM.integration import integrator_factory
 from pipeGEM.analysis import flux_analyzers, consistency_testers, TaskAnalysis, ko_analyzers
 from pipeGEM.analysis.tasks import TaskHandler, TaskContainer
@@ -47,6 +47,8 @@ class Model(GEMComposite):
             raise ValueError("input model should be a cobra model")
         self._model = model if model is not None else cobra.Model(name=name_tag)
         self._gene_data: Union[Dict[str, GeneData]] = {}
+        self._enzyme_data: Optional[EnzymeData] = None  # this is a singleton obj in the model
+        self._metabolite_data: Optional[MetaboliteData] = None  # this is a singleton obj in the model
         self._medium_data = {}
         self._tasks = {}
         self._merged_rxn_lu_table = {}
@@ -123,6 +125,14 @@ class Model(GEMComposite):
     @property
     def gene_data(self) -> Dict[str, GeneData]:
         return self._gene_data
+
+    @property
+    def metabolite_data(self) -> Optional[MetaboliteData]:
+        return self._metabolite_data
+
+    @property
+    def enzyme_data(self) -> Optional[EnzymeData]:
+        return self._enzyme_data
 
     @property
     def medium_data(self) -> Dict[str, MediumData]:
@@ -354,6 +364,12 @@ class Model(GEMComposite):
         analyzer = ko_analyzers.create(method, model=self, solver=solver, log={"name": self.name_tag})
         return analyzer.analyze(**kwargs)
 
+    def integrate_enzyme_data(self,
+                              prot_abund_data_name,
+                              integrator: str = "",
+                              integrator_init_kwargs=None,):
+        pass
+
     def integrate_gene_data(self,
                             data_name,
                             integrator="GIMME",
@@ -367,25 +383,29 @@ class Model(GEMComposite):
 
         Parameters
         ----------
-        data_name
-        integrator
-        integrator_init_kwargs
+        data_name: str
+            Name of the gene data to be integrated with the model
+        integrator: str or Integrator
+            Name of the used integrator (algorithm name)
+            Possible choices: GIMME, CORDA, rFASTCORMICS, mCADRE, RIPTiDe, and Eflux (for now).
+        integrator_init_kwargs: optional, dict
+            Keyword arguments for initializing the integrator
+        rxn_scaling_coefs: optional, dict
+            Reaction scaling coefficient for the integrator if the model was rescaled before.
+        predefined_threshold: ThresholdAnalysis or a dict
+            Threshold analysis object contains expression threshold needed,
+            or a dict contains an expression threshold with a key named exp_th
+            and a non-expression threshold with a key named non_exp_th
+        protected_rxns: list of str
+            Protected reaction IDs contained in a list
+
         kwargs: dict
             Keyword arguments for integrating the data.
-            Common ones are -
-            predefined_threshold: ThresholdAnalysis or a dict
-                Threshold analysis object contains expression threshold needed.
-                Or a dict contains an expression threshold with a key named exp_th
-                and a non-expression threshold with a key named non_exp_th
-
-            protected_rxns: list of str
-                Protected reaction IDs contained in a list
-
-
 
         Returns
         -------
-
+        integrating_result: BaseAnalysis
+            Result object containing gene data-integrated model (context-specific model).
         """
         if isinstance(integrator, str):
             integrator_init_kwargs = {} if integrator_init_kwargs is None else integrator_init_kwargs

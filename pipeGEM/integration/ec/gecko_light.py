@@ -9,8 +9,8 @@ def _check_gene_and_enzymes(model, enzyme_data):
 
 
 @timing
-def apply_gecko3(model,
-                 enzyme_data):
+def apply_gecko_light(model,
+                      enzyme_data):
     genes_not_in_enzyme_data = _check_gene_and_enzymes(model, enzyme_data)
     if len(genes_not_in_enzyme_data) != 0:
         raise ValueError(f"Genes {genes_not_in_enzyme_data} are not in the enzyme data. "

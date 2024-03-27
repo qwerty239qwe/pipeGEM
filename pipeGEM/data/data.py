@@ -456,18 +456,147 @@ class MediumData(BaseData):
         return cls(data, **kwargs)
 
 
+class MetaboliteData(BaseData):
+    def __init__(self,
+                 data: Union[pd.DataFrame],
+                 met_id_col: Optional[str] = None,
+                 smiles_col="SMILES"):
+        super().__init__("metabolites")
+        self._add_met_df = data.copy()
+        self.smiles_col = smiles_col
+        if met_id_col is not None:
+            self._add_met_df.index = self._add_met_df[met_id_col]
+
+        if self.smiles_col not in self._add_met_df.columns:
+            raise KeyError(f"A column named {self.smiles_col} containing SMILES is required")
+
+    def get_smiles(self, ids):
+        if isinstance(ids, str):
+            return self._add_met_df.loc[ids, self.smiles_col]
+        return self._add_met_df.loc[ids, self.smiles_col].values
+
+    def __getitem__(self, item):
+        if isinstance(item, str):
+            item = [item]
+            smiles = [self.get_smiles(item)]
+        else:
+            smiles = self.get_smiles(item)
+        return dict(zip(item, smiles))
+
+
+class ProteinAbundanceData(BaseData):
+    def __init__(self,
+                 data: Union[pd.DataFrame],
+                 prot_id_col: Optional[str] = None,
+                 abundance_col: str = "abundance",):
+        super().__init__("genes")
+        self._prot_abund_df = data.copy()
+        if prot_id_col is not None:
+            self._prot_abund_df.index = self._prot_abund_df[prot_id_col]
+        if abundance_col not in self._prot_abund_df:
+            raise KeyError(f"abundance_col {abundance_col} cannot be found in the data, "
+                           f"possible column names = {self._prot_abund_df.columns}")
+
+    def calc_f_coef(self):
+        pass
+
+
 class EnzymeData(BaseData):
     def __init__(self,
                  data: Union[pd.DataFrame],
                  gene_id_col: Optional[str] = None,
+                 prot_id_col: Optional[str] = None,
+                 rxn_id_col: Optional[str] = None,
                  mw_col: str = "MW",
                  kcat_col: str = "Kcat",
+                 alt_kcat_col: str = "DLKcat",
                  prot_seq_col: str = "Sequence",
-                 abundance_col: str = "abundance",
                  ec_num_col: str = "EC",
-                 gene_id_index: bool = True):
+                 sa_col: str = "SA",
+                 ):
         super().__init__("genes")
         self._enzyme_df = data.copy()
         if gene_id_col is not None:
             self._enzyme_df.index = self._enzyme_df[gene_id_col]
+        else:
+            print("Using dataframe's index as the gene ID")
 
+        if prot_id_col is None:
+            warnings.warn("No prot_id_col is provided, Gene ID will be used in the following process.")
+        self._rxn_id_col = rxn_id_col
+        self.prot_id_col = prot_id_col
+        self.mw_col = mw_col
+        self.kcat_col = kcat_col
+        self.alt_kcat_col = alt_kcat_col
+        self.prot_seq_col = prot_seq_col
+
+        if self.mw_col not in self._enzyme_df.columns:
+            print(f"Inferring molecular weight via protein sequence (column '{prot_seq_col}')")
+            self._enzyme_df[self.mw_col] = self._enzyme_df[self.prot_seq_col].apply(self.calc_molecular_weight)
+        self.ec_num_col = ec_num_col
+        self.sa_col = sa_col
+        self._best_matched_df = None
+
+    @staticmethod
+    def calc_molecular_weight(seq: str) -> float:
+        aa_codes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
+                    'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+        aa_MWs = [71.08, 114.60, 103.14, 115.09, 129.11, 147.17, 57.05, 137.14,
+                  113.16, 113.16, 128.17, 113.16, 131.20, 114.10, 255.31, 97.12,
+                  128.13, 156.19, 87.08, 101.10, 150.04, 99.13, 186.21, 126.50,
+                  163.17, 128.62]
+
+        aa_mw_dic = dict(zip(aa_codes, aa_MWs))
+        return sum([aa_mw_dic[s] for s in seq]) + 18
+
+    def check_gene_rxn_pair(self,
+                            ref_model,
+                            raise_err=True):
+        ref_rxn_gene_map = {r.id: [g.id for g in r.genes] for r in ref_model.reactions}
+        for i, row in self._enzyme_df.iterrows():
+            if i not in ref_rxn_gene_map[row[self._rxn_id_col]]:
+                err_msg = f"Cannot find matched gene: {i} and rxn: {row[self._rxn_id_col]} in the given model"
+                if raise_err:
+                    raise ValueError(err_msg)
+                warnings.warn(err_msg)
+
+    def rxn_items(self):
+        if self._best_matched_df is None:
+            raise AttributeError("Please call .align(model) first before getting the rxn_items")
+
+        rxn_dic = {row["rxn"]: {"protein_to_use": row["protein"],
+                                "best_kcat": row["kcat"],
+                                "best_mw": row["mw"]} for i, row in self._best_matched_df.iterrows()}
+        return rxn_dic.items()
+
+
+    def run_DLKcat(self,
+                   met_data):
+        from pipeGEM.extensions.DLKcat import predict_Kcat
+
+
+    def align(self,
+              model,
+              check_and_raise=True,
+              run_DLKcat=True):
+        if self._rxn_id_col is not None:
+            warnings.warn("Trying to compare the previous rxn ID and the current model's rxn IDs")
+            self.check_gene_rxn_pair(ref_model=model,
+                                     raise_err=check_and_raise)
+
+        else:
+            self._rxn_id_col = "Reaction" if "Reaction" not in self._enzyme_df.columns else "_Reaction"
+            self._enzyme_df[self._rxn_id_col] = self._enzyme_df.index.to_series().apply(lambda x:
+                                                                                        [r.id for r in model.genes.get_by_id(x).reactions])
+            self._enzyme_df = self._enzyme_df.explode(self._rxn_id_col)
+
+        # run DLKat (optional)
+        if run_DLKcat:
+            if model.metabolite_data is None:
+                raise AttributeError("To use DLKcat, a metabolite_data object containing sequence information "
+                                     "needs to be in the model first."
+                                     "Use model.add_metabolite_data() first.")
+
+            self.run_DLKcat(model.metabolite_data)
+
+        # get best_matched_df

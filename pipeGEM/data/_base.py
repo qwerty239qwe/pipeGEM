@@ -7,6 +7,6 @@ class BaseData:
     def clean(self):
         self._hooked_attr = {}
 
-    def align(self, model):
+    def align(self, model, **kwargs):
         raise NotImplementedError()
 
