@@ -55,6 +55,10 @@ doc = [
     "myst-nb",
     "ipywidgets"
 ]
+dlkcat = [
+    "torch",
+    "rdkit"
+]
 
 [project.urls]
 Homepage = "https://github.com/qwerty239qwe/pipeGEM"
