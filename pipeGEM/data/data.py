@@ -507,6 +507,7 @@ class EnzymeData(BaseData):
                  gene_id_col: Optional[str] = None,
                  prot_id_col: Optional[str] = None,
                  rxn_id_col: Optional[str] = None,
+                 met_id_col: Optional[str] = None,
                  mw_col: str = "MW",
                  kcat_col: str = "Kcat",
                  alt_kcat_col: str = "DLKcat",
@@ -524,6 +525,7 @@ class EnzymeData(BaseData):
         if prot_id_col is None:
             warnings.warn("No prot_id_col is provided, Gene ID will be used in the following process.")
         self._rxn_id_col = rxn_id_col
+        self._met_id_col = met_id_col
         self.prot_id_col = prot_id_col
         self.mw_col = mw_col
         self.kcat_col = kcat_col
@@ -536,6 +538,7 @@ class EnzymeData(BaseData):
         self.ec_num_col = ec_num_col
         self.sa_col = sa_col
         self._best_matched_df = None
+        self._rxn_df_to_be_analyzed = None
 
     @staticmethod
     def calc_molecular_weight(seq: str) -> float:
@@ -569,26 +572,42 @@ class EnzymeData(BaseData):
                                 "best_mw": row["mw"]} for i, row in self._best_matched_df.iterrows()}
         return rxn_dic.items()
 
-
     def run_DLKcat(self,
-                   met_data):
+                   met_data,
+                   device="cpu"):
         from pipeGEM.extensions.DLKcat import predict_Kcat
 
 
     def align(self,
               model,
               check_and_raise=True,
-              run_DLKcat=True):
+              run_DLKcat=True,
+              device="cpu"):
         if self._rxn_id_col is not None:
             warnings.warn("Trying to compare the previous rxn ID and the current model's rxn IDs")
             self.check_gene_rxn_pair(ref_model=model,
                                      raise_err=check_and_raise)
+            if self._met_id_col is None:
+                self._met_id_col = "Metabolite" if "Metabolite" not in self._enzyme_df.columns else "_Metabolite"
+                self._enzyme_df[self._met_id_col] = self._enzyme_df[self._rxn_id_col].apply(lambda x:
+                                                                                            [m.id for m in
+                                                                                             model.reactions.get_by_id(
+                                                                                                 x).metabolites])
+        elif self._met_id_col is not None:
+            raise NotImplementedError()
 
         else:
             self._rxn_id_col = "Reaction" if "Reaction" not in self._enzyme_df.columns else "_Reaction"
+            self._met_id_col = "Metabolite" if "Metabolite" not in self._enzyme_df.columns else "_Metabolite"
             self._enzyme_df[self._rxn_id_col] = self._enzyme_df.index.to_series().apply(lambda x:
-                                                                                        [r.id for r in model.genes.get_by_id(x).reactions])
-            self._enzyme_df = self._enzyme_df.explode(self._rxn_id_col)
+                                                                                        [r.id for r in
+                                                                                         model.genes.get_by_id(
+                                                                                             x).reactions])
+            self._enzyme_df[self._met_id_col] = self._enzyme_df[self._rxn_id_col].apply(lambda x:
+                                                                                        [m.id for m in
+                                                                                         model.reactions.get_by_id(
+                                                                                             x).metabolites])
+            self._enzyme_df = self._enzyme_df.explode([self._rxn_id_col, self._met_id_col])
 
         # run DLKat (optional)
         if run_DLKcat:
@@ -597,6 +616,6 @@ class EnzymeData(BaseData):
                                      "needs to be in the model first."
                                      "Use model.add_metabolite_data() first.")
 
-            self.run_DLKcat(model.metabolite_data)
+            self.run_DLKcat(model.metabolite_data, device=device)
 
         # get best_matched_df
