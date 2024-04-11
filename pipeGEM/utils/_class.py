@@ -15,6 +15,9 @@ class ObjectFactory:
             raise KeyError(builder_name)
         return builder(**kwargs)
 
+    def items(self):
+        return self._builders.items()
+
 
 class ClassPropertyDescriptor:
     def __init__(self, fget):

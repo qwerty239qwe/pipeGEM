@@ -51,8 +51,8 @@ Thiamine hydrochloride	0.00089	thm	MAM02982
 Thymidine	0.002892562	thymd	MAM02996
 Vitamin B	0.00103321	-	MAM01361
 Zinc sulfate (ZnSO4.7H2O)	0.0005	zn2	MAM03157
-PE-LD	0.001		MAM02685
-TAG-VLDL	0.001	?	MAM02959
+PE-LD	0.1		MAM02685
+TAG-VLDL	0.1	?	MAM02959
 alpha-tocotrienol	0.1	?	MAM01330
 gamma-tocopherol	0.1	?	MAM01935
 gamma-tocotrienol	0.1	?	MAM01938

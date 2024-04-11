@@ -341,6 +341,13 @@ class Model(GEMComposite):
         rescaler = model_scaler_collection[method]()
         return rescaler.rescale_model(model=self, n_iter=n_iter)
 
+    def scale_model(self,
+                    scaling_result):
+        scaler_cls_name = {v().__class__.__name__: k for k, v in model_scaler_collection.items()}
+        method_name = scaler_cls_name[scaling_result.log["method"]]
+        scaler = model_scaler_collection[method_name]()
+        return scaler.rescale_with_previous_result(model=self, scaling_result=scaling_result)
+
     def check_consistency(self,
                           method: str = "FASTCC",
                           tol: float = 1e-6,

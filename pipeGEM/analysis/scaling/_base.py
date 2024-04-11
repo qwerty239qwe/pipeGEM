@@ -60,7 +60,7 @@ class ModelScaler:
         row_psc, col_psc = self.calc_coef_scale_diff(arr)
         print("Before rescaling:")
         print(f"Problematic rows (metabolite coefficients): {row_psc}")
-        print(f"Problematic cols (metabolite coefficients): {col_psc}")
+        print(f"Problematic cols (reaction coefficients): {col_psc}")
         self.m_ind = model.metabolites.index
         self.r_ind = model.reactions.index
         self.cons_scale_diags = np.ones(shape=(len(model.reactions,)))
@@ -80,9 +80,51 @@ class ModelScaler:
         self._decimals = lil_matrix(np.zeros(shape=self._diff_A.shape), dtype=int)
 
     @timing
-    def rescale_model(self, model, n_iter):
+    def rescale_with_previous_result(self, model, scaling_result: ModelScalingResult):
         new_mod = model.copy()
-        self.get_rescale_factor(new_mod, n_iter)
+
+        rxn_index = [i for i in scaling_result.result["rxn_index"]]
+        met_index = [i for i in scaling_result.result["met_index"]]
+
+        met_scaling_factor = scaling_result.result["met_scaling_factor"]
+        rxn_scaling_factor = scaling_result.result["rxn_scaling_factor"]
+
+        self._diff_A = scaling_result.result["diff_A"]
+
+        rxns_in_model = [r.id for r in new_mod.reactions]
+
+        for i, r_id in enumerate(rxn_index):
+            if r_id is None or r_id not in rxns_in_model:
+                continue
+
+            involved_met_ids = sparse.find(self._diff_A[:, i] != 0)[0]  # met index
+            new_mod.reactions.get_by_id(r_id).add_metabolites({
+                met_index[mi]: self._diff_A[mi, i]
+                for mi in involved_met_ids
+            })
+            new_mod.reactions.get_by_id(r_id).lower_bound *= rxn_scaling_factor[r_id]
+            new_mod.reactions.get_by_id(r_id).upper_bound *= rxn_scaling_factor[r_id]
+        result = ModelScalingResult(log=dict(n_iter=scaling_result.log["n_iter"],
+                                             method=self.__class__.__name__))
+        result.add_result(dict(rescaled_model=new_mod,
+                               diff_A=self._diff_A,
+                               decimals=scaling_result.result["decimals"],
+                               met_scaling_factor=met_scaling_factor,
+                               rxn_scaling_factor=rxn_scaling_factor,
+                               rxn_index=rxn_index,
+                               met_index=met_index))
+
+        return result
+
+
+    @timing
+    def rescale_model(self, model, n_iter, calc_factor=True):
+        new_mod = model.copy()
+        if calc_factor:
+            self.get_rescale_factor(new_mod, n_iter)
+        if self._diff_A is None:
+            raise AttributeError("set calc_factor=True to obtain the right scaling coefficient")
+
         rxn_index = {self.r_ind(r): r.id for r in new_mod.reactions}
         met_index = {self.m_ind(m): m.id for m in new_mod.metabolites}
 
