@@ -225,7 +225,7 @@ def plot_2D_PCA_score(pca_df,
             pc1, pc2 = np.array([pca_df.loc['PC1', name] for name in model_names]), \
                        np.array([pca_df.loc['PC2', name] for name in model_names])
 
-            ax.scatter(pc1, pc2, label=group_name, c=[colors[i]])
+            ax.scatter(pc1, pc2, label=group_name, c=[colors[i]], s=5)
     else:
         x = pca_df.loc['PC1', :].values
         y = pca_df.loc['PC2', :].values
