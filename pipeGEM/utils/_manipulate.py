@@ -105,16 +105,40 @@ def merge_irrevs_in_df(sol_df: pd.DataFrame,
     b_rxns = sol_df.index.str.match(f"^{backward_prefix}")
     f_df = sol_df[f_rxns]
     f_df.index = f_df.index.to_series().str.partition(forward_prefix).iloc[:, 2]
-    f_df.columns = ["forward", "reduced_costs"]
+    f_df.columns = ["forward", "f_reduced_costs"]
     b_df = sol_df[b_rxns]
     b_df.index = b_df.index.to_series().str.partition(backward_prefix).iloc[:, 2]
-    b_df.columns = ["backward", "reduced_costs"]
+    b_df.columns = ["backward", "b_reduced_costs"]
     sol_df = sol_df[(~f_rxns) & (~b_rxns)]
-    sol_df = sol_df.merge(f_df, how="outer",
-                         left_index=True, right_index=True).merge(b_df, how="outer",
-                                                                  left_index=True, right_index=True).fillna(0)
-    sol_df["fluxes"] = sol_df["fluxes"] + sol_df["forward"] - sol_df["backward"]
+    flx_df = sol_df.merge(f_df[["forward"]], how="outer",
+                         left_index=True, right_index=True).merge(b_df[["backward"]], how="outer",
+                                                                 left_index=True, right_index=True).fillna(0)
+    rc_df = sol_df.merge(f_df[["f_reduced_costs"]], how="outer",
+                         left_index=True, right_index=True).merge(b_df[["b_reduced_costs"]], how="outer",
+                                                                 left_index=True, right_index=True).fillna(0)
+
+    sol_df["fluxes"] = sol_df["fluxes"] + flx_df["forward"] - flx_df["backward"]
+    sol_df["reduced_costs"] = sol_df["reduced_costs"] + rc_df["f_reduced_costs"] - rc_df["b_reduced_costs"]
+
     return sol_df
+
+
+def merge_irrevs_in_pivoted_df(sol_df: pd.DataFrame,
+                               forward_prefix="_F_",
+                               backward_prefix="_R_"
+                               ):
+    sol_df = sol_df.copy()
+    f_rxns = sol_df.columns.str.match(f"^{forward_prefix}")
+    b_rxns = sol_df.columns.str.match(f"^{backward_prefix}")
+    f_df = sol_df[sol_df.columns[f_rxns]]
+    b_df = sol_df[sol_df.columns[b_rxns]]
+
+    f_df = f_df.rename(columns=dict(f_df.columns.to_series().str.partition(forward_prefix).iloc[:, 2]))
+    b_df = b_df.rename(columns=dict(b_df.columns.to_series().str.partition(backward_prefix).iloc[:, 2]))
+
+    sol_df.loc[:, f_df.columns] = sol_df.loc[:, f_df.columns].fillna(0) + f_df
+    sol_df.loc[:, b_df.columns] = sol_df.loc[:, b_df.columns].fillna(0) - b_df
+    return sol_df.loc[:, (~f_rxns) & (~b_rxns)]
 
 
 def sep_isoenzymes(model, name_format="{rxn.id}_iso_{i}"):
