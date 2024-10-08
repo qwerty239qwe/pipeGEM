@@ -209,7 +209,6 @@ def _preprocess_int_configs(integration_conf,
                             protected_rxns,
                             rxn_s_factors):
     integration_conf = {k: v for k, v in integration_conf.items()}
-    saved_path = integration_conf.pop("saved_path")
     int_name = integration_conf.pop("integrator_name")
     integration_conf["integrator"] = int_name
     _ = integration_conf.pop("precompute")
@@ -221,7 +220,7 @@ def _preprocess_int_configs(integration_conf,
 
     integration_conf["protected_rxns"] = integration_conf.get("protected_rxns", []) + protected_rxns
     integration_conf["rxn_scaling_coefs"] = rxn_s_factors
-    return integration_conf, saved_path
+    return integration_conf
 
 
 def run_integration_pipeline(gene_data_conf,
@@ -230,6 +229,7 @@ def run_integration_pipeline(gene_data_conf,
                              mapping_conf,
                              integration_conf,
                              **kwargs):
+    integration_conf = {k: v for k, v in integration_conf.items()}
     gene_data_dic = load_gene_data(gene_data_conf=gene_data_conf)
     model, task_result, rxn_s_factors = _integration_get_model_and_task(model_conf=model_conf,
                                                                         integration_conf=integration_conf)
@@ -237,8 +237,10 @@ def run_integration_pipeline(gene_data_conf,
                                        threshold_config=threshold_conf,
                                        integration_conf=integration_conf)
     task_supp_rxns = {}
+    saved_path = integration_conf.pop("saved_path")
     for g_name, g_data in gene_data_dic.items():
-        if (Path(integration_conf["saved_path"]) / g_name).is_dir():
+
+        if (saved_path / g_name).is_dir():
             print(f"{g_name} is already there. Skipping it")
             continue
 
@@ -246,11 +248,11 @@ def run_integration_pipeline(gene_data_conf,
                                           gene_data=g_data,
                                           model=model,
                                           mapping_config=mapping_conf)
-        int_c, saved_path = _preprocess_int_configs(integration_conf=integration_conf,
-                                                    th_result=th_result[g_name]
-                                                        if isinstance(th_result, dict) else th_result,
-                                                    protected_rxns=task_supp_rxns[g_name],
-                                                    rxn_s_factors=rxn_s_factors)
+        int_c = _preprocess_int_configs(integration_conf=integration_conf,
+                                        th_result=th_result[g_name]
+                                        if isinstance(th_result, dict) else th_result,
+                                        protected_rxns=task_supp_rxns[g_name],
+                                        rxn_s_factors=rxn_s_factors)
         int_result = model.integrate_gene_data(data_name=g_name,
                                                **int_c)
         int_result.save(Path(saved_path) / g_name)
@@ -319,6 +321,7 @@ def _fa_with_data(multi_model_conf,
                   threshold_conf,
                   mapping_conf,
                   integration_conf):
+    integration_conf = {k: v for k, v in integration_conf.items()}
     model_path_struct = multi_model_conf["models_input_path"]
     model_type = multi_model_conf["model_type"]
     gene_data_dic = load_gene_data(gene_data_conf=gene_data_conf)
@@ -333,20 +336,22 @@ def _fa_with_data(multi_model_conf,
     else:
         rxn_s_factors = None
     task_supp_rxns = {}
+    saved_path = integration_conf.pop("saved_path")
     for g_name, g_data in gene_data_dic.items():
+        file_saved_path = saved_path.format(g_name)
+        if Path(file_saved_path).is_dir():
+            continue
+
         model = _load_exist_model(model_path_struct, g_name, model_type)
         task_supp_rxns[g_name] = map_data(data_name=g_name,
                                           gene_data=g_data,
                                           model=model,
                                           mapping_config=mapping_conf)
-        int_c, saved_path = _preprocess_int_configs(integration_conf=integration_conf,
-                                                    th_result=th_result[g_name]
-                                                    if isinstance(th_result, dict) else th_result,
-                                                    protected_rxns=task_supp_rxns[g_name],
-                                                    rxn_s_factors=rxn_s_factors)
-        file_saved_path = saved_path.format(g_name)
-        if Path(file_saved_path).is_dir():
-            continue
+        int_c = _preprocess_int_configs(integration_conf=integration_conf,
+                                        th_result=th_result[g_name]
+                                        if isinstance(th_result, dict) else th_result,
+                                        protected_rxns=task_supp_rxns[g_name],
+                                        rxn_s_factors=rxn_s_factors)
 
         int_result = model.integrate_gene_data(data_name=g_name,
                                                **int_c)
