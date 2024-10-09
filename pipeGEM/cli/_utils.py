@@ -237,7 +237,7 @@ def run_integration_pipeline(gene_data_conf,
                                        threshold_config=threshold_conf,
                                        integration_conf=integration_conf)
     task_supp_rxns = {}
-    saved_path = integration_conf.pop("saved_path")
+    saved_path = Path(integration_conf.pop("saved_path"))
     for g_name, g_data in gene_data_dic.items():
 
         if (saved_path / g_name).is_dir():
