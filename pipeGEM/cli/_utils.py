@@ -256,6 +256,8 @@ def run_integration_pipeline(gene_data_conf,
         int_result = model.integrate_gene_data(data_name=g_name,
                                                **int_c)
         int_result.save(Path(saved_path) / g_name)
+        del int_result
+        del task_supp_rxns[g_name]
 
 
 def do_model_comparison(comparison_configs):

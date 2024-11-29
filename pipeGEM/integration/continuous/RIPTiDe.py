@@ -56,16 +56,17 @@ def apply_RIPTiDe_sampling(model,
                            max_gw: float = None,
                            max_inconsistency_score: float = 1e3,
                            obj_frac: float = 0.8,
-                           sampling_obj_frac: float = 0.05,
+                           sampling_obj_frac: float = 0.8,
                            do_sampling: bool = False,
                            solver: str = "gurobi",
                            sampling_method: str = "gapsplit",
                            protected_rxns: Optional[List[str]] = None,
+                           protect_no_expr: bool = False,
                            sampling_n: int = 500,
                            keep_context: bool = False,
                            rxn_scaling_coefs: Dict[str, float] = None,
                            discard_inf_score=True,
-                           thinning=100,
+                           thinning=1,
                            processes=1,
                            seed=None,
                            **kwargs
@@ -73,7 +74,7 @@ def apply_RIPTiDe_sampling(model,
     if discard_inf_score:
         rxn_expr_score = {k: v if np.isfinite(v) else np.nan for k, v in rxn_expr_score.items()}
 
-    rxn_expr_score = {k: v if -max_inconsistency_score < v < max_inconsistency_score else max_inconsistency_score
+    rxn_expr_score = {k: v if -max_inconsistency_score <= v <= max_inconsistency_score else max_inconsistency_score
                       if v > max_inconsistency_score else -max_inconsistency_score
                       for k, v in rxn_expr_score.items() if not np.isnan(v)}
     max_gw = max_gw or np.nanmax(list(rxn_expr_score.values()))
@@ -86,15 +87,16 @@ def apply_RIPTiDe_sampling(model,
     obj_dict = {r_id: (r_exp - min_gw) * rxn_scaling_coefs[r_id] / (max_gw - min_gw)
                 for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)}
     obj_dict.update({r.id: rxn_scaling_coefs[r.id]
-                     for r in model.reactions if r.id not in obj_dict or r.id in protected_rxns})  # same as the smallest weight
+                     for r in model.reactions
+                     if r.id in protected_rxns or (protect_no_expr and (r.id not in obj_dict))})  # same as the largest weight
     # assert all([1 >= i >= 0 for i in list(obj_dict.values())])
-
     sampling_result = None
     if do_sampling:
         with model:
             add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac, direction="max")
             sol = model.optimize()
-            print(sol.to_frame(), sol.objective_value)
+            print(sol.to_frame())
+            print("pFBA obj", sol.objective_value)
             sampling_analyzer = flux_analyzers["sampling"](model, solver, log={"n": sampling_n,
                                                                                "method": sampling_method,
                                                                                **kwargs})
@@ -107,7 +109,8 @@ def apply_RIPTiDe_sampling(model,
     if keep_context:
         add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac, direction="max")
         fix_objective_as_constraint(model=model, fraction=sampling_obj_frac)
-    analysis_result = RIPTiDeSamplingAnalysis(log = {"max_gw": max_gw, "obj_frac": obj_frac,
+    analysis_result = RIPTiDeSamplingAnalysis(log = {"max_gw": max_gw,
+                                                     "obj_frac": obj_frac,
                                                      "sampling_obj_frac": sampling_obj_frac,
                                                      "do_sampling": do_sampling, "solver": solver,
                                                      "sampling_method": sampling_method})
