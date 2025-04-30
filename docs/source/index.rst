@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-PipeGEM: building **Pipe**\ lines for **GEM** (genome-scale metabolic model) reconstruction
+PipeGEM: **Pipe**line for **GEM** (Genome-Scale Metabolic Model) Reconstruction
 =============================================================================================
 
 Contents

@@ -29,7 +29,7 @@ def test_sampling_operate_sum(sampling_result, ecoli_core):
     rxn_ids = [r.id for r in ecoli_core.reactions]
     sel_rxns = rxn_ids[3: 10]
 
-    sampling_result.operate("ans=" + "+".join(rxn_ids))
+    sampling_result.operate("ans=" + "+".join(rxn_ids[3: 10]))
     ans = sampling_result.flux_df["ans"]
 
     assert isinstance(ans, pd.Series)

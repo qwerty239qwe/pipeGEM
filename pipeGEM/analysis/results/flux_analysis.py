@@ -266,11 +266,15 @@ class FBA_Analysis(FluxAnalysis):
                 data[rxn_group_by] = data["Reaction"].map(self._log["rxn_annotations"][rxn_group_by]).astype("category")
         rxn_index_name = rxn_group_by if rxn_group_by is not None else "Reaction"
         sample_col_name = sample_group_by if sample_group_by is not None else "model"
+
         data = pd.pivot_table(data=data.drop(columns=["reduced_costs"]),
+                              values="fluxes",
                               index=rxn_index_name,
                               columns=sample_col_name,
                               aggfunc=group_by_agg_method).fillna(0)
         data.columns = data.columns.droplevel(0)
+
+
         pltr.plot(result=data,
                   *args,
                   **kwargs)

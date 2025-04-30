@@ -73,7 +73,9 @@ def plot_model_components(comp_df: pd.DataFrame,
     sns.boxplot(data=comp_df[comp_df["component"] == "n_genes"], y="number", x=group, hue=group,
                 palette=palette, order=order, ax=axes[2], dodge=False, **kwargs)
     for i in range(3):
-        axes[i].get_legend().remove()
+        legend = axes[i].get_legend()
+        if legend is not None:
+            legend.remove()
         axes[i].set_title(fig_titles[i])
         if i != 0:
             axes[i].set_ylabel("")

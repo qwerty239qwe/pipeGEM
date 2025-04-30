@@ -212,7 +212,10 @@ class DataBaseFetcher:
 
     def fetch_data(self) -> pd.DataFrame:
         try:
-            response = requests.get(self.url, timeout=30)
+            headers = {
+                'User-Agent': 'FETCHER'
+            }
+            response = requests.get(self.url, timeout=30, headers=headers)
             response.raise_for_status()
             data = response.json()
             return self.manipulate_df(data)
@@ -258,8 +261,16 @@ def list_models(databases=["metabolic atlas", "BiGG"],
     all_dfs = []
     for database in databases:
         df = fetchers.init_fetcher(database).fetch_data()
+        if df is None:
+            print("Cannot fetch", database)
+            continue
+
         df["database"] = database
         all_dfs.append(df)
+    if len(all_dfs) == 0:
+        print("No data fetched, returning an empty dataframe")
+        return pd.DataFrame()
+
     mg_df = pd.concat(all_dfs, axis=0)
     if organism is not None:
         organism = _format_organism_name(organism)
