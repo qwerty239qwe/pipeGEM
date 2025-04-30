@@ -25,8 +25,26 @@ _ORGANISM_KEGG = {"human": "hsa", "mouse": "mmu"}
 _ORGANISM_BRENDA = {"human": "Homo sapiens"}
 
 
-def fetch_HPA_data(data_name,
-                   data_path=Path(__file__).parent.parent.parent / Path("external_data/HPA")) -> dict:
+def fetch_HPA_data(data_name: str,
+                   data_path: Union[str, Path] = Path(__file__).parent.parent.parent / Path("external_data/HPA")) -> dict:
+    """
+    Fetch Human Protein Atlas (HPA) data.
+
+    Downloads the specified HPA dataset if it doesn't exist locally.
+
+    Parameters
+    ----------
+    data_name : str
+        The name of the HPA dataset to fetch (e.g., 'rna_tissue_consensus').
+    data_path : Union[str, Path], optional
+        The directory path to save or load the data from.
+        Defaults to 'external_data/HPA' relative to the project root.
+
+    Returns
+    -------
+    dict
+        A dictionary containing the path to the downloaded TSV file under the key "data_path".
+    """
     if isinstance(data_path, str):
         data_path = Path(data_path)
 
@@ -255,6 +273,32 @@ def list_models(databases=["metabolic atlas", "BiGG"],
                 max_n_mets=np.inf,
                 max_n_genes=np.inf,
                 **kwargs) -> pd.DataFrame:
+    """
+    List available metabolic models from specified databases with optional filtering.
+
+    Parameters
+    ----------
+    databases : List[str], optional
+        A list of database names to fetch models from (e.g., ["metabolic atlas", "BiGG"]).
+        Defaults to ["metabolic atlas", "BiGG"].
+    organism : str, optional
+        Filter models by organism name (e.g., "human", "mouse"). Case-insensitive.
+    max_n_rxns : float, optional
+        Maximum number of reactions allowed in the models. Defaults to infinity.
+    max_n_mets : float, optional
+        Maximum number of metabolites allowed in the models. Defaults to infinity.
+    max_n_genes : float, optional
+        Maximum number of genes allowed in the models. Defaults to infinity.
+    **kwargs
+        Additional keyword arguments for DataBaseFetcherIniter.
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing information about the available models, including
+        'id', 'organism', 'reaction_count', 'metabolite_count', 'gene_count',
+        and 'database'. Returns an empty DataFrame if no data is fetched.
+    """
     fetchers = DataBaseFetcherIniter(**kwargs)
     fetchers.register("BiGG", BiggDataBaseFetcher)
     fetchers.register("metabolic atlas", AtlasDataBaseFetcher)
@@ -285,6 +329,32 @@ def load_remote_model(model_id,
                       format="mat",
                       branch="main",
                       download_dest="default"):
+    """
+    Load a metabolic model from a remote database (BiGG or Metabolic Atlas).
+
+    If the model_id is found in the BiGG database, it is loaded directly using
+    cobrapy. Otherwise, it attempts to download the model from the Metabolic
+    Atlas GitHub repository.
+
+    Parameters
+    ----------
+    model_id : str
+        The ID of the model to load.
+    format : str, optional
+        The format of the model file to download (e.g., "mat", "xml", "yml").
+        Defaults to "mat".
+    branch : str, optional
+        The GitHub branch to download the model from for Metabolic Atlas models.
+        Defaults to "main".
+    download_dest : str, optional
+        The destination directory to download the model to. Defaults to "default",
+        which saves to a 'models' directory relative to the project root.
+
+    Returns
+    -------
+    cobra.Model
+        The loaded metabolic model.
+    """
     model_list = list_models()
     if model_id in model_list[model_list["database"]=="BiGG"]["id"].to_list():
         return cobra.io.load_model(model_id)

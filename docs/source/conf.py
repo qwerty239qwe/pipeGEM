@@ -22,7 +22,7 @@ sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 # -- Project information -----------------------------------------------------
 
 project = 'pipeGEM'
-copyright = '2023, Yu-Te Lin'
+copyright = '2025, Yu-Te Lin'
 author = 'Yu-Te Lin'
 
 # The full version, including alpha/beta/rc tags

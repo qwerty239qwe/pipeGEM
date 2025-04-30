@@ -89,6 +89,7 @@ class GeneData(BaseData):
         self.rxn_mapper = None
 
     def __getitem__(self, item):
+        """Retrieve gene expression value by gene ID."""
         return self.gene_data[item]
 
     def align(self, model, **kwargs):
@@ -145,6 +146,14 @@ class GeneData(BaseData):
 
     @property
     def transformed_gene_data(self) -> Dict[str, float]:
+        """
+        Gene data after applying the specified `data_transform`.
+
+        Returns
+        -------
+        dict[str, float]
+            Dictionary mapping gene IDs to their transformed expression values.
+        """
         return {k: self.data_transform(v) for k, v in self.gene_data.items()}
 
     @property
@@ -168,6 +177,17 @@ class GeneData(BaseData):
         return {k: self.data_transform(v) for k, v in self.rxn_mapper.rxn_scores.items()}
 
     def _digitize_data(self, ordered_thresholds):
+        """
+        Discretizes gene data based on provided ordered thresholds.
+
+        Modifies `self.gene_data` in place. Assigns integer bins centered around zero
+        based on where each gene's value falls within the `ordered_thresholds`.
+
+        Parameters
+        ----------
+        ordered_thresholds : list or None
+            A list of ascending threshold values. If None, no digitization occurs.
+        """
         if ordered_thresholds is not None:
             n_bins = len(ordered_thresholds)
             ranges = np.array([i for i in range(-((n_bins - 1) // 2), n_bins // 2 + 1)])
@@ -177,6 +197,30 @@ class GeneData(BaseData):
 
     @staticmethod
     def _parse_discrete_transform(discrete_transform, ordered_thresholds):
+        """
+        Parses the discrete_transform input into a callable function.
+
+        Handles string shortcuts (like "HPA"), dictionary mappings, or existing callables.
+
+        Parameters
+        ----------
+        discrete_transform : str, dict, callable, or None
+            The transformation rule to parse.
+        ordered_thresholds : list or None
+            Thresholds used if digitization is part of the transform (currently not implemented here).
+
+        Returns
+        -------
+        callable or None
+            A function that takes a single value and returns its transformed discrete value,
+            or None if no transform is specified.
+
+        Raises
+        ------
+        ValueError
+            If `discrete_transform` is a string but not a recognized key (e.g., "HPA")
+            or if it's not a str, dict, callable, or None.
+        """
         if isinstance(discrete_transform, str):
             if discrete_transform in dis_trans:
                 return lambda x: dis_trans[discrete_transform][x]
@@ -192,6 +236,34 @@ class GeneData(BaseData):
                             na_value=0,
                             return_if_all_na=-1,
                             method="mean") -> float:
+        """
+        Calculate a statistic (mean or median) for reaction scores of specified reactions.
+
+        Parameters
+        ----------
+        rxn_ids : list or set
+            IDs of the reactions to include in the calculation.
+        ignore_na : bool, default=True
+            If True, ignore NaN scores during calculation.
+        na_value : float, default=0
+            Value to replace NaN scores with if `ignore_na` is False.
+        return_if_all_na : float, default=-1
+            Value to return if all selected reaction scores are NaN.
+        method : {"mean", "median"}, default="mean"
+            The statistic to calculate.
+
+        Returns
+        -------
+        float
+            The calculated statistic.
+
+        Raises
+        ------
+        ValueError
+            If `method` is not "mean" or "median".
+        AttributeError
+            If reaction scores have not been calculated yet (call `.align()` first).
+        """
         scores = np.array([v for k, v in self.rxn_scores.items() if k in rxn_ids])
         if all([np.isnan(i) for i in scores]):
             return return_if_all_na
@@ -206,6 +278,25 @@ class GeneData(BaseData):
         raise ValueError("The method is not supported")
 
     def apply(self, func):
+        """
+        Apply a function to each reaction score.
+
+        Parameters
+        ----------
+        func : callable
+            A function that takes a single reaction score (float) as input.
+
+        Returns
+        -------
+        dict[str, float]
+            A dictionary mapping reaction IDs to the results of applying `func`
+            to their scores.
+
+        Raises
+        ------
+        AttributeError
+            If reaction scores have not been calculated yet (call `.align()` first).
+        """
         return {k: func(v) for k, v in self.rxn_mapper.rxn_scores.items()}
 
     def get_threshold(self,
