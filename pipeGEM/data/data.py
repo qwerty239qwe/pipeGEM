@@ -362,6 +362,47 @@ class ThermalData(BaseData):
 
 
 class MediumData(BaseData):
+    """
+    Stores and processes medium composition data for constraining metabolic models.
+
+    This class handles loading medium data (metabolite concentrations), aligning
+    it with exchange reactions in a metabolic model, and applying these
+    concentrations as constraints on reaction bounds.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        DataFrame containing medium composition data. Must include columns for
+        metabolite IDs and concentrations. Optionally includes metabolite names.
+    conc_col_label : str, default="mmol/L"
+        The label of the column containing metabolite concentrations in `data`.
+    conc_unit : str, default="mmol/L"
+        The unit of the concentrations provided in `conc_col_label`. Uses `pint`
+        for unit handling.
+    id_index : bool, default=False
+        If True, assumes the DataFrame index contains the metabolite IDs.
+        If False, uses the column specified by `id_col_label`.
+    name_index : bool, default=True
+        If True, assumes the DataFrame index contains the metabolite names.
+        If False, uses the column specified by `name_col_label`.
+    id_col_label : str, default="human_1"
+        The label of the column containing metabolite IDs, used if `id_index` is False.
+    name_col_label : str, optional
+        The label of the column containing metabolite names, used if `name_index` is False.
+        If None and `name_index` is False, names will not be stored.
+
+    Attributes
+    ----------
+    data_dict : dict
+        Dictionary mapping metabolite IDs to their concentrations.
+    rxn_dict : dict
+        Dictionary mapping exchange reaction IDs to corresponding metabolite
+        concentrations after alignment with a model.
+    name_dict : dict
+        Dictionary mapping metabolite IDs to their names (if available).
+    conc_unit : pint.Quantity
+        The concentration unit parsed by `pint`.
+    """
     def __init__(self,
                  data,
                  conc_col_label="mmol/L",
@@ -372,23 +413,79 @@ class MediumData(BaseData):
                  name_col_label=None
                  ):
         super().__init__("metabolites")
+        # Ensure necessary columns exist if not using index
+        if not id_index and id_col_label not in data.columns:
+            raise KeyError(f"Metabolite ID column '{id_col_label}' not found in data.")
+        if conc_col_label not in data.columns:
+             raise KeyError(f"Concentration column '{conc_col_label}' not found in data.")
+        if not name_index and name_col_label is not None and name_col_label not in data.columns:
+             warnings.warn(f"Metabolite name column '{name_col_label}' not found. Names will not be stored.")
+             name_col_label = None # Prevent error later
+
         self.data_dict = dict(zip(data[id_col_label] if not id_index else data.index, data[conc_col_label]))
         self.rxn_dict = {}
-        self.name_dict = dict(zip(data[id_col_label] if not id_index else data.index,
-                                  data[name_col_label] if not name_index else data.index))
+        # Handle name mapping based on index/column presence
+        if name_index:
+            self.name_dict = dict(zip(data[id_col_label] if not id_index else data.index, data.index))
+        elif name_col_label is not None:
+             self.name_dict = dict(zip(data[id_col_label] if not id_index else data.index, data[name_col_label]))
+        else:
+             self.name_dict = {} # Initialize empty if no names provided/found
+
         self._u = UnitRegistry()
-        self.conc_unit = self._u.Quantity(conc_unit)
+        try:
+            self.conc_unit = self._u.Quantity(conc_unit)
+        except Exception as e: # Catch potential pint errors
+            raise ValueError(f"Invalid concentration unit '{conc_unit}': {e}")
+
 
     @staticmethod
     def _find_simple_rxn(rxns):
-        cur_simp_ix, best_c, best_nm = -1, 1000, 1000
+        """
+        Finds the 'simplest' exchange reaction among a list for a given metabolite.
+
+        'Simplest' is defined first by the minimum number of metabolites involved
+        (ideally 1 for an exchange reaction), and secondarily by the minimum sum
+        of absolute stoichiometric coefficients.
+
+        Parameters
+        ----------
+        rxns : list of cobra.Reaction
+            A list of reactions associated with a metabolite.
+
+        Returns
+        -------
+        cobra.Reaction
+            The identified 'simplest' reaction from the list.
+
+        Raises
+        ------
+        IndexError
+            If the input `rxns` list is empty.
+        """
+        if not rxns:
+            raise IndexError("Input reaction list cannot be empty.")
+
+        cur_simp_ix, best_c, best_nm = -1, float('inf'), float('inf') # Use inf for comparison
         for i, r in enumerate(rxns):
             nm = len(r.metabolites)
-            c = sum([abs(c) for m, c in r.metabolites.items()])
-            if best_nm > nm or (best_nm == nm and best_c > c):
+            # Ensure coefficients are numeric before summing
+            try:
+                c = sum([abs(float(coeff)) for coeff in r.metabolites.values()])
+            except (ValueError, TypeError):
+                 warnings.warn(f"Non-numeric coefficient found in reaction {r.id}. Skipping coefficient sum calculation for this reaction.")
+                 c = float('inf') # Penalize reactions with non-numeric coeffs
+
+            # Prioritize fewer metabolites, then smaller total coefficient sum
+            if nm < best_nm or (nm == best_nm and c < best_c):
                 cur_simp_ix = i
                 best_nm = nm
                 best_c = c
+
+        if cur_simp_ix == -1:
+             # This might happen if all reactions had issues
+             raise ValueError("Could not determine the simplest reaction from the provided list.")
+
         return rxns[cur_simp_ix]
 
     def align(self,
@@ -396,22 +493,71 @@ class MediumData(BaseData):
               external_comp_name="e",
               met_id_format="{met_id}{comp}",
               raise_err=False):
-        exs = set([r.id for r in model.exchanges])
-        mets_in_model = [m.id for m in model.metabolites]
+        """
+        Aligns medium metabolite data with exchange reactions in a metabolic model.
+
+        Iterates through the metabolites in `data_dict` and attempts to find
+        corresponding exchange reactions in the `model`. Populates `rxn_dict`
+        with mappings from reaction IDs to metabolite concentrations.
+
+        Parameters
+        ----------
+        model : cobra.Model or pipeGEM.Model
+            The metabolic model to align against.
+        external_comp_name : str, default="e"
+            The identifier for the external compartment in the model.
+        met_id_format : str, default="{met_id}{comp}"
+            A format string to construct the full metabolite ID in the model,
+            using the metabolite ID from the data (`met_id`) and the
+            `external_comp_name` (`comp`).
+        raise_err : bool, default=False
+            If True, raises a KeyError if a metabolite from the data cannot be
+            found in the model's external compartment. If False, issues a warning.
+
+        Returns
+        -------
+        None
+        """
+        # Pre-fetch exchange reaction IDs and metabolite IDs for efficiency
+        try:
+            exs = {r.id for r in model.exchanges}
+            mets_in_model = {m.id for m in model.metabolites}
+        except AttributeError as e:
+             raise TypeError(f"Input 'model' does not appear to be a valid cobra.Model or pipeGEM.Model object: {e}")
+
+
         for mid, conc in self.data_dict.items():
-            met_id = met_id_format.format(met_id=mid, comp=external_comp_name)
+            try:
+                met_id = met_id_format.format(met_id=mid, comp=external_comp_name)
+            except KeyError:
+                 raise ValueError(f"Invalid 'met_id_format' string: '{met_id_format}'. Ensure it contains '{{met_id}}' and '{{comp}}'.")
+
             if met_id not in mets_in_model:
+                msg = f"Metabolite '{met_id}' (from data ID '{mid}') not found in the model."
                 if raise_err:
-                    raise KeyError(f"{met_id} is not in the model")
-                warnings.warn(f"{met_id} is not in the model so it is ignored")
+                    raise KeyError(msg)
+                warnings.warn(msg + " Ignoring this metabolite.")
                 continue
 
-            m = model.metabolites.get_by_id(met_id)
-            m_related_r = set([r.id for r in m.reactions]) & exs
-            if len(m_related_r) == 1:
-                self.rxn_dict[list(m_related_r)[0]] = conc
-            else:
-                self.rxn_dict[self._find_simple_rxn(m.reactions).id] = conc
+            try:
+                m = model.metabolites.get_by_id(met_id)
+                # Find reactions associated with the metabolite that are also exchange reactions
+                m_related_exchanges = [r for r in m.reactions if r.id in exs]
+
+                if len(m_related_exchanges) == 1:
+                    self.rxn_dict[m_related_exchanges[0].id] = conc
+                elif len(m_related_exchanges) > 1:
+                    # If multiple exchanges, find the simplest one
+                    simplest_rxn = self._find_simple_rxn(m_related_exchanges)
+                    self.rxn_dict[simplest_rxn.id] = conc
+                    warnings.warn(f"Metabolite '{met_id}' associated with multiple exchange reactions ({[r.id for r in m_related_exchanges]}). Using the 'simplest' one: {simplest_rxn.id}")
+                else:
+                    # No exchange reaction found for this metabolite
+                    warnings.warn(f"Metabolite '{met_id}' found in the model but has no associated exchange reaction. Ignoring.")
+
+            except Exception as e: # Catch potential errors during reaction processing
+                 warnings.warn(f"Error processing metabolite '{met_id}': {e}. Ignoring.")
+
 
     def apply(self,
               model,
@@ -421,38 +567,225 @@ class MediumData(BaseData):
               flux_unit="mmol/g/hr",
               threshold=1e-6
               ):
-        cell_dgw = cell_dgw * self._u.gram
-        n_cells_per_l = n_cells_per_l / self._u.liter
-        time_hr = time_hr * self._u.hour
-        for k in model.exchanges + model.sinks + model.demands:
-            if k.id not in self.rxn_dict:
-                if all([m.formula is not None for m in k.metabolites]) and \
-                        all(["C" not in m.formula for m in k.metabolites]):
-                    print(k.id, " is an inorganic exchange reaction (not constrained)")
-                elif all([c < 0 for m, c in k.metabolites.items()]):
-                    k.lower_bound = 0
-                elif all([c > 0 for m, c in k.metabolites.items()]):
-                    k.upper_bound = 0
-                else:
-                    print(k.id, " is ignored")
+        """
+        Applies the medium constraints to the bounds of model reactions.
 
+        Calculates the maximum possible influx rate for each metabolite based on
+        its concentration, cell density, dry weight, and time. Updates the
+        lower or upper bounds of the corresponding exchange, sink, or demand
+        reactions in the model.
+
+        Parameters
+        ----------
+        model : cobra.Model or pipeGEM.Model
+            The metabolic model whose reaction bounds will be modified.
+        cell_dgw : float, default=1e-12
+            Cell dry weight in grams.
+        n_cells_per_l : float, default=1e9
+            Number of cells per liter of medium.
+        time_hr : float, default=96
+            Duration of the experiment or simulation in hours.
+        flux_unit : str, default="mmol/g/hr"
+            The desired unit for reaction fluxes in the model. The calculated
+            influx bounds will be converted to this unit.
+        threshold : float, default=1e-6
+            A minimum absolute value for the calculated bound. Bounds smaller
+            than this threshold will be set to this value (or its negative).
+            Helps avoid numerical issues with zero bounds.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - Modifies the `model` object in place.
+        - Assumes exchange reactions consuming the metabolite have negative stoichiometry.
+        - Sets bounds for unconstrained inorganic exchanges or sinks/demands to 0
+          if they only produce/consume metabolites, respectively. Issues warnings
+          for others.
+        """
+        # Input validation and unit setup
+        try:
+            cell_dgw_q = cell_dgw * self._u.gram
+            n_cells_per_l_q = n_cells_per_l / self._u.liter
+            time_hr_q = time_hr * self._u.hour
+            target_flux_unit = self._u.Quantity(flux_unit)
+        except Exception as e:
+            raise ValueError(f"Invalid unit or value provided for constraint calculation: {e}")
+
+        # Identify relevant reactions (exchanges, sinks, demands)
+        try:
+            relevant_rxns = {r.id: r for r in model.exchanges + model.sinks + model.demands}
+        except AttributeError:
+             raise TypeError("Input 'model' lacks expected reaction lists (exchanges, sinks, demands).")
+
+
+        # Apply constraints based on aligned reactions in rxn_dict
         for r_id, conc in self.rxn_dict.items():
-            influx_ub = (conc * self.conc_unit / (n_cells_per_l * cell_dgw) / time_hr).to(flux_unit).magnitude
-            r = model.reactions.get_by_id(r_id)
-            total_c = sum([c for m, c in r.metabolites.items()])
-            if total_c < 0:
-                r.bounds = (-max(influx_ub, threshold), r.bounds[1])
-            else:
-                r.bounds = (r.bounds[0], max(influx_ub, threshold))
+            if r_id not in relevant_rxns:
+                warnings.warn(f"Reaction ID '{r_id}' from alignment not found among exchanges/sinks/demands in the current model state. Skipping.")
+                continue
+
+            r = relevant_rxns[r_id]
+            try:
+                # Calculate max influx rate based on concentration and parameters
+                # Formula: (Concentration [mmol/L]) / (Cells/L * CellWeight [g/cell] * Time [hr])
+                # Units: (mmol/L) / (1/L * g * hr) = mmol / (g * hr)
+                influx_ub_q = (conc * self.conc_unit / (n_cells_per_l_q * cell_dgw_q * time_hr_q))
+                # Convert to the target flux unit
+                influx_ub = influx_ub_q.to(target_flux_unit).magnitude
+            except Exception as e: # Catch potential unit conversion errors
+                warnings.warn(f"Could not calculate or convert flux bound for reaction '{r_id}' with concentration {conc} {self.conc_unit}: {e}. Skipping.")
+                continue
+
+            # Determine if the reaction represents uptake (negative net stoichiometry)
+            # or secretion/demand (positive net stoichiometry)
+            try:
+                total_stoich = sum(r.metabolites.values())
+            except (TypeError, AttributeError):
+                 warnings.warn(f"Could not determine stoichiometry for reaction '{r_id}'. Skipping bound update.")
+                 continue
+
+            # Apply the calculated bound, ensuring it meets the threshold
+            # For uptake reactions (typically negative total_stoich for exchanges): set lower bound
+            # For secretion/demand reactions (typically positive total_stoich): set upper bound
+            applied_bound = max(abs(influx_ub), threshold) # Use absolute value for threshold comparison
+
+            current_lb, current_ub = r.bounds
+            if total_stoich < 0: # Assume uptake
+                new_lb = -applied_bound
+                # Only update if the new bound is more restrictive (less negative)
+                if new_lb > current_lb:
+                     r.lower_bound = new_lb
+                # else: keep the potentially more negative original bound
+            elif total_stoich > 0: # Assume secretion/demand
+                 new_ub = applied_bound
+                 # Only update if the new bound is more restrictive (less positive)
+                 if new_ub < current_ub:
+                     r.upper_bound = new_ub
+                 # else: keep the potentially more positive original bound
+            else: # total_stoich == 0 (should not happen for exchanges/sinks/demands)
+                 warnings.warn(f"Reaction '{r_id}' has zero net stoichiometry. Bounds not modified by medium data.")
+
+
+        # Handle reactions *not* in rxn_dict (i.e., not in the medium data)
+        constrained_rxn_ids = set(self.rxn_dict.keys())
+        for r_id, r in relevant_rxns.items():
+            if r_id in constrained_rxn_ids:
+                continue # Already handled
+
+            # Check if it's an inorganic exchange (often unconstrained)
+            # Heuristic: check if *any* metabolite contains 'C' in its formula
+            try:
+                is_organic = any(hasattr(m, 'formula') and m.formula is not None and 'C' in m.formula.upper()
+                                 for m in r.metabolites)
+                if not is_organic:
+                    # print(f"Reaction '{r_id}' appears inorganic; bounds not modified by medium absence.")
+                    pass # Keep original bounds for inorganics
+                else:
+                    # For organic metabolites not in the medium, constrain uptake/demand
+                    total_stoich = sum(r.metabolites.values())
+                    if total_stoich < 0: # Uptake reaction
+                        if r.lower_bound < 0: # Only constrain if it allows uptake
+                            r.lower_bound = 0
+                            # print(f"Constraining uptake for '{r_id}' (absent from medium) to 0.")
+                    elif total_stoich > 0: # Demand/Secretion reaction
+                         if r.upper_bound > 0: # Only constrain if it allows production
+                             r.upper_bound = 0
+                             # print(f"Constraining demand/secretion for '{r_id}' (absent from medium) to 0.")
+                    # else: zero stoichiometry, do nothing
+
+            except Exception as e:
+                 warnings.warn(f"Error processing unconstrained reaction '{r_id}': {e}. Bounds not modified.")
+
 
     @classmethod
     def from_file(cls, file_name="DMEM", csv_kw=None, **kwargs):
+        """
+        Loads medium data from a file.
+
+        Supports TSV and CSV formats. Looks for the file in the standard
+        `medium/` directory relative to the package structure first. If not
+        found there, attempts to load from the provided `file_name` path directly.
+
+        Parameters
+        ----------
+        file_name : str or Path, default="DMEM"
+            The base name of the medium file (e.g., "DMEM", "Hams") or a full
+            path to a custom medium file. The method will try appending ".tsv"
+            first, then assume CSV if not found or if `csv_kw` is provided.
+        csv_kw : dict, optional
+            Keyword arguments to pass directly to `pandas.read_csv`. If provided,
+            CSV reading is prioritized. Example: `{'sep': ',', 'index_col': 0}`.
+        **kwargs :
+            Additional keyword arguments passed directly to the `MediumData`
+            constructor (`__init__`), such as `conc_col_label`, `id_col_label`, etc.
+
+        Returns
+        -------
+        MediumData
+            An instance of the MediumData class initialized with the loaded data.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the specified file cannot be found either in the default directory
+            or at the provided path.
+        Exception
+            Propagates exceptions from `pandas.read_csv` or `MediumData.__init__`.
+        """
         medium_file_dir = Path(__file__).parent.parent.parent / "medium"
-        if (medium_file_dir / file_name).with_suffix(".tsv").is_file():
-            data = pd.read_csv((medium_file_dir / file_name).with_suffix(".tsv"), sep='\t', index_col=0)
-        else:
-            csv_kw = csv_kw or {}
-            data = pd.read_csv(file_name, **csv_kw)
+        potential_tsv_path = (medium_file_dir / file_name).with_suffix(".tsv")
+        potential_csv_path = (medium_file_dir / file_name).with_suffix(".csv") # Also check for .csv in default dir
+        direct_path = Path(file_name) # Treat file_name as a potential direct path
+
+        data = None
+        used_path = None
+
+        # Prioritize TSV in default directory
+        if potential_tsv_path.is_file():
+            try:
+                data = pd.read_csv(potential_tsv_path, sep='\t') # Assume no index col by default for tsv
+                used_path = potential_tsv_path
+                # Allow overriding sep/index with csv_kw if explicitly provided for tsv
+                if csv_kw:
+                     data = pd.read_csv(potential_tsv_path, **csv_kw)
+            except Exception as e:
+                 raise IOError(f"Error reading TSV file '{potential_tsv_path}': {e}")
+
+        # Else, try CSV in default directory (especially if csv_kw is given)
+        elif potential_csv_path.is_file() or csv_kw:
+             path_to_try = potential_csv_path if potential_csv_path.is_file() else None
+             if path_to_try:
+                 try:
+                     csv_kw = csv_kw or {} # Ensure csv_kw is a dict
+                     data = pd.read_csv(path_to_try, **csv_kw)
+                     used_path = path_to_try
+                 except Exception as e:
+                     raise IOError(f"Error reading CSV file '{path_to_try}': {e}")
+
+        # Else, try the direct path provided in file_name
+        elif direct_path.is_file():
+             try:
+                 csv_kw = csv_kw or {} # Ensure csv_kw is a dict
+                 # Determine separator based on extension if not in csv_kw
+                 if 'sep' not in csv_kw:
+                     if direct_path.suffix.lower() == '.tsv':
+                         csv_kw['sep'] = '\t'
+                     # else assume comma or let pandas detect
+                 data = pd.read_csv(direct_path, **csv_kw)
+                 used_path = direct_path
+             except Exception as e:
+                 raise IOError(f"Error reading file '{direct_path}': {e}")
+
+        # If data is still None, file not found
+        if data is None:
+            raise FileNotFoundError(f"Medium file '{file_name}' not found in default directory "
+                                    f"'{medium_file_dir}' (as .tsv or .csv) or as a direct path.")
+
+        print(f"Loaded medium data from: {used_path}")
+        # Pass loaded data and any extra kwargs to constructor
         return cls(data, **kwargs)
 
 
