@@ -32,7 +32,8 @@ def add_iMAT_cons_to_model(model,
                            non_core_rxn_ids,
                            non_core_rxn_lbs,
                            non_core_rxn_ubs,
-                           eps=1):
+                           eps=1,
+                           use_gurobi=False):
     # add_cons_to_model(model, {f"cfi_{ri}": {core_f_ind_vars[f"cfi_{ri}"]: core_rxn_lbs[ri] - eps,
     #                                         model.reactions.get_by_id(ri).forward_variable: 1,
     #                                         #model.reactions.get_by_id(ri).reverse_variable: -1,
@@ -65,7 +66,8 @@ def add_iMAT_cons_to_model(model,
                       prefix="",
                       lbs=eps, ubs=np.inf,
                       binary_vars=[core_f_ind_vars[f"cfi_{ri}"] for ri in core_rxn_ids],
-                      bin_active_val=1)
+                      bin_active_val=1,
+                      use_gurobi=use_gurobi)
 
     add_cons_to_model(model, {f"cbi_{ri}": {model.reactions.get_by_id(ri).reverse_variable: 1,
                                             model.reactions.get_by_id(ri).forward_variable: -1,
@@ -73,7 +75,8 @@ def add_iMAT_cons_to_model(model,
                       prefix="",
                       lbs=eps, ubs=np.inf,
                       binary_vars=[core_b_ind_vars[f"cbi_{ri}"] for ri in core_rxn_ids],
-                      bin_active_val=1)
+                      bin_active_val=1,
+                      use_gurobi=use_gurobi)
 
     add_cons_to_model(model, {f"nci_{ri}": {model.reactions.get_by_id(ri).forward_variable: 1,
                                             model.reactions.get_by_id(ri).reverse_variable: -1,
@@ -81,7 +84,8 @@ def add_iMAT_cons_to_model(model,
                       prefix="",
                       lbs=0, ubs=0,
                       binary_vars=[non_core_ind_vars[f"nci_{ri}"] for ri in non_core_rxn_ids],
-                      bin_active_val=1)
+                      bin_active_val=1,
+                      use_gurobi=use_gurobi)
 
     model.solver.update()
 
@@ -94,7 +98,8 @@ def apply_iMAT(model,
                protected_rxns = None,
                rxn_scaling_coefs=None,
                eps = 1e-6,
-               tol = 1e-6) -> iMAT_Analysis:
+               tol = 1e-6,
+               use_gurobi=False) -> iMAT_Analysis:
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
     threshold_dic = parse_predefined_threshold(predefined_threshold,
                                                gene_data=gene_data,
@@ -143,7 +148,8 @@ def apply_iMAT(model,
                            non_core_rxn_ids=non_core_rxn_ids,
                            non_core_rxn_lbs=non_core_rxn_lbs,
                            non_core_rxn_ubs=non_core_rxn_ubs,
-                           eps=eps)
+                           eps=eps,
+                           use_gurobi=use_gurobi)
     model.objective.set_linear_coefficients(new_objs)
     model.solver.update()
     # print(model.objective)

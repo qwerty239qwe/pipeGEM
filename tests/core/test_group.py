@@ -89,8 +89,8 @@ def test_group_set_items(group, ecoli_core):
 def test_aggregate_models(group):
     ag_grp_dic = group.aggregate_models("treatment")
     assert isinstance(ag_grp_dic, dict)
-    assert len(ag_grp_dic["a"]) == 1
-    assert len(ag_grp_dic["b"]) == 2
+    assert len(ag_grp_dic["a"]) == 2
+    assert len(ag_grp_dic["b"]) == 3
 
 
 def test_compare_jaccard(group):

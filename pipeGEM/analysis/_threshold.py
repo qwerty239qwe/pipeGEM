@@ -184,7 +184,7 @@ class rFASTCORMICSThreshold(DistributionBased):
 
     @timing
     def find_threshold(self,
-                       data: Union[np.ndarray, pd.Series, dict],
+                       data: Union[np.ndarray, pd.Series, dict, list],
                        cut_off: float = -np.inf,
                        return_heuristic: bool = False,
                        hard_x_lims: tuple = (0.05, 0.95),
@@ -195,6 +195,8 @@ class rFASTCORMICSThreshold(DistributionBased):
             arr = data.values
         elif isinstance(data, dict):
             arr = np.array(list(data.values()))
+        elif isinstance(data, list):
+            arr = np.array(data)
         else:
             arr = data
 
