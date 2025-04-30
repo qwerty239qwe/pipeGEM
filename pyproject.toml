@@ -33,7 +33,8 @@ dependencies = [
     "pint",
     "pingouin",
     "scanpy",
-    "tomlkit"
+    "tomlkit",
+    "dask"
 ]
 requires-python = ">=3.8"
 
