@@ -34,7 +34,8 @@ dependencies = [
     "pingouin",
     "scanpy",
     "tomlkit",
-    "dask[distributed]"
+    "dask[distributed]",
+    "openpyxl"
 ]
 requires-python = ">=3.8"
 
