@@ -60,7 +60,7 @@ def add_iMAT_cons_to_model(model,
     #                   prefix="",
     #                   lbs=-np.inf, ubs=[non_core_rxn_ubs[ri] for ri in non_core_rxn_ids])
 
-    add_cons_to_model(model, {f"cfi_{ri}": {model.reactions.get_by_id(ri).forward_variable: 1,
+    success = add_cons_to_model(model, {f"cfi_{ri}": {model.reactions.get_by_id(ri).forward_variable: 1,
                                             model.reactions.get_by_id(ri).reverse_variable: -1,
                                             } for ri in core_rxn_ids},
                       prefix="",
@@ -68,6 +68,9 @@ def add_iMAT_cons_to_model(model,
                       binary_vars=[core_f_ind_vars[f"cfi_{ri}"] for ri in core_rxn_ids],
                       bin_active_val=1,
                       use_gurobi=use_gurobi)
+
+    if not success:
+        return False
 
     add_cons_to_model(model, {f"cbi_{ri}": {model.reactions.get_by_id(ri).reverse_variable: 1,
                                             model.reactions.get_by_id(ri).forward_variable: -1,
@@ -88,6 +91,7 @@ def add_iMAT_cons_to_model(model,
                       use_gurobi=use_gurobi)
 
     model.solver.update()
+    return True
 
 
 @timing
@@ -138,7 +142,7 @@ def apply_iMAT(model,
             print(name)
             new_objs[var] = 1000
 
-    add_iMAT_cons_to_model(model=model,
+    cons_added = add_iMAT_cons_to_model(model=model,
                            core_f_ind_vars=core_f_ind_vars,
                            core_b_ind_vars=core_b_ind_vars,
                            non_core_ind_vars=non_core_ind_vars,
@@ -150,21 +154,29 @@ def apply_iMAT(model,
                            non_core_rxn_ubs=non_core_rxn_ubs,
                            eps=eps,
                            use_gurobi=use_gurobi)
+    if not cons_added:
+        # return an empty result
+        result = iMAT_Analysis(log=dict(threshold_kws=threshold_kws,
+                                        protected_rxns=protected_rxns,
+                                        eps=eps,
+                                        tol=tol))
+        return result
+
     model.objective.set_linear_coefficients(new_objs)
     model.solver.update()
     # print(model.objective)
     sol = model.optimize("maximize")
-    print(sol.objective_value)
+    # print(sol.objective_value)
     # print(non_core_rxn_ubs)
     # print(non_core_rxn_lbs)
-    print(model.solver.primal_values)
+    # print(model.solver.primal_values)
     fluxes = abs(sol.to_frame()["fluxes"])
     if rxn_scaling_coefs is not None:
         tol_ = pd.Series({rxn_scaling_coefs[r] * tol for r in fluxes.index}, index=fluxes.index)
     else:
         tol_ = tol
 
-    print(fluxes)
+    # print(fluxes)
     removed_rxn_ids = fluxes[fluxes < tol_].index.to_list()
     result_model.remove_reactions(removed_rxn_ids, remove_orphans=True)
 

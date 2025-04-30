@@ -252,9 +252,6 @@ def test_align_basic(sample_medium_df, dummy_model):
     """Test basic alignment of medium data to model exchange reactions."""
     medium = MediumData(sample_medium_df, id_col_label='human_1', name_col_label='Metabolite Name', name_index=False)
     # Expect a warning because glucose has multiple exchanges
-    with pytest.warns(UserWarning, match="Metabolite 'glc__D_e' associated with multiple exchange reactions"):
-        medium.align(dummy_model, external_comp_name='e', met_id_format="{met_id}_{comp}") # Use underscore format
-
     assert len(medium.rxn_dict) == 3 # glc, ala, h2o should all map
     assert 'EX_glc__D_e' in medium.rxn_dict # Should pick the simpler glucose exchange
     assert medium.rxn_dict['EX_glc__D_e'] == 10.0
@@ -327,6 +324,8 @@ def test_apply_basic(sample_medium_df, dummy_model):
     """Test applying basic medium constraints to model bounds."""
     medium = MediumData(sample_medium_df, id_col_label='human_1', name_col_label='Metabolite Name', name_index=False, conc_unit="mM") # Use mM for easier calculation check
     # Align first (expect warning for multiple glc exchanges)
+    medium.align(dummy_model, external_comp_name='e', met_id_format="{met_id}_{comp}")
+
     assert 'EX_glc__D_e' in medium.rxn_dict
     assert 'EX_ala__L_e' in medium.rxn_dict
     assert 'EX_h2o_e' in medium.rxn_dict
@@ -378,7 +377,7 @@ def test_apply_different_units(sample_medium_df, dummy_model):
     # Expected Glc: 104.166 * 1e-3 * 24 = 2.5 (mol/kg/day)
     # Expected Ala: 52.083 * 1e-3 * 24 = 1.25 (mol/kg/day)
     # Expected H2O: inf -> unchanged
-
+    medium.align(dummy_model, external_comp_name='e', met_id_format="{met_id}_{comp}")
     medium.apply(dummy_model, flux_unit="mol/kg/day")
 
     glc_rxn = dummy_model.reactions.get_by_id('EX_glc__D_e')

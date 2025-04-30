@@ -1,4 +1,5 @@
 from optlang.symbolics import Zero
+from optlang.exceptions import IndicatorConstraintsNotSupported
 
 
 type_dic = {"c": "continuous", "b": "binary", "i": "integer"}
@@ -49,11 +50,15 @@ def add_cons_to_model(model,
     else:
         for (name, coefs), lb, ub, b_ind in zip(var_coefs.items(), lbs, ubs, binary_vars):
             if not use_gurobi:
-                cons = model.problem.Constraint(Zero, name=f"{prefix}{name}", lb=lb, ub=ub,
-                                                indicator_variable=b_ind,
-                                                active_when=bin_active_val)
-                con_dict[f"{prefix}{name}"] = coefs
-                added_cons.append(cons)
+                try:
+                    cons = model.problem.Constraint(Zero, name=f"{prefix}{name}", lb=lb, ub=ub,
+                                                    indicator_variable=b_ind,
+                                                    active_when=bin_active_val)
+                    con_dict[f"{prefix}{name}"] = coefs
+                    added_cons.append(cons)
+                except IndicatorConstraintsNotSupported:
+                    print(f"Indicator constraint not supported in {prefix}{name}")
+                    return False
             else:
                 if lb == ub:
                     _gurobi_add_indicator(problem=model.solver.problem, var_coefs=coefs, name=name, bound=lb,
@@ -70,6 +75,7 @@ def add_cons_to_model(model,
         model.constraints[name].set_linear_coefficients(coefs)
         # print(coefs)
     model.solver.update()
+    return True
 
 
 def _gurobi_add_indicator(problem, name, bound, var_coefs, bound_type, indicator_variable, active_when):
