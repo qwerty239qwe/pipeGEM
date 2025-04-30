@@ -34,7 +34,7 @@ dependencies = [
     "pingouin",
     "scanpy",
     "tomlkit",
-    "dask"
+    "dask[distributed]"
 ]
 requires-python = ">=3.8"
 
