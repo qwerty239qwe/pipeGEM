@@ -24,5 +24,3 @@ def test_iMAT(ecoli_core, ecoli_core_data):
                                       eps=1e-6,
                                       threshold_kws={},
                                       protected_rxns=["BIOMASS_Ecoli_core_w_GAM"])
-    print(result.result_model.reactions)
-    print(result.removed_rxn_ids)

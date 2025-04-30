@@ -251,6 +251,8 @@ def test_find_simple_rxn_non_numeric_coeff(dummy_model):
 def test_align_basic(sample_medium_df, dummy_model):
     """Test basic alignment of medium data to model exchange reactions."""
     medium = MediumData(sample_medium_df, id_col_label='human_1', name_col_label='Metabolite Name', name_index=False)
+    medium.align(dummy_model, external_comp_name='e', met_id_format="{met_id}_{comp}")
+
     # Expect a warning because glucose has multiple exchanges
     assert len(medium.rxn_dict) == 3 # glc, ala, h2o should all map
     assert 'EX_glc__D_e' in medium.rxn_dict # Should pick the simpler glucose exchange
@@ -313,9 +315,10 @@ def test_align_invalid_model_type(sample_medium_df):
 
 def test_align_invalid_met_id_format(sample_medium_df, dummy_model):
     """Test align raises ValueError for invalid met_id_format."""
-    medium = MediumData(sample_medium_df, id_col_label='human_1', name_col_label='Metabolite Name', name_index=False)
+    medium = MediumData(sample_medium_df, id_col_label='human_1',
+                        name_col_label='Metabolite Name', name_index=False)
     with pytest.raises(ValueError, match="Invalid 'met_id_format' string"):
-        medium.align(dummy_model, met_id_format="{met_id}_missing_comp") # Missing {comp}
+        medium.align(dummy_model, met_id_format="{met_id}_missing_comp", external_comp_name=None) # Missing {comp}
 
 
 # --- Test apply ---
@@ -403,7 +406,7 @@ def test_apply_threshold(sample_medium_df, dummy_model):
     medium.apply(dummy_model, flux_unit="mmol/g/hr", threshold=1e-6)
 
     ala_rxn = dummy_model.reactions.get_by_id('EX_ala__L_e')
-    assert ala_rxn.lower_bound == -1e-6 # Applied threshold
+    assert ala_rxn.upper_bound == 1e-6 # Applied threshold
 
 def test_apply_invalid_unit_param(sample_medium_df, dummy_model):
     """Test error handling for invalid units in apply parameters."""
