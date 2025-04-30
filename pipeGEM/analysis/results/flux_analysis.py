@@ -272,9 +272,6 @@ class FBA_Analysis(FluxAnalysis):
                               index=rxn_index_name,
                               columns=sample_col_name,
                               aggfunc=group_by_agg_method).fillna(0)
-        data.columns = data.columns.droplevel(0)
-
-
         pltr.plot(result=data,
                   *args,
                   **kwargs)

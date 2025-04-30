@@ -514,7 +514,7 @@ class EnzymeData(BaseData):
                  prot_seq_col: str = "Sequence",
                  ec_num_col: str = "EC",
                  sa_col: str = "SA",
-                 ):
+                 ) -> None: # Added return type annotation
         super().__init__("genes")
         self._enzyme_df = data.copy()
         if gene_id_col is not None:
@@ -550,32 +550,147 @@ class EnzymeData(BaseData):
                   163.17, 128.62]
 
         aa_mw_dic = dict(zip(aa_codes, aa_MWs))
-        return sum([aa_mw_dic[s] for s in seq]) + 18
+        # Handle potential non-standard characters or empty strings gracefully
+        try:
+            # Add mass of H2O (18.0153 Da) for terminal groups
+            return sum(aa_mw_dic[s.upper()] for s in seq if s.upper() in aa_mw_dic) + 18.0153
+        except KeyError as e:
+            warnings.warn(f"Unknown amino acid code '{e.args[0]}' encountered in sequence. Ignoring.")
+            # Recalculate excluding the unknown character
+            return sum(aa_mw_dic[s.upper()] for s in seq if s.upper() in aa_mw_dic) + 18.0153
+        except TypeError: # Handle case where seq might not be a string
+             warnings.warn(f"Input sequence is not a string: {seq}. Returning 0 MW.")
+             return 0.0
+
 
     def check_gene_rxn_pair(self,
-                            ref_model,
-                            raise_err=True):
-        ref_rxn_gene_map = {r.id: [g.id for g in r.genes] for r in ref_model.reactions}
-        for i, row in self._enzyme_df.iterrows():
-            if i not in ref_rxn_gene_map[row[self._rxn_id_col]]:
-                err_msg = f"Cannot find matched gene: {i} and rxn: {row[self._rxn_id_col]} in the given model"
+                            ref_model, # Add type hint: Union[cobra.Model, 'pipeGEM.Model'] - requires forward ref or import
+                            raise_err: bool = True) -> None:
+        """
+        Checks if the gene-reaction pairs in the enzyme data exist in the reference model.
+
+        Iterates through the enzyme DataFrame and verifies that for each row,
+        the gene (index or `gene_id_col`) is associated with the reaction
+        specified in `_rxn_id_col` within the `ref_model`.
+
+        Parameters
+        ----------
+        ref_model : cobra.Model or pipeGEM.Model
+            The metabolic model used as a reference.
+        raise_err : bool, default=True
+            If True, raises a ValueError upon finding a mismatch.
+            If False, issues a warning instead.
+
+        Raises
+        ------
+        ValueError
+            If `raise_err` is True and a mismatch is found.
+        AttributeError
+            If `_rxn_id_col` is None or not set.
+        KeyError
+            If a reaction ID from the data is not found in the model.
+        """
+        if self._rxn_id_col is None:
+            raise AttributeError("'_rxn_id_col' must be set before checking gene-reaction pairs.")
+
+        # Create a mapping for faster lookup (handle potential KeyErrors for genes/reactions not in model)
+        ref_rxn_gene_map: Dict[str, List[str]] = {}
+        for r in ref_model.reactions:
+            try:
+                ref_rxn_gene_map[r.id] = [g.id for g in r.genes]
+            except AttributeError: # Handle reactions without genes
+                 ref_rxn_gene_map[r.id] = []
+
+
+        for gene_id, row in self._enzyme_df.iterrows():
+            rxn_id = row[self._rxn_id_col]
+            if rxn_id not in ref_rxn_gene_map:
+                 err_msg = f"Reaction ID '{rxn_id}' from enzyme data not found in the reference model."
+                 if raise_err:
+                     raise KeyError(err_msg)
+                 else:
+                     warnings.warn(err_msg)
+                     continue # Skip to next row if reaction not in model
+
+            if gene_id not in ref_rxn_gene_map[rxn_id]:
+                err_msg = f"Mismatch found: Gene '{gene_id}' is not associated with reaction '{rxn_id}' in the reference model."
                 if raise_err:
                     raise ValueError(err_msg)
-                warnings.warn(err_msg)
+                else:
+                    warnings.warn(err_msg)
 
-    def rxn_items(self):
+    def rxn_items(self) -> Dict[str, Dict[str, Union[str, float]]]: # More specific return type
+        """
+        Returns a dictionary mapping reaction IDs to their best-matched enzyme data.
+
+        Requires the `.align()` method to be called first to populate the
+        `_best_matched_df`.
+
+        Returns
+        -------
+        Dict[str, Dict[str, Union[str, float]]]
+            A dictionary where keys are reaction IDs and values are dictionaries
+            containing 'protein_to_use' (protein ID), 'best_kcat' (kcat value),
+            and 'best_mw' (molecular weight).
+
+        Raises
+        ------
+        AttributeError
+            If `.align()` has not been called yet (`_best_matched_df` is None).
+        """
         if self._best_matched_df is None:
             raise AttributeError("Please call .align(model) first before getting the rxn_items")
 
+        # Ensure required columns exist in _best_matched_df
+        required_cols = ["rxn", "protein", "kcat", "mw"]
+        if not all(col in self._best_matched_df.columns for col in required_cols):
+             missing = [col for col in required_cols if col not in self._best_matched_df.columns]
+             raise ValueError(f"Missing required columns in _best_matched_df: {missing}. Alignment might be incomplete.")
+
         rxn_dic = {row["rxn"]: {"protein_to_use": row["protein"],
                                 "best_kcat": row["kcat"],
-                                "best_mw": row["mw"]} for i, row in self._best_matched_df.iterrows()}
-        return rxn_dic.items()
+                                "best_mw": row["mw"]}
+                   for i, row in self._best_matched_df.iterrows()}
+        # Use .items() directly on the created dictionary
+        return rxn_dic # No need to call .items() here, return the dict itself
 
     def run_DLKcat(self,
-                   met_data,
-                   device="cpu"):
-        from pipeGEM.extensions.DLKcat import predict_Kcat
+                   met_data: MetaboliteData, # Added type hint
+                   device: str = "cpu") -> None: # Added return type hint
+        """
+        Runs the DLKcat tool to predict kcat values.
+
+        (Placeholder - Requires implementation of DLKcat integration)
+
+        Parameters
+        ----------
+        met_data : MetaboliteData
+            Metabolite data object containing SMILES information needed by DLKcat.
+        device : str, default="cpu"
+            Device to run DLKcat on ('cpu' or 'cuda' if available).
+
+        Notes
+        -----
+        - This method currently only imports the DLKcat function.
+        - Actual prediction logic needs to be implemented.
+        - It likely needs to prepare input data (protein sequences, metabolite SMILES)
+          from `self._enzyme_df` and `met_data`.
+        - Predicted kcat values should probably be stored, potentially in the
+          `alt_kcat_col` of `_enzyme_df`.
+        """
+        try:
+            from pipeGEM.extensions.DLKcat import predict_Kcat
+            # --- Implementation needed ---
+            # 1. Prepare input data for predict_Kcat from self._enzyme_df
+            #    (sequences, potentially EC numbers, reaction/metabolite info)
+            #    and met_data (SMILES).
+            # 2. Call predict_Kcat(prepared_data, device=device)
+            # 3. Store results back into self._enzyme_df[self.alt_kcat_col]
+            warnings.warn("DLKcat prediction logic is not yet implemented in run_DLKcat.")
+            pass
+        except ImportError:
+            warnings.warn("DLKcat extension not found. Cannot run kcat prediction. "
+                          "Please ensure it's installed correctly.")
 
 
     def align(self,
@@ -609,13 +724,14 @@ class EnzymeData(BaseData):
                                                                                              x).metabolites])
             self._enzyme_df = self._enzyme_df.explode([self._rxn_id_col, self._met_id_col])
 
-        # run DLKat (optional)
         if run_DLKcat:
-            if model.metabolite_data is None:
-                raise AttributeError("To use DLKcat, a metabolite_data object containing sequence information "
-                                     "needs to be in the model first."
-                                     "Use model.add_metabolite_data() first.")
-
-            self.run_DLKcat(model.metabolite_data, device=device)
-
-        # get best_matched_df
+            if not hasattr(model, 'metabolite_data') or model.metabolite_data is None:
+                warnings.warn("Cannot run DLKcat: 'model.metabolite_data' is missing or None. "
+                              "Add metabolite data with SMILES using model.add_metabolite_data(). Skipping DLKcat.")
+            elif self.prot_seq_col not in self._enzyme_df.columns:
+                 warnings.warn(f"Cannot run DLKcat: Protein sequence column '{self.prot_seq_col}' not found in enzyme data. Skipping DLKcat.")
+            else:
+                # Ensure the alternative kcat column exists
+                if self.alt_kcat_col not in self._enzyme_df.columns:
+                    self._enzyme_df[self.alt_kcat_col] = np.nan
+                self.run_DLKcat(model.metabolite_data, device=device)
