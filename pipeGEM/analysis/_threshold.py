@@ -1,6 +1,6 @@
 import warnings
 
-from typing import Union, List
+from typing import Union, List, Optional, Tuple, Dict
 
 import pandas as pd
 from scipy.stats import gaussian_kde
