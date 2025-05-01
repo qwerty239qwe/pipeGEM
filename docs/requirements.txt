@@ -31,4 +31,4 @@ anndata
 tomlkit
 pingouin
 scanpy
-dask
+dask[distributed]
