@@ -11,7 +11,7 @@ from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, man
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
 from pipeGEM.analysis import ComponentComparisonAnalysis, \
-    ComponentNumberAnalysis, prepare_PCA_dfs, PCA_Analysis, FBA_Analysis
+    ComponentNumberAnalysis, prepare_PCA_dfs, PCA_Analysis, FBA_Analysis, DataAggregation
 from pipeGEM.data import GeneData
 from pipeGEM.plotting import plot_clustermap
 from pipeGEM.utils import is_iter, calc_jaccard_index
@@ -235,11 +235,11 @@ class Group(GEMComposite):
                 else:
                     subs[s_name] = rxns
         for g, rxns in subs.items():
-            subs[s_name] = set(rxns)
+            subs[g] = set(rxns)
         return subs
 
     @property
-    def gene_data(self) -> GeneData:
+    def gene_data(self) -> DataAggregation:
         """GeneData: Aggregated gene data from all models in the group."""
         gene_data = {name: m.gene_data for name, m in self._group.items()}
         # Note: Default aggregation might need refinement depending on desired behavior.
@@ -285,7 +285,7 @@ class Group(GEMComposite):
     def _get_group_model(self, group_by):
         """Helper to get model names grouped by an annotation."""
         if group_by is None:
-            return {"all_models": list(self._group.keys())} # Return all models under a single key
+            return {"models": list(self._group.keys())} # Return all models under a single key
 
         model_annot = self.annotation # Use the property which handles merging
         if group_by not in model_annot.columns:
@@ -635,7 +635,7 @@ class Group(GEMComposite):
             first_model_annots = {}
             original_annot = models.annotation # Get original annotations
             for gp_name, model_list in aggregated_groups.items():
-                 first_model_name = model_list[0].name_tag # Assuming model_list is Group of Models
+                 first_model_name = model_list[list(model_list._group.keys())[0]].name_tag # Assuming model_list is Group of Models
                  if first_model_name in original_annot.index:
                       first_model_annots[gp_name] = original_annot.loc[first_model_name]
             group_annot_df = pd.DataFrame.from_dict(first_model_annots, orient='index')
@@ -808,7 +808,7 @@ class Group(GEMComposite):
             first_model_annots = {}
             original_annot = models.annotation
             for gp_name, model_list in aggregated_groups.items():
-                 first_model_name = model_list[0].name_tag
+                 first_model_name = model_list[list(model_list._group.keys())[0]].name_tag
                  if first_model_name in original_annot.index:
                       first_model_annots[gp_name] = original_annot.loc[first_model_name]
             group_annot_df = pd.DataFrame.from_dict(first_model_annots, orient='index')
@@ -824,7 +824,7 @@ class Group(GEMComposite):
 
     def compare(self,
                 models: Optional[Union[str, list, np.ndarray]] = None,
-                group_by: Optional[str] = None, # Made optional, default handled internally
+                group_by: Optional[str] = "group_name", # Made optional, default handled internally
                 method: Literal["jaccard", "PCA", "num"] = "jaccard",
                 **kwargs
                 ):
