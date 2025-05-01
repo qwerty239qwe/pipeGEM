@@ -1,4 +1,4 @@
-from typing import List, Union, Optional, Tuple, Literal
+from typing import List, Union, Optional, Tuple, Literal, Dict
 from functools import reduce
 import itertools
 from warnings import warn

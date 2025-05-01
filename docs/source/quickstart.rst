@@ -1,95 +1,133 @@
+Quickstart
+==========
+
+.. _quickstart:
+
+.. currentmodule:: pipeGEM
+
+Overview
+--------
+
+This is a package for visualizing and analyzing multiple metabolic models.
+It also allow users to integrate omic data, metabolic tasks, and medium data with GEMs.
+
+The flux analysis functions in the package are based on cobrapy:
+https://cobrapy.readthedocs.io/en/latest/
+
+----
+
 Installation
--------------
+------------
 
-To use PipeGEM, first install it using pip:
+To install directly from PyPI:
 
-.. code-block:: console
+.. code-block:: bash
 
-    $ pip install pipegem
+    pip install pipegem
 
+----
 
-QuickStart
--------------
+Command-Line Interface (CLI) Quick Start
+----------------------------------------
 
-To do model comparison using pipeGEM, create a Group object and call do_flux_analysis method.
-Then use plotting functions to visualize the results
+PipeGEM also provides a command-line interface for running predefined pipelines using configuration files.
+
+1.  **Generate Template Configurations:**
+    Start by generating template TOML configuration files for a specific pipeline (e.g., ``integration``). Replace ``integration`` with the desired pipeline name if needed.
+
+    .. code-block:: bash
+
+        python -m pipeGEM -n template -p integration -o ./configs
+
+    This will create a ``configs`` directory (if it doesn't exist) containing template ``.toml`` files like ``gene_data_conf.toml``, ``model_conf.toml``, etc.
+
+2.  **Modify Configurations (Optional):**
+    Edit the generated ``.toml`` files in the ``configs`` directory to specify your input file paths, parameters, and desired settings. For example, in ``model_conf.toml``, you might specify the path to your metabolic model file.
+
+3.  **Run a Pipeline:**
+    Execute a pipeline using the configuration files. For example, to run the model processing pipeline using the configuration in ``configs/model_conf.toml``:
+
+    .. code-block:: bash
+
+        python -m pipeGEM -n model_processing -t configs/model_conf.toml
+
+    Or, to run the full integration pipeline:
+
+    .. code-block:: bash
+
+        python -m pipeGEM -n integration \
+            -g configs/gene_data_conf.toml \
+            -t configs/model_conf.toml \
+            -r configs/threshold_conf.toml \
+            -m configs/mapping_conf.toml \
+            -i configs/integration_conf.toml
+
+    Refer to the generated template files and the specific pipeline documentation for details on required configurations.
+
+----
+
+Python API Usage
+----------------
+
+**Single Model**
 
 .. code-block:: python
 
     import pipeGEM as pg
     from pipeGEM.utils import load_model
 
-    model_1 = load_model("your_model_path_1")  # cobra.Model
+    model = load_model("your_model_path")  # cobra.Model
+    pmodel = pg.Model(model)
+
+    # Print out model information
+    print(pmodel)
+
+    # Do and plot pFBA result
+    flux_analysis = pmodel.do_flux_analysis("pFBA")
+    flux_analysis.plot()
+
+
+**Multiple Models**
+
+.. code-block:: python
+
+    import pipeGEM as pg
+    from pipeGEM.utils import load_model
+
+    model_1 = load_model("your_model_path_1")
     model_2 = load_model("your_model_path_2")
     group = pg.Group({"model1": model_1, "model2": model_2})
 
-    # get basic info
-    group.get_info()
-
-    # Model comparison
-    group.plot_components()
-
     # Do and plot pFBA result
-    group.do_analysis(method="pFBA", constr="default")
-    group.plot_flux(method="pFBA", constr="default", rxn_ids=["your rxn ids"])
+    flux_analysis = group.do_flux_analysis("pFBA")
+    flux_analysis.plot()
 
-To run existing or create a new pipeline, use the classes defined in pipeGEM.pipeline:
+
+**Generate Context-Specific Models**
 
 .. code-block:: python
 
-    import pandas as pd
-    from pipeGEM.pipeline.algo.constraints import GIMME
+    import numpy as np
+    import pipeGEM as pg
     from pipeGEM.utils import load_model
+    from pipeGEM.data import GeneData, synthesis
 
-    # run GIMME algo
-    template_model = load_model("your_template_model_path")
-    rnaseq_data = pd.read_csv("your_dataset_path")
+    # initialize model
+    mod = pg.Model(load_model("your_model_path_1"))
 
-    pipeline = GIMME(rnaseq_data)
-    pipeline(template_model)  # run the pipeline
+    # create dummy transcriptomic data
+    dummy_data = synthesis.get_syn_gene_data(mod, n_sample=3)
 
-    group = pipeline.output["models"]  # this is a Group contains context-specific Models
-    group.plot_model_heatmap()  # visualize model distances
+    # calculate reaction activity score
+    gene_data = GeneData(data=dummy_data["sample_0"], # pd.Series or a dict
+                         data_transform=lambda x: np.log2(x), # callable
+                         absent_expression=-np.inf) # value
+    mod.add_gene_data(name_or_prefix="sample_0",  # name of the data
+                      data=gene_data,
+                      or_operation="nanmax",  # alternative: nansum
+                      threshold=-np.inf,
+                      absent_value=-np.inf)
 
-.. code-block:: python
-
-    from pipeGEM.pipeline import *
-    from pipeGEM.pipeline.preprocessing import *
-    from pipeGEM.pipeline.task import *
-    from pipeGEM.pipeline.threshold import *
-
-    # creating new pipeLine
-    class MyPipeLine(Pipeline):
-        def __init__(self, data_df):
-            super().__init__()
-            self.data_df = data_df
-            self.gene_dataset = GeneDataSet(data_df)
-            self.threshold = BimodalThreshold()
-            ...
-
-        def run(self):
-            threshold_dict = self.threshold.run(self.data_df)
-            expression_dict = self.gene_dataset()
-            ...
-            self.output = ...
-            return self.output
-
-    template_model = load_model("your_template_model_path")
-    rnaseq_data = pd.read_csv("your_dataset_path")
-    my_pipeline = MyPipeLine(rnaseq_data)
-    my_pipeline(template_model)
-
-Command-line tool
-------------------
-To generate template config files for pipelines
-
-.. code-block:: console
-
-    $ python -m pipeGEM -n template -o path-to-generate-configs
-
-
-To perform model testing on a template model
-
-.. code-block:: console
-
-    $ python -m pipeGEM -n model_processing
+    # apply GIMME algorithm on the model
+    gimme_result = mod.integrate_gene_data(data_name="sample_0", integrator="GIMME")
+    context_specific_gem = gimme_result.result_model

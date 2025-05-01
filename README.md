@@ -14,7 +14,7 @@ To install directly from PyPI:
 <br>
 `pip install pipegem`
 ___
-### How to use this package
+### How to use this package (Python API)
 **single model**
 ```python
 import pipeGEM as pg
@@ -74,3 +74,40 @@ gimme_result = mod.integrate_gene_data(data_name="sample_0", integrator="GIMME")
 context_specific_gem = gimme_result.result_model
 
 ```
+
+___
+
+### Command-Line Interface (CLI) Quick Start
+
+PipeGEM also provides a command-line interface for running predefined pipelines using configuration files.
+
+1.  **Generate Template Configurations:**
+    Start by generating template TOML configuration files for a specific pipeline (e.g., `integration`). Replace `integration` with the desired pipeline name if needed.
+
+    ```bash
+    python -m pipeGEM -n template -p integration -o ./configs
+    ```
+    This will create a `configs` directory (if it doesn't exist) containing template `.toml` files like `gene_data_conf.toml`, `model_conf.toml`, etc.
+
+2.  **Modify Configurations (Optional):**
+    Edit the generated `.toml` files in the `configs` directory to specify your input file paths, parameters, and desired settings. For example, in `model_conf.toml`, you might specify the path to your metabolic model file.
+
+3.  **Run a Pipeline:**
+    Execute a pipeline using the configuration files. For example, to run the model processing pipeline using the configuration in `configs/model_conf.toml`:
+
+    ```bash
+    python -m pipeGEM -n model_processing -t configs/model_conf.toml
+    ```
+
+    Or, to run the full integration pipeline:
+
+    ```bash
+    python -m pipeGEM -n integration \
+        -g configs/gene_data_conf.toml \
+        -t configs/model_conf.toml \
+        -r configs/threshold_conf.toml \
+        -m configs/mapping_conf.toml \
+        -i configs/integration_conf.toml
+    ```
+
+    Refer to the generated template files and the specific pipeline documentation for details on required configurations.
