@@ -340,7 +340,7 @@ class Group(GEMComposite):
         pd.DataFrame
             A DataFrame containing the requested reaction information, indexed by reaction ID (potentially duplicated if drop_duplicates=False).
         """
-        if models is None:
+        if models is None or models == "all":
             selected_models_group = self
         elif isinstance(models, str):
              selected_models_group = [self[models]] # Get single model
@@ -615,7 +615,7 @@ class Group(GEMComposite):
                          for A, B in itertools.combinations(group_list, 2)}
         jaccard_index.update({f'{A.name_tag}_to_{A.name_tag}': 1 for A in group_list})
         group_names = [A.name_tag for A in group_list]
-        comp_arr = np.array([[jaccard_index[f'{sorted([A, B], key=lambda x: label_index[x])[0]}'
+        comp_arr = np.array([[jaccard_index[f'{sorted([A, B], key=lambda x: label_index[x.name_tag])[0].name_tag}'
                                           f'_to_'
                                           f'{sorted([A, B], key=lambda x: label_index[x.name_tag])[1].name_tag}'] # Use name_tag
                               for A in group_list] # Iterate through group_list directly

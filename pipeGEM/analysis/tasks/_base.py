@@ -56,7 +56,48 @@ class Task:
                  subsystem: str = None,
                  description: str = None,
                  annotation: str = None):
+        """
+        Initialize a metabolic task.
 
+        Parameters
+        ----------
+        should_fail : bool
+            Indicates if the task is expected to fail (e.g., cannot carry flux).
+        in_mets : List[Dict[str, Any]]
+            List of dictionaries defining input metabolites and their bounds.
+        out_mets : List[Dict[str, Any]]
+            List of dictionaries defining output metabolites and their bounds.
+        knockout_input_flag : bool, optional
+            Whether to knock out (set bounds to 0) boundary reactions for inputs
+            not specified in `in_mets`. Default is True.
+        knockout_output_flag : bool, optional
+            Whether to knock out boundary reactions for outputs not specified
+            in `out_mets`. Default is True.
+        ko_input_type : Literal["all", "organic"], optional
+            Type of input boundary reactions to knock out ('all' or 'organic').
+            Default is "all".
+        ko_output_type : Literal["all", "organic"], optional
+            Type of output boundary reactions to knock out ('all' or 'organic').
+            Default is "all".
+        compartment_parenthesis : str, optional
+            Format string for compartment identifiers (e.g., "[{}]"). Default is "[{}]".
+        met_id_str : str, optional
+            Dictionary key for metabolite ID within `in_mets`/`out_mets`. Default is "met_id".
+        lower_bound_str : str, optional
+            Dictionary key for lower bound. Default is "lb".
+        upper_bound_str : str, optional
+            Dictionary key for upper bound. Default is "ub".
+        compartment_str : str, optional
+            Dictionary key for compartment ID. Default is "compartment".
+        system : str, optional
+            Broad functional category of the task. Default is None.
+        subsystem : str, optional
+            Specific metabolic pathway or subsystem. Default is None.
+        description : str, optional
+            Textual description of the task. Default is None.
+        annotation : str, optional
+            Additional annotations for the task. Default is None.
+        """
         self.system = system
         self.subsystem = subsystem
         self.description = description
@@ -72,6 +113,7 @@ class Task:
         self.ko_input_type, self.ko_output_type = ko_input_type, ko_output_type
 
     def to_dict(self) -> dict:
+        """Convert the Task object attributes to a dictionary."""
         return {"system": self.system,
                 "subsystem": self.subsystem,
                 "description": self.description,
@@ -149,10 +191,27 @@ class Task:
 
     @staticmethod
     def setup_support_flux_exp(model,
-                               rxn_fluxes):
+                               rxn_fluxes: Dict[str, float]):
+        """
+        Set up model objective and bounds based on supporting reaction fluxes.
+
+        Used internally for testing task sinks. Modifies the model in place.
+
+        Parameters
+        ----------
+        model : cobra.Model
+            The metabolic model to modify.
+        rxn_fluxes : Dict[str, float]
+            A dictionary mapping reaction IDs to their flux values obtained
+            from a previous task simulation (e.g., pFBA). Reaction bounds
+            are adjusted slightly around these fluxes, and the objective
+            is set to maximize flux through these reactions (weighted by sign).
+        """
         obj_dic = {}
 
         for k, v in rxn_fluxes.items():
+            # Set bounds slightly away from the calculated flux to ensure feasibility
+            # while constraining the solution space near the pFBA result.
             model.reactions.get_by_id(k).bounds = (-1000, max(-1e-6, v)) if v < 0 else (min(1e-6, v), 1000)
             obj_dic[model.reactions.get_by_id(k)] = 1 if v > 0 else -1
         model.objective = obj_dic
@@ -224,6 +283,11 @@ class Task:
 def get_met_prod_task(met_id: str,
                       comp: str = "c") -> Task:
     """
+    Create a simple metabolic task for producing a single metabolite.
+
+    This task defines the production of a specified metabolite from any
+    available precursors in the model, with no specific inputs defined
+    and boundary reactions generally open (unless knockout flags are changed later).
 
     Parameters
     ----------
@@ -244,51 +308,134 @@ def get_met_prod_task(met_id: str,
 
 
 class TaskContainer:
+    """
+    A container to hold and manage multiple Task objects.
+
+    Attributes
+    ----------
+    tasks : Dict[str, Task]
+        A dictionary where keys are task IDs (str) and values are Task objects.
+    ALLOW_BATCH_CHANGED_ATTR : List[str]
+        Class attribute listing Task attributes that can be modified in batch
+        using `set_all_mets_attr`.
+    """
     ALLOW_BATCH_CHANGED_ATTR = ["compartment_parenthesis",
                                 "lower_bound_str",
                                 "upper_bound_str",
                                 "compartment_str"]
 
     def __init__(self,
-                 tasks: dict = None):
+                 tasks: Optional[Dict[str, Task]] = None):
+        """
+        Initialize the TaskContainer.
+
+        Parameters
+        ----------
+        tasks : Optional[Dict[str, Task]], optional
+            A dictionary of tasks to initialize the container with.
+            Keys are task IDs, values are Task objects. Defaults to None,
+            creating an empty container.
+
+        Raises
+        ------
+        TypeError
+            If `tasks` is provided and is not a dictionary.
+        """
         if tasks is not None and not isinstance(tasks, dict):
             raise TypeError("tasks must be a dict with strings as keys and Task as values")
-        self.tasks = {} if tasks is None else tasks
+        self.tasks: Dict[str, Task] = {} if tasks is None else tasks
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """Return the number of tasks in the container."""
         return len(self.tasks)
 
-    def __contains__(self, item):
+    def __contains__(self, item: str) -> bool:
+        """Check if a task ID exists in the container."""
         return item in self.tasks
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return a string representation showing the number of tasks."""
         return str(len(self.tasks)) + " tasks in this container"
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: str) -> Task:
+        """Retrieve a task by its ID."""
         return self.tasks[item]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Task):
+        """Add or update a task in the container."""
+        if not isinstance(value, Task):
+            raise TypeError("Value must be a Task object.")
         self.tasks[key] = value
 
-    def __add__(self, other):
+    def __add__(self, other: 'TaskContainer') -> 'TaskContainer':
+        """
+        Combine two TaskContainers.
+
+        Parameters
+        ----------
+        other : TaskContainer
+            Another TaskContainer to add.
+
+        Returns
+        -------
+        TaskContainer
+            A new TaskContainer containing tasks from both containers.
+
+        Raises
+        ------
+        AssertionError
+            If there are overlapping task IDs between the two containers.
+        """
         assert len(set(other.tasks.keys()) & set(self.tasks.keys())) == 0, \
             f"task id collision: {set(other.tasks.keys()) & set(self.tasks.keys())}"
         new_task = {}
-        new_task.update(other.tasks)
-        new_task.update(self.tasks)
+        new_task.update(self.tasks) # Start with self's tasks
+        new_task.update(other.tasks) # Add/overwrite with other's tasks
         return self.__class__(new_task)
 
     def items(self):
+        """Return an iterator over the (task_id, Task) items."""
         return self.tasks.items()
 
-    def subset(self, items):
+    def subset(self, items: List[str]) -> 'TaskContainer':
+        """
+        Create a new TaskContainer containing only specified task IDs.
+
+        Parameters
+        ----------
+        items : List[str]
+            A list of task IDs to include in the subset.
+
+        Returns
+        -------
+        TaskContainer
+            A new container with the subset of tasks.
+        """
         return self.__class__(tasks={name: task for name, task in self.tasks.items() if name in items})
 
     @classmethod
     def load(cls,
-             file_path=TASKS_FILE_PATH):
+             file_path: Union[str, Path] = TASKS_FILE_PATH) -> 'TaskContainer':
+        """
+        Load tasks from a JSON file.
+
+        Searches for the file first at the provided path, then in the default
+        'tasks' directory relative to the package root if the path is not absolute.
+
+        Parameters
+        ----------
+        file_path : Union[str, Path], optional
+            Path to the JSON file containing task definitions.
+            Defaults to the path defined by `TASKS_FILE_PATH`.
+
+        Returns
+        -------
+        TaskContainer
+            A new container populated with tasks from the file.
+        """
         tasks_folder = Path(__file__).parent.parent.parent.parent / "tasks"
-        if (not Path(file_path).is_file()) and (tasks_folder / file_path).is_file():
+        file_path = Path(file_path) # Ensure it's a Path object
+        if (not file_path.is_file()) and (tasks_folder / file_path).is_file():
             file_path = (tasks_folder / file_path)
 
         with open(file_path) as json_file:
@@ -296,29 +443,81 @@ class TaskContainer:
             tasks = {ids: Task(**obj) for ids, obj in data.items()}
         return cls(tasks)
 
-    def save(self, file_path):
+    def save(self, file_path: Union[str, Path]):
+        """
+        Save the tasks in the container to a JSON file.
+
+        Parameters
+        ----------
+        file_path : Union[str, Path]
+            Path where the JSON file will be saved.
+        """
         data = {tid: tobj.to_dict() for tid, tobj in self.tasks.items()}
         with open(file_path, "w") as f:
-            json.dump(data, f)
+            json.dump(data, f, indent=4) # Add indent for readability
 
-    def set_all_mets_attr(self, attr_name, new):
-        assert attr_name in self.ALLOW_BATCH_CHANGED_ATTR, "attr_name should be chose from: " + str(self.ALLOW_BATCH_CHANGED_ATTR)
+    def set_all_mets_attr(self, attr_name: str, new_value: Any):
+        """
+        Set a specific attribute for all Task objects within the container.
+
+        Only attributes listed in `ALLOW_BATCH_CHANGED_ATTR` can be modified.
+
+        Parameters
+        ----------
+        attr_name : str
+            The name of the Task attribute to modify.
+        new_value : Any
+            The new value to assign to the attribute.
+
+        Raises
+        ------
+        AssertionError
+            If `attr_name` is not in `ALLOW_BATCH_CHANGED_ATTR`.
+        """
+        assert attr_name in self.ALLOW_BATCH_CHANGED_ATTR, \
+            f"attr_name must be one of: {self.ALLOW_BATCH_CHANGED_ATTR}"
         for tid, tobj in self.tasks.items():
-            setattr(tobj, attr_name, new)
+            setattr(tobj, attr_name, new_value)
 
 
 class TaskHandler:
+    """
+    Handles the execution and analysis of metabolic tasks on a given model.
+
+    Attributes
+    ----------
+    model : cobra.Model
+        The metabolic model on which tasks will be tested.
+    tasks : TaskContainer
+        The container holding the metabolic tasks to be tested.
+    """
     def __init__(self,
-                 model,
-                 tasks_path_or_container: Union[TaskContainer, str],
+                 model: cobra.Model,
+                 tasks_path_or_container: Union[TaskContainer, str, Path],
                  model_compartment_parenthesis: str = "[{}]"
                  ):
+        """
+        Initialize the TaskHandler.
+
+        Parameters
+        ----------
+        model : cobra.Model
+            The metabolic model to use for task testing.
+        tasks_path_or_container : Union[TaskContainer, str, Path]
+            Either a TaskContainer object or a path to a JSON file
+            defining the tasks.
+        model_compartment_parenthesis : str, optional
+            The format string used for compartment identifiers in the model's
+            metabolite IDs (e.g., "[{}]" for "met_c[c]"). Defaults to "[{}]".
+        """
         self.model = model
         self.tasks = self._init_task_container(tasks_path_or_container,
                                                compartment_patenthesis=model_compartment_parenthesis)
 
     @staticmethod
-    def _init_task_container(task_container, compartment_patenthesis):
+    def _init_task_container(task_container: Union[TaskContainer, str, Path],
+                             compartment_patenthesis: str) -> TaskContainer:
+        """Load or prepare the TaskContainer, setting compartment format."""
         if isinstance(task_container, str) or isinstance(task_container, Path):
             task_container_obj = TaskContainer.load(task_container)
             task_container_obj.set_all_mets_attr("compartment_parenthesis", compartment_patenthesis)
@@ -346,13 +545,52 @@ class TaskHandler:
                       method,
                       method_kws,
                       solver,
-                      fail_threshold,
-                      n_additional_path=0,
-                      **kwargs):
+                      fail_threshold: float,
+                      n_additional_path: int = 0,
+                      **kwargs) -> dict:
+        """
+        Test a single metabolic task on a given model context.
+
+        Applies task constraints (inputs, outputs, knockouts), runs flux
+        analysis (e.g., pFBA), and determines if the task passes based on
+        feasibility and expected outcome (`should_fail`). Optionally identifies
+        supporting reactions.
+
+        Parameters
+        ----------
+        task : Task
+            The metabolic task object to test.
+        model : cobra.Model
+            The model context (potentially modified with knockouts) to test the task on.
+        all_mets_in_model : List[str]
+            A list of all metabolite IDs present in the original model.
+        method : str
+            Flux analysis method to use (e.g., "pFBA", "FBA").
+        method_kws : Optional[Dict]
+            Keyword arguments for the chosen flux analysis method.
+        solver : str
+            The LP solver to use (e.g., "gurobi", "cplex").
+        fail_threshold : float
+            Flux threshold below which a reaction is considered inactive.
+        n_additional_path : int, optional
+            Number of additional paths (minimal flux solutions) to find for
+            identifying alternative supporting reactions. Default is 0.
+        **kwargs
+            Additional keyword arguments passed to `task.assign`.
+
+        Returns
+        -------
+        dict
+            A dictionary containing results: 'Passed', 'Should fail',
+            'Missing mets', 'Status', 'Obj_value', 'Obj_rxns', 'system',
+            'subsystem', 'description', 'annotation', and optionally
+            'task_support_rxns' and 'task_support_rxn_fluxes'.
+        """
         all_met_exist, dummy_rxns, obj_rxns = task.assign(model, all_mets_in_model, **kwargs)
-        assert n_additional_path >= 0
+        assert n_additional_path >= 0, "n_additional_path cannot be negative."
 
         if not all_met_exist:
+            # Task cannot be tested if required metabolites are missing
             return {'Passed': False,
                     'Should fail': task.should_fail,
                     'Missing mets': True,
@@ -443,8 +681,10 @@ class TaskHandler:
                                                            rxn_fluxes=rxn_f)
             for k, v in one_sink_result.items():
                 if k == "Passed":
+                    # Overall 'Passed' is True if any path passes
                     output_dic[k] = (output_dic[k] or v)
                 elif k not in output_dic:
+                    # Initialize list for other keys
                     output_dic[k] = [v]
                 else:
                     output_dic[k].append(v)
@@ -459,9 +699,47 @@ class TaskHandler:
                    verbosity=0,
                    fail_threshold=1e-6,
                    n_additional_path=0,
-                   met_scaling_coefs=None,
-                   log=None):
-        # maybe needs some modifications
+                   met_scaling_coefs: Optional[Dict] = None,
+                   log: Optional[Dict] = None) -> TaskAnalysis:
+        """
+        Test a set of metabolic tasks on the model.
+
+        Iterates through specified tasks, applies constraints, runs flux
+        analysis, and aggregates results into a TaskAnalysis object.
+
+        Parameters
+        ----------
+        method : str, optional
+            Flux analysis method used for testing each task (e.g., "pFBA").
+            Default is "pFBA".
+        method_kws : Optional[Dict], optional
+            Keyword arguments for the flux analysis method. Default is None.
+        solver : str, optional
+            LP solver to use. Default is "gurobi".
+        get_support_rxns : bool, optional
+            If True, attempts to identify reactions supporting passed tasks
+            by analyzing flux distributions and testing sinks. Default is True.
+        task_ids : Union[str, List[str]], optional
+            Specific task IDs to test. If "all" (default), tests all tasks
+            in the container.
+        verbosity : int, optional
+            Level of printed output (0: silent, 1: summary, 2: detailed). Default is 0.
+        fail_threshold : float, optional
+            Flux threshold for determining reaction activity. Default is 1e-6.
+        n_additional_path : int, optional
+            Number of additional paths to find for supporting reactions. Default is 0.
+        met_scaling_coefs : Optional[Dict], optional
+            Dictionary mapping metabolite IDs to scaling coefficients, used if
+            the model stoichiometry has been rescaled. Default is None.
+        log : Optional[Dict], optional
+            Additional information to store in the TaskAnalysis log. Default is None.
+
+        Returns
+        -------
+        TaskAnalysis
+            An object containing the aggregated results (DataFrame, score) and logs.
+        """
+        # Define boundary reactions based on type
         boundary = [r.id for r in self.model.exchanges] + \
                    [r.id for r in self.model.demands] + \
                    [r.id for r in self.model.sinks]
@@ -536,10 +814,56 @@ def table_to_container(df,
                        out_met_ub="OUT UB",
                        sys_name="SYSTEM",
                        sub_sys_name="SUBSYSTEM",
-                       compartment_format="\[(.?)\]"
-                       ):
-    # a helper function to construct TaskContainer from a dataframe, the table could be
+                       compartment_format: str = r"\[(.?)\]" # Raw string for regex
+                       ) -> TaskContainer:
+    """
+    Construct a TaskContainer from a pandas DataFrame.
+
+    Parses a DataFrame where rows define aspects of metabolic tasks (inputs,
+    outputs, metadata) and converts it into a TaskContainer object. Assumes
+    a specific table structure defined by the column name parameters.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame containing task definitions.
+    met_id_map : Optional[Dict], optional
+        A dictionary to map metabolite IDs found in the table to different IDs
+        if needed. Default is None.
+    id_name : str, optional
+        Column name for the unique Task ID. Default is "ID".
+    should_fail_name : str, optional
+        Column name indicating if the task should fail (boolean). Default is "SHOULD FAIL".
+    desc_name : str, optional
+        Column name for the task description. Default is "DESCRIPTION".
+    in_met_name : str, optional
+        Column name for input metabolite IDs (including compartment). Default is "IN".
+    in_met_lb : str, optional
+        Column name for input metabolite lower bound. Default is "IN LB".
+    in_met_ub : str, optional
+        Column name for input metabolite upper bound. Default is "IN UB".
+    out_met_name : str, optional
+        Column name for output metabolite IDs (including compartment). Default is "OUT".
+    out_met_lb : str, optional
+        Column name for output metabolite lower bound. Default is "OUT LB".
+    out_met_ub : str, optional
+        Column name for output metabolite upper bound. Default is "OUT UB".
+    sys_name : str, optional
+        Column name for the task system. Default is "SYSTEM".
+    sub_sys_name : str, optional
+        Column name for the task subsystem. Default is "SUBSYSTEM".
+    compartment_format : str, optional
+        Regular expression to extract the compartment ID from metabolite strings
+        (e.g., in `in_met_name`, `out_met_name`). Default captures a single
+        character within square brackets: r"\\[(.?)\\]".
+
+    Returns
+    -------
+    TaskContainer
+        A container populated with Task objects derived from the DataFrame.
+    """
     df = df.copy()
+    # Forward fill Task IDs to associate multiple rows (e.g., multiple inputs/outputs) with the same task
     df[id_name] = df[id_name].fillna(method='ffill')
     task_d = {}
 
