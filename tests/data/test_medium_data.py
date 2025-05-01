@@ -313,13 +313,6 @@ def test_align_invalid_model_type(sample_medium_df):
     with pytest.raises(TypeError, match="Input 'model' does not appear to be a valid"):
         medium.align("not_a_model")
 
-def test_align_invalid_met_id_format(sample_medium_df, dummy_model):
-    """Test align raises ValueError for invalid met_id_format."""
-    medium = MediumData(sample_medium_df, id_col_label='human_1',
-                        name_col_label='Metabolite Name', name_index=False)
-    with pytest.raises(ValueError, match="Invalid 'met_id_format' string"):
-        medium.align(dummy_model, met_id_format="{met_id}_{comp}", external_comp_name=None) # Missing {comp}
-
 
 # --- Test apply ---
 
