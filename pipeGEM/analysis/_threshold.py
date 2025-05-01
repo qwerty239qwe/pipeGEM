@@ -11,30 +11,95 @@ from pipeGEM.analysis.results.thresholds import rFASTCORMICSThresholdAnalysis, P
 
 
 class ThresholdFinders(ObjectFactory):
+    """Factory class for registering and creating threshold finding algorithms."""
     def __init__(self):
+        """Initializes the ThresholdFinders factory."""
         super(ThresholdFinders, self).__init__()
 
 
 class ThresholdFinder:
+    """Abstract base class for threshold finding algorithms."""
     def __init__(self):
+        """Initializes the ThresholdFinder."""
         pass
 
     def find_threshold(self, **kwargs):
+        """
+        Abstract method to find expression thresholds.
+
+        Subclasses must implement this method.
+
+        Parameters
+        ----------
+        **kwargs
+            Algorithm-specific parameters.
+
+        Raises
+        ------
+        NotImplementedError
+            If the subclass does not implement this method.
+        """
         raise NotImplementedError("")
 
 
 class DistributionBased(ThresholdFinder):
+    """Base class for threshold finders based on data distribution analysis."""
     def __init__(self):
+        """Initializes the DistributionBased finder."""
         super().__init__()
 
     def find_threshold(self, **kwargs):
+        """
+        Abstract method for distribution-based threshold finding.
+
+        Raises
+        ------
+        NotImplementedError
+        """
         raise NotImplementedError("")
 
     @staticmethod
-    def gaussian_dist(x, amp, cen, wid):
+    def gaussian_dist(x: np.ndarray, amp: float, cen: float, wid: float) -> np.ndarray:
+        """
+        Calculate the Gaussian function value.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            Input array.
+        amp : float
+            Amplitude (height) of the Gaussian peak.
+        cen : float
+            Center (mean) of the Gaussian distribution.
+        wid : float
+            Width (related to variance) of the Gaussian distribution.
+
+        Returns
+        -------
+        np.ndarray
+            Gaussian function values corresponding to x.
+        """
+        # Note: 'wid' here might represent 2*sigma^2 depending on convention.
         return amp * np.exp(-np.power(x - cen, 2) / wid)
 
-    def bimodal_dist(self, x, A1, mu1, wid1, A2, mu2, wid2):
+    def bimodal_dist(self, x: np.ndarray, A1: float, mu1: float, wid1: float, A2: float, mu2: float, wid2: float) -> np.ndarray:
+        """
+        Calculate the sum of two Gaussian distributions (bimodal).
+
+        Parameters
+        ----------
+        x : np.ndarray
+            Input array.
+        A1, mu1, wid1 : float
+            Amplitude, center, and width of the first Gaussian component.
+        A2, mu2, wid2 : float
+            Amplitude, center, and width of the second Gaussian component.
+
+        Returns
+        -------
+        np.ndarray
+            Sum of the two Gaussian functions evaluated at x.
+        """
         return self.gaussian_dist(x, A1, mu1, wid1) + self.gaussian_dist(x, A2, mu2, wid2)
 
     @staticmethod
@@ -45,8 +110,41 @@ class DistributionBased(ThresholdFinder):
     def _cal_canyons_p(x1, y1, x2, y2, c=0.5):
         return c * 2 ** (-abs(x1 - x2)) + (1 - c) * 1.5 ** (((y1 / y2) if y1 > y2 else (y2 / y1)) - 1) / 50
 
-    def get_init_for_bimodal(self, x, y, max_x, min_x, min_h_ratio=1.5, max_w_ratio=2, n_top=100):
-        assert len(x) == len(y)
+    def get_init_for_bimodal(self, x: np.ndarray, y: np.ndarray, max_x: float, min_x: float,
+                             min_h_ratio: float = 1.5, max_w_ratio: float = 2, n_top: int = 100) -> Tuple[float, float]:
+        """
+        Heuristically find initial guesses for the centers of two modes in a distribution.
+
+        Analyzes the second derivative of the distribution `y` with respect to `x`
+        to find potential peaks (local minima in the second derivative) and selects
+        the best pair based on height, width ratios, and a scoring function.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            The x-coordinates of the distribution data points. Assumed to be evenly spaced.
+        y : np.ndarray
+            The y-coordinates (density/frequency) of the distribution data points.
+        max_x : float
+            Maximum allowed x-value for candidate peaks.
+        min_x : float
+            Minimum allowed x-value for candidate peaks.
+        min_h_ratio : float, optional
+            Minimum ratio relative to the global peak height for a candidate peak
+            to be considered valid. Default is 1.5.
+        max_w_ratio : float, optional
+            Maximum allowed ratio between the widths defined by the two candidate
+            peaks relative to the overall data range. Default is 2.
+        n_top : int, optional
+            Number of top candidate peaks (based on second derivative depth) to consider.
+            Default is 100.
+
+        Returns
+        -------
+        Tuple[float, float]
+            A tuple containing the estimated x-coordinates (centers) of the two modes.
+        """
+        assert len(x) == len(y), "x and y must have the same length."
 
         dx = x[1] - x[0]
         ypp = self._get_second_deriv(y, dx)
@@ -178,8 +276,16 @@ class DistributionBased(ThresholdFinder):
 
 
 class rFASTCORMICSThreshold(DistributionBased):
+    """
+    Finds expression thresholds by fitting a bimodal Gaussian distribution.
 
+    This method assumes gene expression data often follows a bimodal distribution,
+    representing 'off' and 'on' states. It fits two Gaussian curves to the data's
+    Kernel Density Estimate (KDE) and uses the means of these curves as potential
+    thresholds.
+    """
     def __init__(self):
+        """Initializes the rFASTCORMICSThreshold finder."""
         super().__init__()
 
     @timing
@@ -189,7 +295,37 @@ class rFASTCORMICSThreshold(DistributionBased):
                        return_heuristic: bool = False,
                        hard_x_lims: tuple = (0.05, 0.95),
                        k_best: int = 3) -> rFASTCORMICSThresholdAnalysis:
-        assert hard_x_lims[0] < hard_x_lims[1]
+        """
+        Finds expression and non-expression thresholds using bimodal Gaussian fitting.
+
+        Filters data below `cut_off`, calculates KDE, fits a bimodal Gaussian,
+        and returns the means of the fitted Gaussians as potential thresholds.
+
+        Parameters
+        ----------
+        data : Union[np.ndarray, pd.Series, dict, list]
+            Input expression data (typically log-transformed).
+        cut_off : float, optional
+            Value below which data points are excluded before analysis.
+            Default is -infinity (no cutoff).
+        return_heuristic : bool, optional
+            If True, returns the initial heuristic guesses for the means instead
+            of the fitted means. Default is False.
+        hard_x_lims : tuple, optional
+            Tuple defining the percentile range (e.g., (0.05, 0.95)) of the data
+            to consider for fitting, restricting the search space for means.
+            Default is (0.05, 0.95).
+        k_best : int, optional
+            Number of best-fitting parameter sets to return (ranked by p-score).
+            Default is 3.
+
+        Returns
+        -------
+        rFASTCORMICSThresholdAnalysis
+            An analysis object containing the calculated thresholds, fitted curves,
+            and intermediate data (x, y KDE values).
+        """
+        assert 0 <= hard_x_lims[0] < hard_x_lims[1] <= 1, "hard_x_lims must be percentiles between 0 and 1."
 
         if isinstance(data, pd.Series):
             arr = data.values
@@ -242,25 +378,37 @@ class rFASTCORMICSThreshold(DistributionBased):
 
 
 class RankBased(ThresholdFinder):
+    """Base class for threshold finders based on data ranking (e.g., percentiles)."""
     def __init__(self):
+        """Initializes the RankBased finder."""
         super().__init__()
 
     def find_threshold(self, **kwargs):
+        """
+        Abstract method for rank-based threshold finding.
+
+        Raises
+        ------
+        NotImplementedError
+        """
         raise NotImplementedError()
 
 
 class PercentileThreshold(RankBased):
+    """Finds thresholds based on simple percentiles of the data."""
     def __init__(self):
+        """Initializes the PercentileThreshold finder."""
         super().__init__()
 
     @timing
     def find_threshold(self,
-                       data,  # 1d array
+                       data: Union[np.ndarray, pd.Series, dict, list],
                        p: Union[int, float, List[int], List[float], np.ndarray],
-                       exp_p: int = None,
-                       non_exp_p: int = None,
+                       exp_p: Optional[Union[int, float]] = None,
+                       non_exp_p: Optional[Union[int, float]] = None,
                        **kwargs) -> PercentileThresholdAnalysis:
         """
+        Calculate thresholds based on specified percentiles of the input data.
 
         Parameters
         ----------
@@ -324,32 +472,69 @@ class PercentileThreshold(RankBased):
 
 
 class LocalThreshold(RankBased):
+    """
+    Finds local expression thresholds based on percentiles within groups.
+
+    Calculates gene-specific thresholds for different sample groups based on
+    a specified percentile `p`. Optionally applies global 'on'/'off' thresholds
+    to override local thresholds for genes consistently high or low across a group.
+    """
     def __init__(self):
+        """Initializes the LocalThreshold finder."""
         super().__init__()
 
     @timing
     def find_threshold(self,
-                       data,  # 2d array
-                       p: Union[int, float, List[int], List[float], np.ndarray],
-                       global_on_p : Union[int, float] = 90,
-                       global_off_p: Union[int, float] = 10,
-                       global_on_th: Union[int, float] = None,
-                       global_off_th: Union[int, float] = None,
-                       groups: Union[pd.Series, dict] = None,
+                       data: Union[np.ndarray, pd.DataFrame],
+                       p: Union[int, float], # Simplified: expects single percentile for local
+                       global_on_p : Optional[Union[int, float]] = 90,
+                       global_off_p: Optional[Union[int, float]] = 10,
+                       global_on_th: Optional[Union[int, float]] = None,
+                       global_off_th: Optional[Union[int, float]] = None,
+                       groups: Optional[Union[pd.Series, dict]] = None,
+                       genes: Optional[List[str]] = None, # Added for array input
+                       samples: Optional[List[str]] = None, # Added for array input
                        **kwargs) -> LocalThresholdAnalysis:
         """
+        Calculate local, gene-specific expression thresholds for sample groups.
 
         Parameters
         ----------
-        data
-        p: float or int
-            Percentile or sequence of percentiles to compute, which must be between 0 and 100 inclusive.
-        global_on_p
-        global_off_p
-        global_on_th
-        global_off_th
-        groups: dict or pd.Series
-        kwargs
+        data : Union[np.ndarray, pd.DataFrame]
+            Input expression data (genes x samples). If ndarray, `genes` and
+            `samples` arguments must be provided.
+        p : Union[int, float]
+            The percentile (0-100) used to calculate the local threshold for each gene
+            within each group.
+        global_on_p : Optional[Union[int, float]], optional
+            Percentile (0-100) to determine the global 'on' threshold. If a gene's
+            minimum expression within a group exceeds this percentile's value
+            across the group, the global threshold overrides the local one.
+            Used if `global_on_th` is None. Default is 90.
+        global_off_p : Optional[Union[int, float]], optional
+            Percentile (0-100) to determine the global 'off' threshold. If a gene's
+            maximum expression within a group is below this percentile's value
+            across the group, the global threshold overrides the local one.
+            Used if `global_off_th` is None. Default is 10.
+        global_on_th : Optional[Union[int, float]], optional
+            Explicit value for the global 'on' threshold. Overrides `global_on_p`.
+            Default is None.
+        global_off_th : Optional[Union[int, float]], optional
+            Explicit value for the global 'off' threshold. Overrides `global_off_p`.
+            Default is None.
+        groups : Optional[Union[pd.Series, dict]], optional
+            Mapping samples to groups. If dict, keys are group names, values are
+            lists of sample names. If Series, index is sample names, values are
+            group names. If None, all samples are treated as one group named 'exp_th'.
+            Default is None.
+        genes : Optional[List[str]], optional
+            List of gene names corresponding to rows if `data` is an ndarray.
+            Required if `data` is an ndarray. Default is None.
+        samples : Optional[List[str]], optional
+            List of sample names corresponding to columns if `data` is an ndarray.
+            Required if `data` is an ndarray. Default is None.
+        **kwargs
+            Additional keyword arguments (currently unused).
 
         Returns
         -------
