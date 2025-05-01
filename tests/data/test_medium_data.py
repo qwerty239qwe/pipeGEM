@@ -396,6 +396,7 @@ def test_apply_threshold(sample_medium_df, dummy_model):
     # Default threshold is 1e-6
     # Calculated Ala influx: (1e-9 mmol/L) / (0.096 g*hr/L) = 1.04e-8 mmol/g/hr
     # This is less than 1e-6, so bound should be set to -threshold
+    medium.align(dummy_model, external_comp_name='e', met_id_format="{met_id}_{comp}")
     medium.apply(dummy_model, flux_unit="mmol/g/hr", threshold=1e-6)
 
     ala_rxn = dummy_model.reactions.get_by_id('EX_ala__L_e')
