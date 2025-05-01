@@ -4,14 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pipeGEM"
-version = "0.0.1a1"
+version = "0.1.0"
 description = "Processing and integrating data with genome-scale metabolic models (GEM)"
 readme = "README.md"
 authors = [{ name = "Yu-Te Lin", email = "qwerty239qwe@gmail.com" }]
 classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 keywords = ["metabolism", "metabolic-model", "computational-biology", "system-biology", "cobra"]
 dependencies = [

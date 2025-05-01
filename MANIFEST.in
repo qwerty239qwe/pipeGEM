@@ -1,1 +1,4 @@
 include pipeGEM/*.toml
+recursive-include tasks *
+recursive-include medium *
+recursive-include enzyme_data *
