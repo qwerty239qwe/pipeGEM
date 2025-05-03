@@ -20,6 +20,59 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
                    raise_err: bool = True,
                    rxn_scaling_coefs: dict = None,
                    calc_efficacy: bool = True) -> FASTCOREAnalysis:
+    """Apply the FASTCORE algorithm to extract a flux-consistent subnetwork.
+
+    FASTCORE identifies a minimal set of reactions from a given metabolic model
+    that includes a defined set of core reactions (C) while ensuring flux
+    consistency. Non-penalty reactions (nonP) can be included without affecting
+    the objective function during the sparse mode search.
+
+    Parameters
+    ----------
+    C : list[str] or set[str]
+        Core reaction IDs that must be included and carry flux.
+    nonP : list[str] or set[str]
+        Non-penalty reaction IDs. Included if needed but not prioritized.
+    model : cobra.Model
+        Input genome-scale metabolic model.
+    epsilon : float
+        Tolerance threshold for flux consistency checks. Flux values below
+        this are considered zero. Adjusted per reaction if `rxn_scaling_coefs`
+        is provided.
+    return_model : bool
+        If True, return the extracted subnetwork as a cobra.Model object.
+    copy_model : bool, optional
+        If True (default), operate on a copy of the input model.
+        If False, modify the input model directly.
+    raise_err : bool, optional
+        If True (default), raise ValueError on inconsistency.
+        If False, warn and potentially remove problematic core reactions.
+    rxn_scaling_coefs : dict, optional
+        Mapping of reaction IDs to scaling coefficients to adjust `epsilon`
+        per reaction. Defaults to None.
+    calc_efficacy : bool, optional
+        If True (default), calculate efficacy metrics.
+
+    Returns
+    -------
+    FASTCOREAnalysis
+        An object containing the results:
+        - result_model (cobra.Model, optional): Extracted subnetwork (if `return_model` is True).
+        - kept_rxn_ids (np.ndarray): Reaction IDs included in the subnetwork.
+        - removed_rxn_ids (np.ndarray): Reaction IDs excluded from the subnetwork.
+        - algo_efficacy (dict, optional): Efficacy metrics (if `calc_efficacy` is True).
+        - log (dict): Algorithm parameters like epsilon.
+
+    Raises
+    ------
+    ValueError
+        If `raise_err` is True and an inconsistency prevents including all core reactions.
+
+    Notes
+    -----
+    Based on the algorithm described in: Vlassis, N., Pacheco, M. P., & Sauter, T. (2014).
+    Fast reconstruction of compact context-specific metabolic networks. PLoS computational biology, 10(1), e1003424.
+    """
     output_model = None
     if return_model:
         output_model = model.copy() if copy_model else model

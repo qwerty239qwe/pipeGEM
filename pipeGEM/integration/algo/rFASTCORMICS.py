@@ -21,29 +21,64 @@ def apply_rFASTCORMICS(model: cobra.Model,
                        threshold: float = 1e-6,
                        FASTCORE_raise_error: bool = False,
                        calc_efficacy: bool = True) -> rFASTCORMICSAnalysis:
-    """
-    Apply rFASTCORMICS algorithm on the given model.
+    """Apply the rFASTCORMICS algorithm to build a context-specific model.
+
+    Leverages expression data to define core/non-core reaction sets and uses
+    FASTCORE to extract a consistent subnetwork. Optionally includes model
+    consistency checking and handling of protected reactions and unpenalized
+    subsystems.
 
     Parameters
     ----------
-    model: cobra.Model
-        A cobra model
-    data
-    protected_rxns
-    predefined_threshold
-    threshold_kws
-    rxn_scaling_coefs
-    consistent_checking_method
-    unpenalized_subsystem
-    method
-    threshold
-    FASTCORE_raise_error
-    calc_efficacy
+    model : cobra.Model
+        Input genome-scale metabolic model.
+    data : object
+        Object with gene expression data (`data.gene_data`) and reaction
+        scores (`data.rxn_scores`).
+    protected_rxns : list[str], optional
+        Reaction IDs always included in the core set. Defaults to None.
+    predefined_threshold : dict or analysis_types, optional
+        Strategy or dictionary defining thresholds to classify reactions based
+        on scores (e.g., 'percentile_90'). See
+        `pipeGEM.integration.utils.parse_predefined_threshold`. Defaults to None.
+    threshold_kws : dict, optional
+        Additional keyword arguments for the thresholding function. Defaults to None.
+    rxn_scaling_coefs : dict, optional
+        Mapping of reaction IDs to scaling coefficients to adjust flux thresholds
+        in FASTCORE. Defaults to None.
+    consistent_checking_method : {'FASTCC', 'FVA'}, optional
+        Method to ensure initial model consistency ('FASTCC' or 'FVA').
+        Set to None to skip. Defaults to "FASTCC".
+    unpenalized_subsystem : str or list[str], optional
+        Subsystem name(s) (regex allowed) included in the non-penalty set (nonP)
+        during FASTCORE. Defaults to "Transport.*".
+    method : {'onestep', 'twostep'}, optional
+        rFASTCORMICS variant:
+        - 'onestep': Run FASTCORE once with core and non-penalty sets.
+        - 'twostep': Run FASTCORE on protected reactions, refine, run again on
+                     expanded core set. (May need validation).
+        Defaults to "onestep".
+    threshold : float, optional
+        Flux threshold below which flux is considered zero. Defaults to 1e-6.
+    FASTCORE_raise_error : bool, optional
+        If True, FASTCORE raises error on inconsistency. If False, warns.
+        Defaults to False.
+    calc_efficacy : bool, optional
+        If True, calculate efficacy metrics based on expression-defined sets.
+        Defaults to True.
 
     Returns
     -------
-    analysis_result: rFASTCORMICSAnalysis
+    rFASTCORMICSAnalysis
+        Object containing results: context-specific model (in nested FASTCORE result),
+        core/non-core sets, thresholding analysis, efficacy metrics.
 
+    Notes
+    -----
+    Based on the algorithm described in: Pacheco, M. P., Bintener, T., Ternes, D.,
+    Kulik, M., Sauter, T., Sinkkonen, L., & Heinäniemi, M. (2019). rFASTCORMICS:
+    A fast and effective reconstruction of context-specific metabolic models.
+    PLoS computational biology, 15(10), e1007416.
     """
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
     threshold_dic = parse_predefined_threshold(predefined_threshold,
