@@ -18,6 +18,76 @@ def apply_MBA(model,
               tolerance: float = 1e-8,
               epsilon: float = 0.33,
               random_state: int = 42):
+    """Apply the Model Building Algorithm (MBA) to generate a context-specific model.
+
+    MBA iteratively removes reactions with no confidence score ('no-confidence' set)
+    based on consistency checks, while preserving high-confidence reactions and
+    minimizing the removal of medium-confidence reactions.
+
+    Parameters
+    ----------
+    model : cobra.Model
+        The input genome-scale metabolic model.
+    data : object, optional
+        An object containing gene expression data (`data.gene_data`) and
+        reaction scores (`data.rxn_scores`). If provided, `medium_conf_rxn_ids`
+        and `high_conf_rxn_ids` are derived from this data using thresholds.
+        Defaults to None.
+    predefined_threshold : dict or analysis_types, optional
+        Strategy or dictionary defining thresholds (`exp_th`, `non_exp_th`) to
+        classify reactions based on scores when `data` is provided. See
+        `pipeGEM.integration.utils.parse_predefined_threshold`. Defaults to None.
+    threshold_kws : dict, optional
+        Additional keyword arguments for the thresholding function when `data`
+        is provided. Defaults to None.
+    protected_rxns : list[str], optional
+        A list of reaction IDs that should always be treated as high-confidence
+        and never removed. Defaults to None.
+    rxn_scaling_coefs : dict[str, float], optional
+        Dictionary mapping reaction IDs to scaling coefficients, used to adjust
+        consistency check tolerance. Defaults to None.
+    medium_conf_rxn_ids : list[str], optional
+        List of reaction IDs considered medium confidence. Used only if `data`
+        is None. Defaults to None.
+    high_conf_rxn_ids : list[str], optional
+        List of reaction IDs considered high confidence. Used only if `data`
+        is None. Defaults to None.
+    consistent_checking_method : str, optional
+        Method used for consistency checks (e.g., 'FASTCC'). Defaults to "FASTCC".
+    tolerance : float, optional
+        Tolerance used for consistency checks. Defaults to 1e-8.
+    epsilon : float, optional
+        Weighting factor used in the consistency check stopping criteria.
+        Represents the maximum allowed ratio of removed medium-confidence
+        reactions to removed no-confidence reactions during the removal check
+        of a no-confidence reaction. Defaults to 0.33.
+    random_state : int, optional
+        Seed for the random number generator used to shuffle the order of
+        no-confidence reactions being tested for removal. Defaults to 42.
+
+    Returns
+    -------
+    MBA_Analysis
+        An object containing the results:
+        - result_model (cobra.Model): The final context-specific model.
+        - removed_rxn_ids (np.ndarray): IDs of removed reactions.
+        - threshold_analysis (ThresholdAnalysis or None): Details of thresholding
+          used if `data` was provided.
+        - algo_efficacy (float): Efficacy score comparing the final model
+          against the initial high/no-confidence sets.
+
+    Raises
+    ------
+    AssertionError
+        If `data` is None and either `medium_conf_rxn_ids` or
+        `high_conf_rxn_ids` contain IDs not present in the model.
+
+    Notes
+    -----
+    Based on the algorithm described in: Jerby, L., Shlomi, T., & Ruppin, E. (2010).
+    Computational reconstruction of tissue-specific metabolic models: application
+    to human tissues. Molecular systems biology, 6(1), 401.
+    """
     rxn_ids = [r.id for r in model.reactions]
     if data is not None:
         print(f"Using data-inferred threshold. Ignoring medium_conf_rxn_ids and high_conf_rxn_ids.")
@@ -95,5 +165,3 @@ def apply_MBA(model,
                            algo_efficacy=eff_score))
 
     return result
-
-

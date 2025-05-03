@@ -433,6 +433,12 @@ def apply_CORDA(model,
     CORDA_Analysis
         Object containing results: context-specific model, confidence scores,
         removed reactions, efficacy metrics, and logs.
+
+    Note
+    -------
+    Original paper: Schultz, A., & Qutub, A. A. (2016).
+    Reconstruction of tissue-specific metabolic networks using CORDA.
+    PLoS computational biology, 12(3), e1004808.
     """
     mocks = []
     threshold_kws = threshold_kws or {}

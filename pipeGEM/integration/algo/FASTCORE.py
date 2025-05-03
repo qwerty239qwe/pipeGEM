@@ -71,7 +71,8 @@ def apply_FASTCORE(C: Union[List[str], Set[str]],
     Notes
     -----
     Based on the algorithm described in: Vlassis, N., Pacheco, M. P., & Sauter, T. (2014).
-    Fast reconstruction of compact context-specific metabolic networks. PLoS computational biology, 10(1), e1003424.
+    Fast reconstruction of compact context-specific metabolic network models.
+    PLoS computational biology, 10(1), e1003424.
     """
     output_model = None
     if return_model:

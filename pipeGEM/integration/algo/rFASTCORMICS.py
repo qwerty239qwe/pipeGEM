@@ -75,10 +75,9 @@ def apply_rFASTCORMICS(model: cobra.Model,
 
     Notes
     -----
-    Based on the algorithm described in: Pacheco, M. P., Bintener, T., Ternes, D.,
-    Kulik, M., Sauter, T., Sinkkonen, L., & Heinäniemi, M. (2019). rFASTCORMICS:
-    A fast and effective reconstruction of context-specific metabolic models.
-    PLoS computational biology, 15(10), e1007416.
+    Original paper: Pacheco, M. P., Bintener, T., Ternes, D., Kulms, D., Haan, S., Letellier, E., & Sauter, T. (2019).
+    Identifying and targeting cancer-specific metabolism with network-based drug target prediction.
+    EBioMedicine, 43, 98-106.
     """
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
     threshold_dic = parse_predefined_threshold(predefined_threshold,

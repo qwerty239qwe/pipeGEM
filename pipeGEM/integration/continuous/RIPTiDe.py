@@ -19,6 +19,66 @@ def apply_RIPTiDe_pruning(model,
                           rxn_scaling_coefs: Dict[str, float] = None,
                           **kwargs
                           ):
+    """Apply the pruning step of the RIPTiDe algorithm.
+
+    This step uses parsimonious Flux Balance Analysis (pFBA) with weights
+    derived from reaction expression scores (or RALs - Reaction Activity Levels)
+    to identify and remove low-flux reactions, creating a pruned,
+    context-specific model.
+
+    Parameters
+    ----------
+    model : cobra.Model
+        The input genome-scale metabolic model.
+    rxn_expr_score : dict[str, float]
+        Dictionary mapping reaction IDs to their expression scores (RALs).
+        NaN values are ignored. Scores outside [-max_inconsistency_score,
+        max_inconsistency_score] are capped.
+    max_gw : float, optional
+        Maximum possible reaction expression score (RAL). If None, it's
+        calculated as the maximum finite value in `rxn_expr_score`.
+        Defaults to None.
+    obj_frac : float, optional
+        Fraction of the optimal objective value to maintain when minimizing
+        fluxes during pFBA. Defaults to 0.8.
+    threshold : float, optional
+        Flux threshold below which reactions are considered inactive and
+        removed. Adjusted by `rxn_scaling_coefs` if provided. Defaults to 1e-6.
+    protected_rxns : list[str], optional
+        List of reaction IDs that should not be removed, even if their flux
+        is below the threshold. Defaults to None.
+    max_inconsistency_score : float, optional
+        Value to cap reaction scores at (positive and negative) to handle
+        extreme outliers. Defaults to 1e3.
+    rxn_scaling_coefs : dict[str, float], optional
+        Dictionary mapping reaction IDs to scaling coefficients. Used to adjust
+        pFBA weights and the removal `threshold`. Defaults to None (all coeffs 1).
+    **kwargs
+        Additional keyword arguments (currently unused).
+
+    Returns
+    -------
+    RIPTiDePruningAnalysis
+        An object containing the results:
+        - result_model (cobra.Model): The pruned context-specific model.
+        - removed_rxn_ids (list[str]): List of IDs of removed reactions.
+        - obj_dict (dict[str, float]): Dictionary of weights used in pFBA.
+
+    Raises
+    ------
+    ValueError
+        If `max_gw` is NaN after calculation or if derived pFBA objective
+        coefficients are outside the expected [0, 1] range (after scaling).
+
+    Notes
+    -----
+    RIPTiDe (Reaction Inclusion by Parsimony and Transcript Distribution) aims
+    to create context-specific models reflecting metabolic activity based on
+    transcriptomic data. This pruning step is the first part.
+    Original paper: Jenior, M. L., et al. (2021). Transcriptome-guided parsimonious flux
+    analysis improves predictions with metabolic networks in complex environments. 
+    PLoS computational biology, 16(4), e1007099.
+    """
     if protected_rxns is None:
         protected_rxns = []
     rxn_expr_score = {k: v if -max_inconsistency_score < v < max_inconsistency_score else max_inconsistency_score
@@ -71,6 +131,91 @@ def apply_RIPTiDe_sampling(model,
                            seed=None,
                            **kwargs
                            ):
+    """Apply the sampling step of the RIPTiDe algorithm or prepare for it.
+
+    This step uses reaction expression scores (RALs) to define an objective
+    function maximizing flux through high-expression reactions. It can optionally
+    perform flux sampling on the model constrained by this objective.
+
+    Parameters
+    ----------
+    model : cobra.Model
+        The input metabolic model, typically the result of RIPTiDe pruning.
+    rxn_expr_score : dict[str, float]
+        Dictionary mapping reaction IDs to their expression scores (RALs).
+        NaN values are ignored. Scores outside [-max_inconsistency_score,
+        max_inconsistency_score] are capped unless `discard_inf_score` is True.
+    max_gw : float, optional
+        Maximum possible reaction expression score (RAL). If None, it's
+        calculated as the maximum finite value in `rxn_expr_score`.
+        Defaults to None.
+    max_inconsistency_score : float, optional
+        Value to cap reaction scores at (positive and negative) if
+        `discard_inf_score` is False. Defaults to 1e3.
+    obj_frac : float, optional
+        Fraction of the optimal objective value (based on maximizing flux
+        through high-RAL reactions) to use as a constraint if `keep_context`
+        is True or during sampling setup. Defaults to 0.8.
+    sampling_obj_frac : float, optional
+        Fraction of the optimal objective value to maintain during flux
+        sampling (passed to the sampler). Defaults to 0.8.
+    do_sampling : bool, optional
+        If True, perform flux sampling after setting up the objective and
+        constraints. If False, only sets up the model context. Defaults to False.
+    solver : str, optional
+        Solver to use for optimization and sampling (e.g., 'gurobi', 'cplex').
+        Defaults to "gurobi".
+    sampling_method : str, optional
+        Flux sampling algorithm to use ('achr', 'optgp', 'gapsplit').
+        Defaults to "gapsplit".
+    protected_rxns : list[str], optional
+        List of reaction IDs to assign the maximum weight in the objective,
+        regardless of their RAL. Defaults to None.
+    protect_no_expr : bool, optional
+        If True, assign maximum weight to reactions not present in
+        `rxn_expr_score`. Defaults to False.
+    sampling_n : int, optional
+        Number of flux samples to generate if `do_sampling` is True.
+        Defaults to 500.
+    keep_context : bool, optional
+        If True, modify the input `model` by adding the RIPTiDe objective
+        and constraining it based on `obj_frac`. If False, modifications
+        happen within a context manager only during sampling. Defaults to False.
+    rxn_scaling_coefs : dict[str, float], optional
+        Dictionary mapping reaction IDs to scaling coefficients, used to adjust
+        objective weights. Defaults to None (all coeffs 1).
+    discard_inf_score : bool, optional
+        If True, treat infinite scores in `rxn_expr_score` as NaN (ignored).
+        If False, cap them using `max_inconsistency_score`. Defaults to True.
+    thinning : int, optional
+        Thinning factor for flux sampling (passed to sampler). Defaults to 1.
+    processes : int, optional
+        Number of parallel processes for flux sampling. Defaults to 1.
+    seed : int, optional
+        Random seed for flux sampling. Defaults to None.
+    **kwargs
+        Additional keyword arguments passed to the flux sampler.
+
+    Returns
+    -------
+    RIPTiDeSamplingAnalysis
+        An object containing the results:
+        - sampling_result (SamplingAnalysis or None): Results from flux sampling
+          if `do_sampling` was True, otherwise None.
+
+    Raises
+    ------
+    ValueError
+        If `max_gw` is less than the maximum score in `rxn_expr_score`.
+
+    Notes
+    -----
+    This function sets up the model for RIPTiDe-based flux analysis or sampling.
+    The objective function maximizes flux weighted by scaled RALs.
+    See: Jenior, M. L., et al. (2021). Transcriptome-guided parsimonious flux 
+    analysis improves predictions with metabolic networks in complex environments. 
+    PLoS computational biology, 16(4), e1007099.
+    """
     if discard_inf_score:
         rxn_expr_score = {k: v if np.isfinite(v) else np.nan for k, v in rxn_expr_score.items()}
 

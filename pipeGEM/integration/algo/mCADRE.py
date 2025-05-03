@@ -242,6 +242,94 @@ def apply_mCADRE(model,
                  required_met_ids=None,
                  default_func_test=False,
                  ) -> mCADRE_Analysis:
+    """Apply the mCADRE algorithm to generate a context-specific metabolic model.
+
+    mCADRE (metabolic Context-specificity Assessed by Deterministic Reaction Evaluation)
+    builds context-specific models by iteratively removing reactions based on expression
+    data, network connectivity, and optional evidence scores, while ensuring the model
+    can still perform essential metabolic functions (tasks).
+
+    Parameters
+    ----------
+    model : cobra.Model
+        The input genome-scale metabolic model.
+    data : object
+        An object containing gene expression data (`data.gene_data`) and
+        reaction scores (`data.rxn_scores`) derived from it.
+    protected_rxns : list[str]
+        A list of reaction IDs that should never be removed from the model.
+    predefined_threshold : dict or analysis_types, optional
+        Strategy or dictionary defining thresholds (`exp_th`, `non_exp_th`) to
+        classify reactions based on scores. See
+        `pipeGEM.integration.utils.parse_predefined_threshold`. Defaults to None.
+    threshold_kws : dict, optional
+        Additional keyword arguments for the thresholding function. Defaults to None.
+    rxn_scaling_coefs : dict[str, float], optional
+        Dictionary mapping reaction IDs to scaling coefficients, used to adjust
+        consistency check tolerance. Defaults to None.
+    exp_cutoff : float, optional
+        Expression score threshold (after mapping to [0, 1]) above which a
+        reaction is considered part of the initial 'core' set. Defaults to 0.9.
+    absent_value : float, optional
+        The raw score in `data.rxn_scores` that indicates a reaction is absent
+        (e.g., 0 for some expression data types). Defaults to 0.
+    absent_value_indicator : float, optional
+        The internal score assigned to absent reactions after mapping. Should be
+        less than 0. Defaults to -1e-6.
+    tol : float, optional
+        Tolerance used for consistency checks (e.g., FASTCC). Defaults to 1e-6.
+    eta : float, optional
+        Weighting factor used in the consistency check stopping criteria when
+        evaluating removal of medium-confidence reactions. Represents the
+        trade-off between removing non-core reactions and keeping core reactions.
+        Defaults to 0.333.
+    evidence_scores : dict[str, Union[int, float]] or pd.Series, optional
+        Additional evidence scores for reactions (e.g., from literature, proteomics).
+        Higher scores favor keeping the reaction. Defaults to None (all zero).
+    salvage_check_tasks : TaskContainer or str, optional
+        Metabolic tasks (e.g., salvage pathways) that the final model must be
+        able to perform. Can be a TaskContainer object or a path to a task file.
+        Defaults to None.
+    default_salv_test : bool, optional
+        If True, use predefined default salvage pathway tasks (Guanine -> GMP,
+        Hypoxanthine -> IMP). Defaults to False.
+    func_test_tasks : TaskContainer or str, optional
+        General metabolic function tasks that the final model must be able to
+        perform. Defaults to None.
+    required_met_ids : list[str], optional
+        List of metabolite IDs that the model must be able to produce (used if
+        `default_func_test` is True). Defaults to None.
+    default_func_test : bool, optional
+        If True and `required_met_ids` is provided, use predefined default
+        functional tasks (production of each required metabolite from glucose).
+        Defaults to False.
+
+    Returns
+    -------
+    mCADRE_Analysis
+        An object containing the results:
+        - result_model (cobra.Model): The final context-specific model.
+        - removed_rxn_ids (np.ndarray): IDs of removed reactions.
+        - core_rxn_ids (np.ndarray): IDs of reactions initially defined as core.
+        - non_expressed_rxn_ids (np.ndarray): IDs of reactions initially defined as non-expressed.
+        - score_df (pd.DataFrame): DataFrame with expression, connectivity, and evidence scores.
+        - salvage_test_result (TaskAnalysis or None): Results of salvage pathway tests.
+        - func_test_result (TaskAnalysis or None): Results of functional tests.
+        - threshold_analysis (ThresholdAnalysis): Details of thresholding used.
+        - algo_efficacy (float): Efficacy score (e.g., F1) comparing the final model
+          against the initial core/non-core sets.
+
+    Raises
+    ------
+    RuntimeError
+        If the initial model fails any of the provided functional or salvage tests.
+
+    Notes
+    -----
+    Based on the algorithm described in: Wang, Y., Eddy, J. A., & Price, N. D. (2012).
+    Reconstruction of genome-scale metabolic models for 126 human tissues using mCADRE.
+    BMC systems biology, 6, 1-16.
+    """
     threshold_dic = parse_predefined_threshold(predefined_threshold=predefined_threshold,
                                                gene_data=data.gene_data,
                                                **threshold_kws)
