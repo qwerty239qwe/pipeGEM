@@ -57,3 +57,26 @@ Flux Analysis
 
    Group.do_flux_analysis
    Group.do_ko_analysis
+
+
+Model comparison
+---------------
+
+.. autosummary::
+   .. toctree:: pipeGEM/
+
+   Group.compare
+
+
+Model comparison results
+---------------
+
+.. autosummary::
+   .. toctree:: pipeGEM/
+
+   analysis.ComponentNumberAnalysis
+   analysis.ComponentNumberAnalysis.plot
+   analysis.ComponentComparisonAnalysis
+   analysis.ComponentComparisonAnalysis.plot
+   analysis.PCA_Analysis
+   analysis.PCA_Analysis.plot

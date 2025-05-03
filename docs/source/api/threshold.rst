@@ -28,3 +28,16 @@ Thresholding operators
    analysis.rFASTCORMICSThreshold
    analysis.PercentileThreshold
    analysis.LocalThreshold
+
+Threshold analysis result
+-----------------------
+
+.. autosummary::
+   .. toctree:: pipeGEM/
+
+   analysis.LocalThresholdAnalysis
+   analysis.LocalThresholdAnalysis.plot
+   analysis.PercentileThresholdAnalysis
+   analysis.PercentileThresholdAnalysis.plot
+   analysis.rFASTCORMICSThresholdAnalysis
+   analysis.rFASTCORMICSThresholdAnalysis.plot
