@@ -22,41 +22,78 @@ def apply_EFlux(model: cobra.Model,
                 transform: Union[Callable, str] = exp_x,
                 rxn_scaling_coefs: Dict[str, float] = None,
                 predefined_threshold=None) -> EFluxAnalysis:
-    """
-    Applies the EFlux algorithm to a metabolic model, using gene expression data
-    to constrain reaction fluxes. The EFlux method scales gene expression values
-    to the range of reaction bounds, effectively enforcing that highly expressed
-    reactions have high fluxes, and vice versa. Returns an EFluxAnalysis object
-    with the calculated reaction bounds, gene expression scores, and fluxes.
+    """Apply the E-Flux algorithm to constrain model fluxes based on expression.
+
+    E-Flux uses reaction expression scores (e.g., derived from transcriptomics)
+    to set reaction bounds. Scores are typically transformed and then linearly
+    scaled to map the expression range [min_exp, max_exp] to the flux range
+    [min_lb, max_ub]. This enforces higher flux capacity for highly expressed
+    reactions. Parsimonious FBA (pFBA) is then run on the constrained model.
 
     Parameters
     ----------
     model : cobra.Model
-        A COBRApy metabolic model to be analyzed.
-    rxn_expr_score : dict
-        A dictionary of reaction IDs (str) to gene expression scores (float).
+        The input genome-scale metabolic model.
+    rxn_expr_score : dict[str, float]
+        Dictionary mapping reaction IDs to their expression scores. NaN values
+        are handled. Scores below `min_score` are capped.
     max_ub : float, optional
-        The maximum upper bound value to apply to the most highly expressed reaction
-        (default 1000).
+        The maximum flux bound assigned to the reaction(s) with the highest
+        (transformed) expression score. Defaults to 1000.
     min_lb : float, optional
-        The minimum lower bound value to apply to the least expressed reaction
-        (default 1e-6).
+        The minimum flux bound assigned to the reaction(s) with the lowest
+        (transformed) expression score. Defaults to 1e-6.
     min_score : float, optional
-        The minimum gene expression score to consider (default -1e3).
-    protected_rxns : str, list of str, or None, optional
-        A single reaction ID, list of reaction IDs, or None. Any reactions in this
-        list will be excluded from the analysis (default None).
+        Minimum expression score to consider; scores below this are capped at
+        this value before transformation and scaling. Defaults to -1e3.
+    protected_rxns : str or list[str] or None, optional
+        Reaction ID(s) to exclude from bound constraints. Defaults to None.
+    flux_threshold : float, optional
+        Flux threshold used when `remove_zero_fluxes` is True. Reactions with
+        absolute pFBA flux below this are removed. Defaults to 1e-6.
+    remove_zero_fluxes : bool, optional
+        If True, remove reactions with pFBA flux below `flux_threshold` from
+        the final model. Defaults to False.
     return_fluxes : bool, optional
-        Whether to return the resulting fluxes as a pandas DataFrame (default True).
-    transform : callable, optional
-        A user-specified transformation function to apply to gene expression scores
-        before scaling. Must take a single float argument and return a float.
+        If True, include the pFBA flux distribution in the result object.
+        Defaults to True.
+    transform : callable or str, optional
+        Function or name of a function (from `pipeGEM.utils.transform.functions`
+        or `numpy`) to apply to expression scores before scaling (e.g., `exp_x`).
+        Defaults to `exp_x`.
+    rxn_scaling_coefs : dict[str, float], optional
+        Dictionary mapping reaction IDs to scaling coefficients. Applied *after*
+        scaling expression to bounds (divides the calculated bound).
+        Defaults to None (all coeffs 1).
+    predefined_threshold : any, optional
+        This parameter is currently ignored by E-Flux. Defaults to None.
 
     Returns
     -------
     EFluxAnalysis
-        An EFluxAnalysis object containing the calculated reaction bounds, gene
-        expression scores, and optionally, the resulting fluxes.
+        An object containing the results:
+        - rxn_bounds (dict): Dictionary of the final bounds applied to each reaction.
+        - rxn_scores (dict): The input reaction expression scores.
+        - flux_result (pd.DataFrame or None): pFBA flux distribution if `return_fluxes` is True.
+        - result_model (cobra.Model): The model with E-Flux bounds applied (and
+          potentially pruned if `remove_zero_fluxes` is True).
+
+    Raises
+    ------
+    AssertionError
+        If `max_ub` <= 0, `min_lb` < 0, `max_ub` <= `min_lb`, or `max_exp` <= 0.
+    ValueError
+        If the denominator used for scaling becomes non-finite (e.g., due to
+        `transform` function behavior or `max_exp` == `min_exp`).
+
+    Notes
+    -----
+    Based on the method described in: Colijn, C., Brandes, A., Zucker, J., Lun, D. S.,
+    Wienecke, A., Romaszko, J., ... & Ekins, S. (2009). Interpreting expression data
+    with metabolic flux models: predicting Mycobacterium tuberculosis mycolic acid
+    production. PLoS computational biology, 5(8), e1000489. (Though the implementation
+    details like transformation and scaling might differ).
+    Exchange reactions are typically excluded from bound setting.
     """
     assert max_ub > 0, "max_ub should be a positive number"
     assert min_lb >= 0, "min_lb should be zero or a positive number"

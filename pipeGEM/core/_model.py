@@ -254,7 +254,7 @@ class Model(GEMComposite):
                       data_kwargs: dict = None,
                       **kwargs) -> None:
         """
-        Add gene data to the internal dictionary of gene data in MyClass.
+        Add gene data to the internal dictionary of gene data.
 
         Parameters
         ----------
@@ -503,7 +503,7 @@ class Model(GEMComposite):
                           tol: float = 1e-6,
                           **kwargs):
         """
-        Check the metabolic consistency of the model.
+        Check the flux consistency of the model.
 
         Parameters
         ----------

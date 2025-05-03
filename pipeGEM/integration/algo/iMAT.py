@@ -104,6 +104,60 @@ def apply_iMAT(model,
                eps = 1e-6,
                tol = 1e-6,
                use_gurobi=False) -> iMAT_Analysis:
+    """Apply the iMAT algorithm to generate a context-specific metabolic model.
+
+    iMAT (integrative Metabolic Analysis Tool) uses gene expression data to
+    classify reactions into high-confidence (core) and low-confidence (non-core)
+    sets. It then solves a mixed-integer linear programming (MILP) problem to
+    find a flux distribution that maximizes activity through core reactions while
+    minimizing activity through non-core reactions. Reactions with near-zero
+    flux in the optimal solution are removed.
+
+    Parameters
+    ----------
+    model : cobra.Model
+        The input genome-scale metabolic model.
+    data : object
+        An object containing gene expression data (`data.gene_data`) and
+        reaction scores (`data.rxn_scores`) derived from it.
+    predefined_threshold : dict or analysis_types
+        Strategy or dictionary defining thresholds (`exp_th`, `non_exp_th`) to
+        classify reactions based on scores. See
+        `pipeGEM.integration.utils.parse_predefined_threshold`.
+    threshold_kws : dict
+        Additional keyword arguments for the thresholding function.
+    protected_rxns : list[str], optional
+        A list of reaction IDs that should always be treated as high-confidence
+        (core) and potentially weighted higher in the objective. Defaults to None.
+    rxn_scaling_coefs : dict[str, float], optional
+        Dictionary mapping reaction IDs to scaling coefficients. Currently unused
+        in the main logic but potentially used for tolerance adjustment.
+        Defaults to None.
+    eps : float, optional
+        Small flux value used in constraints to enforce activity through core
+        reactions selected by the MILP. Defaults to 1e-6.
+    tol : float, optional
+        Flux tolerance threshold. Reactions with absolute flux below this value
+        in the MILP solution are removed from the final model. Defaults to 1e-6.
+    use_gurobi : bool, optional
+        If True, use Gurobi-specific indicator constraints for potentially better
+        performance. Requires Gurobi solver. Defaults to False.
+
+    Returns
+    -------
+    iMAT_Analysis
+        An object containing the results:
+        - result_model (cobra.Model): The final context-specific model.
+        - removed_rxn_ids (np.ndarray): IDs of removed reactions.
+        - threshold_analysis (ThresholdAnalysis): Details of thresholding used.
+
+    Notes
+    -----
+    Based on the algorithm described in: Shlomi, T., Cabili, M. N., Herrgård, M. J.,
+    Palsson, B. Ø., & Ruppin, E. (2008). Network-based prediction of human
+    tissue-specific metabolism. Nature biotechnology, 26(9), 1003-1010.
+    The implementation uses binary indicator variables to control reaction activity.
+    """
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
     threshold_dic = parse_predefined_threshold(predefined_threshold,
                                                gene_data=gene_data,

@@ -32,24 +32,66 @@ def apply_INIT(model,
                tol=1e-6,
                weight_method: Literal["default", "threshold"] = "threshold",
                rxn_scaling_coefs: dict = None,) -> INIT_Analysis:
-    """
+    """Apply the INIT algorithm to generate a context-specific metabolic model.
+
+    INIT (Integrative Network Inference for Tissues) uses expression data to
+    assign weights to reactions. It then solves a mixed-integer linear
+    programming (MILP) problem, similar to iMAT, to find a flux distribution
+    that maximizes the sum of weights for active reactions. Reactions with
+    near-zero flux in the optimal solution are removed.
 
     Parameters
     ----------
-    model
-    data
-    predefined_threshold
-    threshold_kws
-    protected_rxns
-    eps
-    tol
-    weight_method
-    rxn_scaling_coefs
-
+    model : cobra.Model
+        The input genome-scale metabolic model.
+    data : object
+        An object containing gene expression data (`data.gene_data`) and
+        reaction scores (`data.rxn_scores`) derived from it.
+    predefined_threshold : dict or analysis_types
+        Strategy or dictionary defining thresholds (`exp_th`, `non_exp_th`) used
+        for weight calculation if `weight_method` is 'threshold'. See
+        `pipeGEM.integration.utils.parse_predefined_threshold`.
+    threshold_kws : dict
+        Additional keyword arguments for the thresholding function if
+        `weight_method` is 'threshold'.
+    protected_rxns : list[str], optional
+        A list of reaction IDs that should always be treated as core reactions
+        and potentially assigned a high weight. Defaults to None.
+    eps : float, optional
+        Small flux value used in constraints to enforce activity through core
+        reactions selected by the MILP (inherited from iMAT constraints).
+        Defaults to 1e-6.
+    tol : float, optional
+        Flux tolerance threshold. Reactions with absolute flux below this value
+        in the MILP solution are removed from the final model. Defaults to 1e-6.
+    weight_method : {'default', 'threshold'}, optional
+        Method to calculate reaction weights from scores:
+        - 'default': Uses 5 * log(score).
+        - 'threshold': Uses linear interpolation based on `exp_th` and `non_exp_th`.
+        Defaults to "threshold".
+    rxn_scaling_coefs : dict[str, float], optional
+        Dictionary mapping reaction IDs to scaling coefficients. Currently unused
+        in the main logic but potentially used for tolerance adjustment.
+        Defaults to None.
 
     Returns
     -------
+    INIT_Analysis
+        An object containing the results:
+        - result_model (cobra.Model): The final context-specific model.
+        - removed_rxn_ids (np.ndarray): IDs of removed reactions.
+        - threshold_analysis (ThresholdAnalysis or None): Details of thresholding
+          used if `weight_method` was 'threshold'.
+        - weight_dic (dict): Dictionary of calculated weights used in the objective.
+        - fluxes (pd.DataFrame): DataFrame of absolute fluxes from the MILP solution.
 
+    Notes
+    -----
+    Based on the algorithm described in: Agren, R., Bordel, S., Mardinoglu, A.,
+    Pornputtapong, N., Nookaew, I., & Nielsen, J. (2012). Reconstruction of
+    genome-scale active metabolic networks for 69 human cell types and 16 cancer
+    types using INIT. PLoS computational biology, 8(5), e1002518.
+    The implementation leverages the MILP formulation structure from iMAT.
     """
     gene_data, rxn_scores = data.gene_data, data.rxn_scores
     if weight_method == "threshold":

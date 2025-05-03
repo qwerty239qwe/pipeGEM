@@ -23,22 +23,73 @@ def apply_GIMME(model: cobra.Model,
                 rxn_scaling_coefs: dict = None,
                 predefined_threshold=None
                 ):
-    """
-    GIMME implementation
+    """Apply the GIMME algorithm to generate a context-specific metabolic model.
+
+    GIMME (Gene Inactivity Moderated by Metabolism and Expression) assumes that
+    cellular metabolism aims to achieve a required metabolic functionality
+    (defined by the model's objective function) with minimal deviation from a
+    reference expression state. It minimizes the flux through reactions with
+    expression below a threshold, subject to maintaining a certain level of
+    the original objective function.
 
     Parameters
     ----------
-    model: cobra.Model
-        A model with objective function
-    rxn_expr_score: Dict[str, float]
-        A dict with rxn_ids as keys and expression values as values
-    high_exp: float
-        Expression value higher than this value is defined as high expression
-    obj_frac: float
+    model : cobra.Model
+        The input genome-scale metabolic model with a defined objective function
+        representing the required metabolic functionality.
+    rxn_expr_score : dict[str, float]
+        Dictionary mapping reaction IDs to their expression scores. NaN values
+        are ignored.
+    high_exp : float
+        Expression score threshold. Reactions with scores below this threshold
+        are penalized in the GIMME objective function.
+    protected_rxns : list[str], optional
+        List of reaction IDs that should not be penalized, even if their
+        expression is below `high_exp`. Defaults to None.
+    obj_frac : float, optional
+        Fraction of the original model's optimal objective value that must be
+        maintained by the GIMME solution. Defaults to 0.8.
+    remove_zero_fluxes : bool, optional
+        If True, create a `result_model` by removing reactions with flux below
+        `flux_threshold` in the GIMME solution. Defaults to False.
+    flux_threshold : float, optional
+        Flux threshold used when `remove_zero_fluxes` is True. Defaults to 1e-6.
+    max_inconsistency_score : float, optional
+        Value to cap the penalty applied to low-expression reactions to handle
+        potential numerical issues with very low scores. Defaults to 1e3.
+    return_fluxes : bool, optional
+        If True, include the GIMME flux distribution in the result object.
+        Defaults to True.
+    keep_context : bool, optional
+        If True, modify the input `model` by adding the GIMME objective and
+        constraining the original objective. If False (default), modifications
+        happen within a context manager.
+    rxn_scaling_coefs : dict[str, float], optional
+        Dictionary mapping reaction IDs to scaling coefficients, used to adjust
+        objective weights and the removal `flux_threshold`. Defaults to None
+        (all coeffs 1).
+    predefined_threshold : any, optional
+        This parameter is currently ignored by GIMME. Defaults to None.
 
     Returns
     -------
-    result: GIMMEAnalysis
+    GIMMEAnalysis
+        An object containing the results:
+        - rxn_coefficients (dict): Dictionary of objective coefficients (penalties)
+          applied to low-expression reactions.
+        - rxn_scores (dict): The input reaction expression scores.
+        - flux_result (pd.DataFrame or None): GIMME flux distribution if
+          `return_fluxes` is True.
+        - result_model (cobra.Model or None): Pruned model if `remove_zero_fluxes`
+          is True, otherwise None.
+
+    Notes
+    -----
+    Based on the algorithm described in: Becker, S. A., & Palsson, B. Ø. (2008).
+    Context-specific metabolic networks are consistent with experiments.
+    PLoS computational biology, 4(5), e1000082.
+    The objective function minimizes the sum of fluxes weighted by (high_exp - score)
+    for reactions with score < high_exp.
     """
     protected_rxns = [] if protected_rxns is None else protected_rxns
     ori_obj = [r.id for r in model.reactions if r.objective_coefficient != 0]

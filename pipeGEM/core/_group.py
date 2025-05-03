@@ -828,6 +828,61 @@ class Group(GEMComposite):
                 method: Literal["jaccard", "PCA", "num"] = "jaccard",
                 **kwargs
                 ):
+        """Compare models within the group based on their components.
+
+        This method provides different ways to compare the models contained
+        within this group, or subsets/aggregations thereof. Comparisons can be
+        based on component overlap (Jaccard index), component counts, or
+        dimensionality reduction (PCA) of component presence/absence.
+
+        Parameters
+        ----------
+        models : str or list[str] or np.ndarray, optional
+            Specifies which models from the group to include in the comparison.
+            Can be a single model name tag, a list/array of name tags, or None
+            to include all models in the current group. Defaults to None.
+        group_by : str, optional
+            An annotation key present in the group's `annotation` DataFrame.
+            If provided, models are first aggregated into subgroups based on the
+            unique values of this annotation before comparison. The comparison
+            (e.g., Jaccard index, PCA) is then performed between these aggregated
+            subgroups. If None, comparison happens between individual models
+            specified by the `models` parameter (or all models if `models` is None).
+            Defaults to "group_name" (which might exist if groups were nested).
+        method : {'jaccard', 'PCA', 'num'}, optional
+            The comparison method to use:
+            - 'jaccard': Calculate pairwise Jaccard similarity based on shared
+              components (genes, reactions, metabolites). See `_compare_components_jaccard`.
+            - 'PCA': Perform Principal Component Analysis on a matrix where rows
+              are models/groups and columns are components (presence/absence).
+              See `_compare_component_PCA`.
+            - 'num': Compare the number of components (genes, reactions, metabolites)
+              across models/groups. See `_compare_component_num`.
+            Defaults to "jaccard".
+        **kwargs
+            Additional keyword arguments passed to the specific comparison method
+            (e.g., `components` for 'jaccard' and 'num', `n_components` for 'PCA').
+
+        Returns
+        -------
+        Union[ComponentComparisonAnalysis, ComponentNumberAnalysis, PCA_Analysis]
+            An analysis result object corresponding to the chosen `method`.
+
+        Raises
+        ------
+        ValueError
+            If an invalid `method` is specified.
+        KeyError
+            If `group_by` refers to an annotation key not present, or if `models`
+            contains names not in the group.
+
+        See Also
+        --------
+        _compare_components_jaccard : Calculates Jaccard similarity.
+        _compare_component_num : Compares component counts.
+        _compare_component_PCA : Performs PCA on component presence.
+        aggregate_models : Aggregates models based on annotations.
+        """
         if method not in ["jaccard", "PCA", "num"]:
             raise ValueError("Method should be 'jaccard', 'PCA', or 'num'")
 
