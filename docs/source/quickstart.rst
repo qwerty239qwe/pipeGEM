@@ -77,14 +77,18 @@ Python API Usage
     from pipeGEM.utils import load_model
 
     model = load_model("your_model_path")  # cobra.Model
-    pmodel = pg.Model(model)
+    pmodel = pg.Model(name_tag="model_name",
+                      model=model)
 
     # Print out model information
     print(pmodel)
 
     # Do and plot pFBA result
     flux_analysis = pmodel.do_flux_analysis("pFBA")
-    flux_analysis.plot()
+    flux_analysis.plot(
+        rxn_ids=['rxn_a', 'rxn_b'],
+        file_name='pfba_flux.png'  # can be None if you don't want to save the figure
+        )
 
 
 **Multiple Models**
@@ -94,13 +98,32 @@ Python API Usage
     import pipeGEM as pg
     from pipeGEM.utils import load_model
 
-    model_1 = load_model("your_model_path_1")
-    model_2 = load_model("your_model_path_2")
-    group = pg.Group({"model1": model_1, "model2": model_2})
+    model_a1 = load_model("your_model_path_1")
+    model_a2 = load_model("your_model_path_2")
+
+    model_b1 = load_model("your_model_path_3")
+    model_b2 = load_model("your_model_path_4")
+
+    group = pg.Group({
+            "group_a": {
+                "model_a_dmso": model_a1,
+                "model_a_metformin": model_a2
+            },
+            "group_b": {
+                "model_b_dmso": model_b1,
+                "model_b_metformin": model_b2
+            }
+        },
+        name_tag="my_group",
+        treatments={"model_a_dmso": "DMSO",
+                    "model_b_dmso": "DMSO",
+                    "model_a_metformin": "metformin",
+                    "model_b_metformin": "metformin"}
+    )
 
     # Do and plot pFBA result
     flux_analysis = group.do_flux_analysis("pFBA")
-    flux_analysis.plot()
+    flux_analysis.plot(rxn_ids=['rxn_a', 'rxn_b'])
 
 
 **Generate Context-Specific Models**
@@ -129,5 +152,5 @@ Python API Usage
                       absent_value=-np.inf)
 
     # apply GIMME algorithm on the model
-    gimme_result = mod.integrate_gene_data(data_name="sample_0", integrator="GIMME")
+    gimme_result = mod.integrate_gene_data(data_name="sample_0", integrator="GIMME", high_exp=5*np.log10(2))
     context_specific_gem = gimme_result.result_model
