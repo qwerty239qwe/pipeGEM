@@ -1,4 +1,4 @@
-# PipeGEM v0.1.0
+# PipeGEM v0.1.1
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/pipeGEM.svg)](https://pypi.python.org/pypi/pipeGEM/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![ci](https://github.com/qwerty239qwe/pipeGEM/actions/workflows/ci.yml/badge.svg)
