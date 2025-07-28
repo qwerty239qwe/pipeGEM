@@ -35,6 +35,9 @@ def generate_template_configs(dest_folder, pl_name):
             for dfn in (template_folder / fn).iterdir():
                 conf = parse_toml_file(dfn)
                 save_toml_file((saved_conf_dir / fn / dfn.stem).with_suffix(".toml"), conf)
+        else:
+            raise FileNotFoundError(f"{template_folder / fn} is missing, "
+                                    f"please make sure the package is correctly installed.")
 
 
 def read_configs(config_path_dict):

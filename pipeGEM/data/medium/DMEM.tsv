@@ -1,0 +1,61 @@
+	mmol/L	BiGG	human_1
+Biotin	1.43e-05	btn	MAM01401
+Calcium Chloride (CaCl2) (anhyd.)	1.050639755	ca2	MAM01413
+Choline chloride	0.064317433	chol	MAM01513
+Cupric sulfate (CuSO4.5H2O)	5.21e-06	so4	MAM02946
+D-Calcium pantothenate	0.004700944	pnto_R	MAM02680
+D-Glucose (Dextrose)	17.49000888	glc_D	MAM01965
+Ferric Nitrate (Fe(NO3)3.9H2O)	0.000123762	fe3	MAM01822
+Ferrous Sulfate (FeSO4.7H2O)	0.001499892	fe2	MAM01821
+Ferrous Sulfate (FeSO4.7H2O)	0.001499892	so4	MAM02946
+Folic Acid	0.006003625	fol	MAM01830
+Glycine	0.249766884	gly	MAM01986
+Hypoxanthine Na	0.015117971	hxan	MAM02159
+i-Inositol	0.069937833	inost	MAM02171
+L-Alanine	0.049949489	ala_L	MAM01307
+L-Arginine hydrochloride	0.700180386	arg_L	MAM01365
+L-Asparagine-H2O	0.04962615	asp_L	MAM01370
+L-Aspartic acid	0.049962434	asp_L	MAM01370
+L-Cystine 2HCl	0.099904215	Lcystin	MAM01629
+L-Cysteine hydrochloride-H2O	0.099982919	cys_L	MAM01628
+L-Glutamic Acid	0.049955821	glu_L	MAM01974
+L-Glutamine	2.497605036	gln_L	MAM01975
+L-Histidine hydrochloride-H2O	0.150169346	his_L	MAM02125
+L-hydroxyproline	0.0		MAM03037
+L-Isoleucine	0.415262636	ile_L	MAM02184
+L-Leucine	0.450179157	leu_L	MAM02360
+L-Lysine hydrochloride	0.499589379	lys_L	MAM02426
+L-Methionine	0.115541854	met_L	MAM02471
+L-Phenylalanine	0.214782977	phe_L	MAM02724
+L-Proline	0.149830626	pro_L	MAM02770
+L-Serine	0.249785898	ser_L	MAM02896
+L-Threonine	0.448707186	thr_L	MAM02993
+L-Tryptophan	0.044168054	trp_L	MAM03089
+L-Tyrosine disodium salt dihydrate	0.213607474	tyr_L	MAM03101
+L-Valine	0.451131029	val_L	MAM03135
+Linoleic Acid (18:2)	0.000149786	lnlc	MAM02387
+Lipoic Acid	0.000508968	lipoate	MAM02394
+Magnesium Chloride (anhyd.)	0.300808739	cl	MAM01442
+Magnesium Sulfate (MgSO4) (anhyd.)	0.405748941	so4	MAM02946
+Niacinamide	0.016541107	ncam	MAM02583
+Potassium Chloride (KCl)	4.182427901	k	MAM02200
+Putrescine 2HCl	0.000502887	ptrc	MAM02812
+Pyridoxine hydrochloride	0.009725734	pydxn	MAM02817
+Riboflavin	0.000581828	ribflv	MAM02842
+Sodium Bicarbonate (NaHCO3)	14.28452391	hco3	MAM02046
+Sodium Chloride (NaCl)	119.7039699	na1	MAM02519
+Sodium Phosphate dibasic (Na2HPO4) (anhyd.)	0.500285294	pi	MAM02751
+Sodium Phosphate monobasic (NaH2PO4.H2O)	0.520933179	pi	MAM02751
+Sodium Pyruvate	0.499818248	pyr	MAM02819
+Thiamine hydrochloride	0.006433442	thm	MAM02982
+Thymidine	0.001506832	thymd	MAM02996
+Vitamin B	0.089063	-	MAM01361
+Zinc sulfate (ZnSO4.7H2O)	0.00267658	zn2	MAM03157
+PE-LD	0.1		MAM02685
+TAG-VLDL	0.1		MAM02959
+alpha-tocotrienol	0.1		MAM01330
+gamma-tocopherol	0.1		MAM01935
+gamma-tocotrienol	0.1		MAM01938
+O2	10	o2	MAM02630
+retinol	0.1		MAM02834
+ascorbate	0.1		MAM01368

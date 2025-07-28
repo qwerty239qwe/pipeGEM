@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pipeGEM"
-version = "0.1.0"
+version = "0.1.1"
 description = "Processing and integrating data with genome-scale metabolic models (GEM)"
 readme = "README.md"
 authors = [{ name = "Yu-Te Lin", email = "qwerty239qwe@gmail.com" }]
@@ -70,4 +70,12 @@ dlkcat = [
 Homepage = "https://github.com/qwerty239qwe/pipeGEM"
 
 [project.scripts]
-pipegem = "pipeGEM.cli:main"
+pipeGEM = "pipeGEM.cli.cli:main"
+
+[tool.setuptools.package-data]
+"analysis.tasks" = ["task_files/*.json"]
+"data" = ["enzyme_data/*", "medium/*"]
+"cli" = ["configs/*.toml"]
+
+[tool.setuptools]
+include-package-data = true

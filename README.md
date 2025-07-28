@@ -109,9 +109,9 @@ PipeGEM also provides a command-line interface for running predefined pipelines 
     Start by generating template TOML configuration files for a specific pipeline (e.g., `integration`). Replace `integration` with the desired pipeline name if needed.
 
     ```bash
-    python -m pipeGEM -n template -p integration -o ./configs
+    python -m pipeGEM.cli -n template -p integration -o ./
     ```
-    This will create a `configs` directory (if it doesn't exist) containing template `.toml` files like `gene_data_conf.toml`, `model_conf.toml`, etc.
+    This will create a `configs` directory in the current folder (if it doesn't exist) containing template `.toml` files like `gene_data_conf.toml`, `model_conf.toml`, etc.
 
 2.  **Modify Configurations (Optional):**
     Edit the generated `.toml` files in the `configs` directory to specify your input file paths, parameters, and desired settings. For example, in `model_conf.toml`, you might specify the path to your metabolic model file.
@@ -120,13 +120,13 @@ PipeGEM also provides a command-line interface for running predefined pipelines 
     Execute a pipeline using the configuration files. For example, to run the model processing pipeline using the configuration in `configs/model_conf.toml`:
 
     ```bash
-    python -m pipeGEM -n model_processing -t configs/model_conf.toml
+    python -m pipeGEM.cli -n model_processing -t configs/model_conf.toml
     ```
 
     Or, to run the full integration pipeline:
 
     ```bash
-    python -m pipeGEM -n integration \
+    python -m pipeGEM.cli -n integration \
         -g configs/gene_data_conf.toml \
         -t configs/model_conf.toml \
         -r configs/threshold_conf.toml \

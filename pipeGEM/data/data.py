@@ -826,7 +826,7 @@ class MediumData(BaseData):
         Exception
             Propagates exceptions from `pandas.read_csv` or `MediumData.__init__`.
         """
-        medium_file_dir = Path(__file__).parent.parent.parent / "medium"
+        medium_file_dir = Path(__file__).parent / "medium"
         potential_tsv_path = (medium_file_dir / file_name).with_suffix(".tsv")
         potential_csv_path = (medium_file_dir / file_name).with_suffix(".csv") # Also check for .csv in default dir
         direct_path = Path(file_name) # Treat file_name as a potential direct path
