@@ -2,6 +2,8 @@
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/pipeGEM.svg)](https://pypi.python.org/pypi/pipeGEM/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![ci](https://github.com/qwerty239qwe/pipeGEM/actions/workflows/ci.yml/badge.svg)
+[![codecov](https://codecov.io/gh/qwerty239qwe/pipeGEM/graph/badge.svg?token=1BJAWO79OL)](https://codecov.io/gh/qwerty239qwe/pipeGEM)
+
 ___
 This is a package for visualizing and analyzing multiple metabolic models. 
 It also allow users to integrate omic data, metabolic tasks, and medium data with GEMs. 
