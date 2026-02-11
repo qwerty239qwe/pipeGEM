@@ -7,6 +7,10 @@ import cobra
 import pandas as pd
 from biodbs.BioMart import Dataset
 
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
+
 
 CORDA_THRESHOLDS = {"discrete": {"HC": (np.inf, 3), "MC": (2, 1), "NC": (-1, -np.inf)},
                     "continuous": {"HC": (np.inf, 2.5), "MC": (2.5, 1), "NC": (-0.5, -np.inf)}}
@@ -93,21 +97,21 @@ def unify_score_column(data_df: pd.DataFrame,
             level_cols.append(level)
             score_series += (data_df[level] * val)
             total_series += data_df[level]
-    print(level_cols)
+    logger.debug("level_cols: %s", level_cols)
     if len(level_cols) != 0:
-        print("Using thresholds for continuous data")
+        logger.info("Using thresholds for continuous data")
         used_rxn_thres = CORDA_THRESHOLDS["continuous"]
         score_series /= total_series
         data_df = data_df.drop(level_cols)
         data_df["score"] = score_series
     elif "Level" in data_df.columns:
-        print("Using thresholds for discrete data")
+        logger.info("Using thresholds for discrete data")
         used_rxn_thres = CORDA_THRESHOLDS["discrete"]
         data_df["Level"] = data_df["Level"].apply(lambda x: level_dic[x] if x in level_dic else 0)
         data_df.rename(columns={"Level": "score"}, inplace=True)
     else:
         # TODO: use fastcormic thresholding
-        print("Using Fastcormic thresholds")
+        logger.info("Using Fastcormic thresholds")
         used_rxn_thres = None
         for score_col in HPA_SCORE_COLS:
             if score_col in data_df.columns:

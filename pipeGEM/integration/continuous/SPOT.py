@@ -50,7 +50,7 @@ def apply_SPOT(model: cobra.Model,
 
         # add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=0)
         sol = model.optimize("maximize")
-        print(sol.objective_value)
+        logger.info("SPOT objective value: %s", sol.objective_value)
 
     flux_df = sol.to_frame()
     new_model = None

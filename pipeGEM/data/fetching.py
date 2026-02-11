@@ -18,6 +18,9 @@ from zeep import Client
 from biodbs.HPA import HPAdb
 
 from pipeGEM.utils import load_model
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 _ORGANISM_DICT = {"human": "Homo sapiens", "mouse": "Mus musculus"}
@@ -50,11 +53,11 @@ def fetch_HPA_data(data_name: str,
 
     data_path.mkdir(parents=True, exist_ok=True)
     if not (data_path / Path(data_name)).with_suffix(".tsv").exists():
-        print("fetching data...")
+        logger.info("Fetching data...")
         hpa = HPAdb()
         hpa.download_HPA_data(options=[data_name], saved_path=data_path)
     else:
-        print("The dataframe is already exist.")
+        logger.info("The dataframe already exists.")
     return {"data_path": (data_path / Path(data_name)).with_suffix(".tsv")}
 
 
@@ -158,7 +161,7 @@ def fetch_brenda_data(account, pwd, organism, field):
         except TransportError:
             warnings.warn(f"cannot get the information of {ec}")
         if i % 100 == 0:
-            print(f"{i} / {len(field_ec_list)}")
+            logger.info("%d / %d", i, len(field_ec_list))
     return results
 
 
@@ -239,13 +242,13 @@ class DataBaseFetcher:
             return self.manipulate_df(data)
             # Code here will only run if the request is successful
         except requests.exceptions.HTTPError as errh:
-            print(errh)
+            logger.error("HTTP error: %s", errh)
         except requests.exceptions.ConnectionError as errc:
-            print(errc)
+            logger.error("Connection error: %s", errc)
         except requests.exceptions.Timeout as errt:
-            print(errt)
+            logger.error("Timeout error: %s", errt)
         except requests.exceptions.RequestException as err:
-            print(err)
+            logger.error("Request error: %s", err)
 
 
 class BiggDataBaseFetcher(DataBaseFetcher):
@@ -306,13 +309,13 @@ def list_models(databases=["metabolic atlas", "BiGG"],
     for database in databases:
         df = fetchers.init_fetcher(database).fetch_data()
         if df is None:
-            print("Cannot fetch", database)
+            logger.warning("Cannot fetch %s", database)
             continue
 
         df["database"] = database
         all_dfs.append(df)
     if len(all_dfs) == 0:
-        print("No data fetched, returning an empty dataframe")
+        logger.warning("No data fetched, returning an empty dataframe.")
         return pd.DataFrame()
 
     mg_df = pd.concat(all_dfs, axis=0)
@@ -372,7 +375,7 @@ def download_atlas_model(model_id="Human-GEM", format="mat", branch="main", down
         if download_dest == "default" else download_dest
     download_dest.mkdir(parents=True, exist_ok=True)
     if (download_dest / f"{model_id}.{format}").is_file():
-        print(f"Model {model_id} is already downloaded")
+        logger.info("Model %s is already downloaded.", model_id)
         return download_dest / f"{model_id}.{format}"
 
     url = f"https://github.com/SysBioChalmers/{model_id}/raw/{branch}/model/{model_id}.{format}"

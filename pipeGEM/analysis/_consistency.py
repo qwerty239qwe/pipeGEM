@@ -10,6 +10,9 @@ from pipeGEM.analysis import timing, LP3, LP7, non_convex_LP7, non_convex_LP3, \
 from ._flux import FVA_Analyzer
 from pipeGEM.utils import ObjectFactory
 from pipeGEM.utils import get_rxn_set, flip_direction
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class FluxLogger:
@@ -88,8 +91,8 @@ class NumInequalityStoppingCriteria(StoppingCriteria):
         model.add([cons])
         status = model.optimize()
         if status != "optimal":
-            print("removed", {k: len(v) for k, v in self._removed_var.items()})
-            print("kept", {k: len(v) for k, v in self._kept_var.items()})
+            logger.debug("removed: %s", {k: len(v) for k, v in self._removed_var.items()})
+            logger.debug("kept: %s", {k: len(v) for k, v in self._kept_var.items()})
 
         return status != "optimal"
 
@@ -107,8 +110,8 @@ class FASTCC(ConsistencyTester):
                 stopping_callback=None,
                 **kwargs) -> FastCCAnalysis:
         if not is_convex:
-            print("Using non-convex fastcc method")
-        print(f"Flux tolerance used: {tol}")
+            logger.info("Using non-convex fastcc method")
+        logger.info("Flux tolerance used: %s", tol)
         tol_ = tol
         consistent_model = None
         if rxn_scaling_coefs is not None:
@@ -123,14 +126,14 @@ class FASTCC(ConsistencyTester):
         J = np.setdiff1d(irr_rxns, no_expressed)
         with self.model as model:
             if len(backward_rxns) > 0:
-                print(f"Found and flipped {len(backward_rxns)} reactions")
+                logger.info("Found and flipped %d reactions", len(backward_rxns))
                 flip_direction(model, backward_rxns)
             A = np.array(LP7(J, model, tol, use_abs=True, flux_logger=self._flux_recorder))  # rxns to keeps
-            print(f"Inconsistent irreversible rxns: {len(np.setdiff1d(J, A))}")
+            logger.info("Inconsistent irreversible rxns: %d", len(np.setdiff1d(J, A)))
 
             if len(np.setdiff1d(J, A)) > 0:
                 A_2 = np.array(LP7(np.setdiff1d(J, A), model, tol, use_abs=True, flux_logger=self._flux_recorder))
-                print(f"Inconsistent irreversible rxns (2nd run): {len(np.setdiff1d(np.setdiff1d(J, A), A_2))}")
+                logger.info("Inconsistent irreversible rxns (2nd run): %d", len(np.setdiff1d(np.setdiff1d(J, A), A_2)))
                 A = np.union1d(A, A_2)
 
             if stopping_callback is not None:
@@ -139,7 +142,7 @@ class FASTCC(ConsistencyTester):
                     reach_stop_crit = reach_stop_crit or cb.check(removed=np.union1d(no_expressed, np.setdiff1d(J, A)),
                                                                   kept=A)
                 if reach_stop_crit:
-                    print("Stopping criteria is met, stop the process.")
+                    logger.info("Stopping criteria is met, stop the process.")
                     return FastCCAnalysis(log={"is_convex": is_convex, "tol": tol_, "stopped": True})
 
             J = np.setdiff1d(all_rxns, np.union1d(np.union1d(A, no_expressed), J))  # rev rxns to check
@@ -187,7 +190,7 @@ class FASTCC(ConsistencyTester):
                             reach_stop_crit = reach_stop_crit or cb.check(removed=new_removed,
                                                                           kept=new_kept)
                         if reach_stop_crit:
-                            print("Stopping criteria is met, stop the process.")
+                            logger.info("Stopping criteria is met, stop the process.")
                             pbar.close()
                             return FastCCAnalysis(log={"is_convex": is_convex, "tol": tol_, "stopped": True})
 

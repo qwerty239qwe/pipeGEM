@@ -105,7 +105,7 @@ class CoreProblem(Problem):
                             self.react_num,
                             core_index=self.core_index,
                             weights=self.weights)
-        print(f"rev : #{sum(rev == -1)}")
+        logger.debug("rev : #%d", sum(rev == -1))
         self.S[:, rev == -1] = -self.S[:, rev == -1]
         self.temp_rev = rev
 
@@ -132,7 +132,7 @@ class CoreProblem(Problem):
 
         if not any(self.blocked):
             self.lbs[(self.weights == 0) & (~rev)] = 1
-            print(f"Forcing {sum((self.weights == 0) & (~rev))} reactions to generate fluxes")
+            logger.debug("Forcing %d reactions to generate fluxes", sum((self.weights == 0) & (~rev)))
         self.ubs = np.where(self.blocked, self.ubs, max_val)
         self.extend_horizontal(np.zeros(shape=(m, k + l)),
                                e_v=np.array(["C" for _ in range(k + l)]),
@@ -207,16 +207,16 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
         weights[abs(flux["fluxes"].values) > tol] = 0
         assert len(weights) == __w
         blocked[abs(flux["fluxes"].values) > tol] = False
-        print(f"Remove {blocked_size - sum(blocked)} blocked rxns, {sum(blocked)} left.")
+        logger.info("Remove %d blocked rxns, %d left.", blocked_size - sum(blocked), sum(blocked))
         assert len(
             set(rxn_num[blocked]) - set(rxn_num[weights == 0])) == 0, f"{rxn_num[blocked]}, {rxn_num[weights == 0]}"
         if 2 * sum(blocked) > blocked_size:
             weights /= 2
             assert n_lps < 400, f"{n_lps}, {blocked_size}, {rxn_num[blocked]}, {rxn_num[(weights == 0)]}"
-    print(f"Number of solved LP: {n_lps}")
+    logger.info("Number of solved LP: %d", n_lps)
     kept_rxns = rxn_num[(weights == 0)]
     rxns_to_remove = [r.id for i, r in enumerate(model.reactions) if i not in kept_rxns]
     output = model.copy()
-    print(f"Remove {len(rxns_to_remove)} reactions")
+    logger.info("Remove %d reactions", len(rxns_to_remove))
     output.remove_reactions(rxns_to_remove, remove_orphans=True)
     return output

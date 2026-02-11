@@ -14,6 +14,9 @@ from pipeGEM.analysis import consistency_testers
 from pipeGEM.analysis.tasks import TaskContainer
 from pipeGEM.analysis import TaskAnalysis, LocalThresholdAnalysis, rFASTCORMICSThresholdAnalysis, \
     PercentileThresholdAnalysis, ModelScalingResult
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 pl_needed_config = {"integration": ["thresholds", "gene_data",
@@ -244,7 +247,7 @@ def run_integration_pipeline(gene_data_conf,
     for g_name, g_data in gene_data_dic.items():
 
         if (saved_path / g_name).is_dir():
-            print(f"{g_name} is already there. Skipping it")
+            logger.info("%s is already there. Skipping it", g_name)
             continue
 
         task_supp_rxns[g_name] = map_data(data_name=g_name,
@@ -278,10 +281,10 @@ def do_model_comparison(comparison_configs):
     if Path(comparison_configs["factor_file"]).is_file():
         factors = pd.read_csv(comparison_configs["factor_file"],
                               index_col=0)
-        print("Factor data loaded, top rows are:")
-        print(factors.head())
+        logger.info("Factor data loaded, top rows are:")
+        logger.info("%s", factors.head())
     grp = Group(model_dic, name_tag="group", factors=factors)
-    print(grp.get_info())
+    logger.info("%s", grp.get_info())
     Path(comparison_configs["output_dir"]).mkdir(parents=True, exist_ok=True)
     root = Path(comparison_configs["output_dir"])
     #  number of comp

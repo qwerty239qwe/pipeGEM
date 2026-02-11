@@ -18,6 +18,9 @@ from .._constant import var_type_dict
 from .results import *
 from pipeGEM.analysis._gapsplit import gapsplit
 from pipeGEM.utils import ObjectFactory
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class FluxAnalyzers(ObjectFactory):
@@ -212,10 +215,10 @@ class ProblemAnalyzer:
     def get_fluxes(self, direction="max", raise_error=True) -> pd.DataFrame:
         self.new_model.solver.objective.direction = direction
         self.new_model.solver.optimize()
-        print(self.new_model.solver.status)
+        logger.info("Solver status: %s", self.new_model.solver.status)
         if raise_error and self.new_model.solver.status != "optimal":
             raise RuntimeError("The solver's status is infeasible")
-        print(self.new_model.solver.objective.value)
+        logger.info("Objective value: %s", self.new_model.solver.objective.value)
         vals = {}
         _skips = []
         for var_name, val in self.new_model.solver.primal_values.items():
@@ -253,7 +256,7 @@ def add_mod_pfba(
     else:
         if any([np.isnan(x) for x in weights.values()]):
             invalid = [k for k, v in weights.items() if np.isnan(v)]
-            print(f"NaN detected: {invalid}")
+            logger.warning("NaN detected: %s", invalid)
             raise ValueError("weights dict contains NaN")
         rxn_ids = [r.id for r in reactions]
         weights = {k: v for k, v in weights.items() if k in rxn_ids}

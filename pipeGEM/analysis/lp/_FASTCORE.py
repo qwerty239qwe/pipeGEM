@@ -7,6 +7,10 @@ import numpy as np
 from numpy import linalg as LA
 from optlang.symbolics import Zero
 
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def LP3(J: Union[set, np.ndarray, List[str]],
         model: cobra.Model,
@@ -280,7 +284,7 @@ def LP9(K: np.ndarray,
         try:
             sol = model.optimize(objective_sense="maximize", raise_error=True)
         except:
-            print("infeasible result: |K| = ", len(K))
+            logger.warning("infeasible result: |K| = %d", len(K))
             return []
         fm = sol.to_frame()["fluxes"].abs().sort_index()
     if flux_logger is not None:

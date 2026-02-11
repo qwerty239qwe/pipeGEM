@@ -60,7 +60,7 @@ def add_cons_to_model(model,
                     con_dict[f"{prefix}{name}"] = coefs
                     added_cons.append(cons)
                 except IndicatorConstraintsNotSupported:
-                    print(f"Indicator constraint not supported in {prefix}{name}")
+                    logger.warning("Indicator constraint not supported in %s%s", prefix, name)
                     return False
             else:
                 if lb == ub:

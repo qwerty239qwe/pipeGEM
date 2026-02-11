@@ -8,9 +8,12 @@ import pandas as pd
 from pint import UnitRegistry
 
 from ._base import BaseData
+from pipeGEM._logging import get_logger
 from pipeGEM.analysis import RxnMapper
 from pipeGEM.analysis import threshold_finders, ALL_THRESHOLD_ANALYSES
 from pipeGEM.analysis import DataAggregation
+
+logger = get_logger(__name__)
 
 HPA_scores = {'High': 20,
               'Medium': 15,
@@ -320,7 +323,7 @@ class GeneData(BaseData):
 
         """
         tf = threshold_finders.create(name)
-        print("transform:", transform)
+        logger.debug("transform: %s", transform)
         return tf.find_threshold({gn: self.data_transform(gv) if transform else gv
                                   for gn, gv in self.gene_data.items()}, **kwargs)
 
@@ -875,7 +878,7 @@ class MediumData(BaseData):
             raise FileNotFoundError(f"Medium file '{file_name}' not found in default directory "
                                     f"'{medium_file_dir}' (as .tsv or .csv) or as a direct path.")
 
-        print(f"Loaded medium data from: {used_path}")
+        logger.info("Loaded medium data from: %s", used_path)
         # Pass loaded data and any extra kwargs to constructor
         return cls(data, **kwargs)
 
@@ -944,7 +947,7 @@ class EnzymeData(BaseData):
         if gene_id_col is not None:
             self._enzyme_df.index = self._enzyme_df[gene_id_col]
         else:
-            print("Using dataframe's index as the gene ID")
+            logger.info("Using dataframe's index as the gene ID.")
 
         if prot_id_col is None:
             warnings.warn("No prot_id_col is provided, Gene ID will be used in the following process.")
@@ -957,7 +960,7 @@ class EnzymeData(BaseData):
         self.prot_seq_col = prot_seq_col
 
         if self.mw_col not in self._enzyme_df.columns:
-            print(f"Inferring molecular weight via protein sequence (column '{prot_seq_col}')")
+            logger.info("Inferring molecular weight via protein sequence (column '%s').", prot_seq_col)
             self._enzyme_df[self.mw_col] = self._enzyme_df[self.prot_seq_col].apply(self.calc_molecular_weight)
         self.ec_num_col = ec_num_col
         self.sa_col = sa_col

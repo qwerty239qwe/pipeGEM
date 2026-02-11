@@ -191,12 +191,12 @@ def apply_iMAT(model,
     for name, var in core_f_ind_vars.items():
         new_objs[var] = 1
         if name[4:] in protected_rxns:
-            print(name)
+            logger.debug("Protected reaction in core forward: %s", name)
             new_objs[var] = 1000
     for name, var in core_b_ind_vars.items():
         new_objs[var] = 1
         if name[4:] in protected_rxns:
-            print(name)
+            logger.debug("Protected reaction in core backward: %s", name)
             new_objs[var] = 1000
 
     cons_added = add_iMAT_cons_to_model(model=model,

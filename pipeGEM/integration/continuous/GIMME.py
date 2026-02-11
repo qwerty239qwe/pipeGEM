@@ -108,7 +108,7 @@ def apply_GIMME(model: cobra.Model,
         sol = model.optimize("minimize")
 
     flux_df = sol.to_frame()
-    print("original obj's optimized value: ", flux_df.loc[ori_obj, "fluxes"])
+    logger.info("original obj's optimized value: %s", flux_df.loc[ori_obj, "fluxes"].to_dict())
 
     new_model = None
     if remove_zero_fluxes:

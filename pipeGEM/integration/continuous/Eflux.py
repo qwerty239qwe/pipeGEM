@@ -103,19 +103,19 @@ def apply_EFlux(model: cobra.Model,
     assert max_ub - min_lb > 0, "max_ub should be larger than min_lb"
     if protected_rxns:
         ignore_rxn_ids = select_rxns_from_model(model, protected_rxns, return_id=True)
-        print(f"Ignoring {len(ignore_rxn_ids)} reactions ({ignore_rxn_ids[:10]}"
-              f"{'...' if len(ignore_rxn_ids) > 10 else ''}) "
-              f", no constraints will be applied on them")
+        logger.info("Ignoring %d reactions (%s%s), no constraints will be applied on them",
+                    len(ignore_rxn_ids), ignore_rxn_ids[:10],
+                    "..." if len(ignore_rxn_ids) > 10 else "")
     else:
         ignore_rxn_ids = []
 
     if rxn_scaling_coefs is not None:
-        print("Identified rxn_scaling_coefs, will use it to adjust flux values")
+        logger.info("Identified rxn_scaling_coefs, will use it to adjust flux values")
     rxn_scaling_coefs = {r.id: 1 for r in model.reactions} if rxn_scaling_coefs is None else rxn_scaling_coefs
     exps = [v if v > min_score else min_score for _, v in rxn_expr_score.items() if not np.isnan(v)]
     max_exp = max(exps) if len(exps) != 0 else max_ub
     min_exp = min(exps) if len(exps) != 0 else min_lb
-    print(f"Max expression: {max_exp} | Min expression: {min_exp}")
+    logger.info("Max expression: %s | Min expression: %s", max_exp, min_exp)
     assert max_exp > 0, "max_exp should be a positive number, all expression values might be zeros"
     if isinstance(transform, str):
         if transform in functions:
@@ -131,7 +131,7 @@ def apply_EFlux(model: cobra.Model,
     trans_rxn_exp_dict = {k: min_lb + ((max_ub - min_lb) * (transform(v) - trans_min_exp) / denominator)
                           if not np.isnan(v) else v
                           for k, v in capped_scores.items()}
-    print(denominator, trans_min_exp)
+    logger.debug("denominator: %s, trans_min_exp: %s", denominator, trans_min_exp)
     assert all([v >= 0 for v in trans_rxn_exp_dict.values() if not np.isnan(v)]), trans_rxn_exp_dict
     r_bounds_dict = {}
     model = model.copy()

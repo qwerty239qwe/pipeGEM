@@ -7,6 +7,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def _get_subsystem_ticks(data: pd.DataFrame, rxn_subsystem):
     assert "_subsystem" not in data.columns.to_list() and "_index" not in data.columns.to_list()
@@ -101,7 +105,7 @@ def save_fig(func=None, *, prefix="", dpi=150, name_format="{file_name}"):
             updated_name = format_file_name(name_format, plotting_kws)
             plotting_kws["file_name"] = updated_name
             if plotting_kws["file_name"] is not None:
-                print("saving ",plotting_kws["file_name"])
+                logger.info("saving %s", plotting_kws["file_name"])
                 _save_fig(**plotting_kws)
             plt.show()
         return info_kws

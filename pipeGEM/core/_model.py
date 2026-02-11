@@ -594,11 +594,41 @@ class Model(GEMComposite):
         return analyzer.analyze(**kwargs)
 
     def integrate_enzyme_data(self,
-                              prot_abund_data_name,
-                              integrator: str = "",
-                              integrator_init_kwargs=None,):
-        """Integrate enzyme abundance data (Placeholder)."""
-        pass
+                              prot_abund_data_name=None,
+                              method="GECKOLight",
+                              **kwargs):
+        """Integrate enzyme data using GECKO formulations.
+
+        Parameters
+        ----------
+        prot_abund_data_name : str, optional
+            Name of the ProteinAbundanceData attached to this model. If
+            ``None``, protein abundance is not used (only kcat limits flux).
+        method : str
+            GECKO method to use: ``"GECKOLight"`` or ``"GECKOFull"``.
+        **kwargs
+            Additional keyword arguments passed to the integrator.
+
+        Returns
+        -------
+        GECKOLightAnalysis or GECKOFullAnalysis
+        """
+        from pipeGEM.integration._class import enzyme_integrator_factory
+
+        if self._enzyme_data is None:
+            raise ValueError("No enzyme data attached. Call add_enzyme_data() first.")
+
+        protein_abundance = None
+        if prot_abund_data_name is not None:
+            protein_abundance = getattr(self, '_prot_abund_data', {}).get(prot_abund_data_name)
+
+        integrator = enzyme_integrator_factory.create(method)
+        return integrator.integrate(
+            model=self._model,
+            data=self._enzyme_data,
+            protein_abundance=protein_abundance,
+            **kwargs,
+        )
 
     def integrate_gene_data(self,
                             data_name,

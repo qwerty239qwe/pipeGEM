@@ -11,7 +11,10 @@ from cobra.exceptions import Infeasible, OptimizationError
 
 from pipeGEM.utils import get_organic_exs
 from pipeGEM.analysis import flux_analyzers, TaskAnalysis
+from pipeGEM._logging import get_logger
 from ._var import TASKS_FILE_PATH
+
+logger = get_logger(__name__)
 
 
 class Task:
@@ -185,7 +188,7 @@ class Task:
         for met in self.in_mets:
             met = f"{met[self.met_id_str]}{self.compartment_parenthesis[0]}{met[self.compartment_str]}{self.compartment_parenthesis[1]}"
             if met not in all_mets_in_model:
-                print(f"{met} is not in the model")
+                logger.warning("%s is not in the model", met)
                 all_fine = False
         return all_fine
 
@@ -272,7 +275,7 @@ class Task:
                             dummy_rxn_list.append(dummy_rxn)
                         obj_rxn_list.append(dummy_rxn)
                 else:
-                    print(met_id, 'not exists in the model')
+                    logger.warning("%s not exists in the model", met_id)
                     all_met_exist = False
         if all_met_exist:
             model.add_reactions(dummy_rxn_list)
@@ -633,7 +636,7 @@ class TaskHandler:
 
             except Infeasible:
                 true_status = "infeasible"
-                print("Got an infeasible result")
+                logger.warning("Got an infeasible result")
                 break
 
         return {'Passed': (((true_status == 'optimal') != task.should_fail) and all_met_exist),
@@ -656,10 +659,10 @@ class TaskHandler:
                 sol = pfba(model)
             except Infeasible:
                 sol = None
-                print(f"Task {ID} cannot support tasks' metabolites")
+                logger.warning("Task %s cannot support tasks' metabolites", ID)
             except OptimizationError:
                 sol = None
-                print(f"Weird result happened when testing Task {ID}")
+                logger.warning("Weird result happened when testing Task %s", ID)
 
         return sol
 
@@ -759,9 +762,9 @@ class TaskHandler:
                     for r in ko_types[task.ko_output_type]:
                         model.reactions.get_by_id(r).lower_bound = 0
                 if verbosity >= 2:
-                    print(f'Checking Task {ID}')
+                    logger.info("Checking Task %s", ID)
                 elif verbosity >= 1:
-                    print(f'Task {ID} - ', end='')
+                    logger.info("Task %s", ID)
                 # add dummy reactions to the model
                 task_info[ID] = self.test_one_task(task=task,
                                                    model=model,
@@ -778,19 +781,18 @@ class TaskHandler:
                                                       rxn_fluxes=task_info[ID]["task_support_rxn_fluxes"])
                 task_info[ID].update(sup_exp_result)
             if verbosity >= 2:
-                print('status: ', task_info[ID]['Status'],
-                      'should fail: ', task.should_fail,
-                      'Passed: ', task_info[ID]['Passed'])
+                logger.info("status: %s, should fail: %s, Passed: %s",
+                            task_info[ID]['Status'], task.should_fail, task_info[ID]['Passed'])
             elif verbosity >= 1:
-                print('Passed' if task_info[ID]['Passed'] else 'Failed')
+                logger.info("Passed" if task_info[ID]['Passed'] else "Failed")
         result_df = pd.DataFrame(data=task_info).T
         score = len(self.tasks) if task_ids == "all" else len(task_ids)
         for ID, info in task_info.items():
             if not info['Passed']:
                 if verbosity >= 1:
-                    print(f'Task {ID} is not correct')
+                    logger.info("Task %s is not correct", ID)
                 score -= 1
-        print(f'score of the model: {score} / {len(self.tasks) if task_ids == "all" else len(task_ids)}')
+        logger.info("score of the model: %d / %d", score, len(self.tasks) if task_ids == "all" else len(task_ids))
         log = {"method": method,
                "method_kws": method_kws,
                **(log if log is not None else {})}

@@ -93,7 +93,7 @@ def apply_MBA(model,
     """
     rxn_ids = [r.id for r in model.reactions]
     if data is not None:
-        print(f"Using data-inferred threshold. Ignoring medium_conf_rxn_ids and high_conf_rxn_ids.")
+        logger.info("Using data-inferred threshold. Ignoring medium_conf_rxn_ids and high_conf_rxn_ids.")
         threshold_dic = parse_predefined_threshold(predefined_threshold,
                                                    gene_data=data.gene_data,
                                                    **threshold_kws)
@@ -105,7 +105,7 @@ def apply_MBA(model,
             protected_rxns)) & rxn_in_model
     else:
         th_result = None
-        print(f"Using defined medium and high conf rxns. Ignoring predefined_threshold.")
+        logger.info("Using defined medium and high conf rxns. Ignoring predefined_threshold.")
         assert all([r in rxn_ids for r in medium_conf_rxn_ids])
         assert all([r in rxn_ids for r in high_conf_rxn_ids])
     protected_rxns = protected_rxns if protected_rxns is not None else []
@@ -144,13 +144,13 @@ def apply_MBA(model,
         excluded_HC = set(high_conf_rxn_ids) & set(test_result.removed_rxn_ids)
         excluded_MC = set(medium_conf_rxn_ids) & set(test_result.removed_rxn_ids)
         excluded_NC = set(test_result.removed_rxn_ids) - excluded_HC - excluded_MC
-        print(excluded_HC, excluded_MC, excluded_NC)
+        logger.debug("excluded_HC: %s, excluded_MC: %s, excluded_NC: %s", excluded_HC, excluded_MC, excluded_NC)
 
         if len(excluded_HC) == 0 and len(excluded_MC) < epsilon * len(excluded_NC):
             for removed_r in test_result.removed_rxn_ids:
                 model.reactions.get_by_id(removed_r).bounds = (0, 0)
             removed_rxns.extend(test_result.removed_rxn_ids)
-            print(f"Detect {len(test_result.removed_rxn_ids)} removable reactions in NC set.")
+            logger.info("Detect %d removable reactions in NC set.", len(test_result.removed_rxn_ids))
         else:
             kept_nc_rxns.append(r)
     removed_rxns = list(set(removed_rxns))

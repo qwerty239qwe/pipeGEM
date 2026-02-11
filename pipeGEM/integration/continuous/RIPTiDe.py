@@ -92,7 +92,7 @@ def apply_RIPTiDe_pruning(model,
     if np.isnan(max_gw):
         raise ValueError("max_gw cannot be NaN")
     min_gw = min([i for i in rxn_expr_score.values() if np.isfinite(i)])
-    print(f"Max RAL: {max_gw}, Min RAL: {min_gw}")
+    logger.info("Max RAL: %s, Min RAL: %s", max_gw, min_gw)
     obj_dict = {r_id: (max_gw - r_exp) * rxn_scaling_coefs[r_id] / (max_gw - min_gw)
                 if (max_gw + min_gw - r_exp) < max_inconsistency_score else rxn_scaling_coefs[r_id]
                 for r_id, r_exp in rxn_expr_score.items() if not (np.isnan(r_exp) or r_id in protected_rxns)}
@@ -228,7 +228,7 @@ def apply_RIPTiDe_sampling(model,
     max_gw = max_gw or np.nanmax(list(rxn_expr_score.values()))
     min_gw = np.nanmin(list(rxn_expr_score.values()))
     rxn_scaling_coefs = {r.id: 1 for r in model.reactions} if rxn_scaling_coefs is None else rxn_scaling_coefs
-    print(f"Max RAL: {max_gw}, Min RAL: {min_gw}")
+    logger.info("Max RAL: %s, Min RAL: %s", max_gw, min_gw)
     protected_rxns = protected_rxns or []
     if max_gw < max(rxn_expr_score.values()):
         raise ValueError("max_gw must be greater than or equal to the max rxn score")
@@ -243,8 +243,8 @@ def apply_RIPTiDe_sampling(model,
         with model:
             add_mod_pfba(model, weights=obj_dict, fraction_of_optimum=obj_frac, direction="max")
             sol = model.optimize()
-            print(sol.to_frame())
-            print("pFBA obj", sol.objective_value)
+            logger.debug("Solution frame:\n%s", sol.to_frame())
+            logger.info("pFBA obj: %s", sol.objective_value)
             sampling_analyzer = flux_analyzers["sampling"](model, solver, log={"n": sampling_n,
                                                                                "method": sampling_method,
                                                                                **kwargs})

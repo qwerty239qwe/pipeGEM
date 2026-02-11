@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 from ._base import *
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def measure_efficacy(kept_rxn_ids,
@@ -12,12 +15,12 @@ def measure_efficacy(kept_rxn_ids,
     TP = len(set(kept_rxn_ids) & set(core_rxn_ids))
     TN = len(set(removed_rxn_ids) & set(non_core_rxn_ids))
     FN = len(set(removed_rxn_ids) & set(core_rxn_ids))
-    print("# Kept core reactions:", TP)
-    print("# Removed core reactions:", FN)
-    print("# Kept non-core reactions:", FP)
-    print("# Removed non-core reactions:", TN)
-    print("Percentage of kept core rxns:", TP / (TP+FN))
-    print("Percentage of removed non-core rxns:", TN / (TN + FP))
+    logger.info("# Kept core reactions: %d", TP)
+    logger.info("# Removed core reactions: %d", FN)
+    logger.info("# Kept non-core reactions: %d", FP)
+    logger.info("# Removed non-core reactions: %d", TN)
+    logger.info("Percentage of kept core rxns: %s", TP / (TP+FN))
+    logger.info("Percentage of removed non-core rxns: %s", TN / (TN + FP))
     if method == "MCC":
         return (TN * TP - FN * FP) / np.sqrt((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))
     precision = TP / (TP + FP)

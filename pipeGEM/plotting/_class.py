@@ -4,11 +4,14 @@ from typing import Union, Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from pipeGEM._logging import get_logger
 from ._flux import plot_fba, plot_fva, plot_sampling_df
 from .curve import plot_rFastCormic_thresholds, plot_percentile_thresholds
 from .heatmap import plot_heatmap
 from .scatter import plot_PCA, plot_embedding
 from .categorical import plot_model_components, plot_local_threshold_boxplot, plot_data_cat
+
+logger = get_logger(__name__)
 
 
 class BasePlotter:
@@ -74,7 +77,7 @@ class BasePlotter:
             updated_name = self.format_file_name(name_format, plotting_kws)
             plotting_kws["file_name"] = updated_name
             if plotting_kws["file_name"] is not None:
-                print("saving ", plotting_kws["file_name"])
+                logger.info("Saving %s", plotting_kws["file_name"])
                 self._save_fig(**plotting_kws)
             else:
                 plt.show()

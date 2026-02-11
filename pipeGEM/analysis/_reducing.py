@@ -1,6 +1,10 @@
 import cobra
 import itertools
 
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class MergedReaction(cobra.Reaction):
     def __init__(self, id=None, name=None, lower_bound=0, upper_bound=1000):
@@ -47,7 +51,7 @@ def _iter_merge_rxns(model, not_merged_rxns):
     to_continue_flag = False
     for i, m in enumerate(mets_to_merge):
         if (i+1) % 100 == 0 or i+1 == len(mets_to_merge):
-            print(f"merging .. {i} / {len(mets_to_merge)}")
+            logger.info("merging .. %d / %d", i, len(mets_to_merge))
         if len(set(not_merged_rxns) & set([r.id for r in m.reactions])) != 0 or len([r.id for r in m.reactions]) != 2:
             continue
         pos = [r.id for r in m.reactions if r.reversibility or (r.metabolites[m] > 0 and r.upper_bound > 0)]

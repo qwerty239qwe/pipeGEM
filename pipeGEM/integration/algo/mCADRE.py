@@ -210,7 +210,7 @@ def _prune_model(model,
                                                       return_model=False,
                                                       rxn_scaling_coefs=rxn_scaling_coefs)
             except OptimizationError:
-                print(f"{non_core_rxn_id} knocking-out makes the model infeasible.")
+                logger.warning("%s knocking-out makes the model infeasible.", non_core_rxn_id)
                 continue
         if "stopped" in test_result.log and test_result.log["stopped"]:
             continue

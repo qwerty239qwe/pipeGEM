@@ -9,6 +9,9 @@ import seaborn as sns
 from ._utils import save_fig, draw_significance
 from ._prep import prep_fva_plotting_data, filter_fva_df
 # from pipeGEM.analysis import StatisticAnalyzer
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def plot_fba(flux_df: pd.DataFrame,
@@ -29,12 +32,12 @@ def plot_fba(flux_df: pd.DataFrame,
              ):
     if "Reaction" not in flux_df.columns:
         flux_df = flux_df.reset_index().rename(columns={"index": "Reaction"})
-        print("Use index as the reaction IDs")
+        logger.debug("Use index as the reaction IDs")
     flux_df = flux_df.loc[flux_df["Reaction"].isin(rxn_ids), [c for c in flux_df.columns if c != "reduced_costs"]]
     if filter_all_zeros:
         n_all_zeros_rxn = flux_df.query(f"abs(fluxes) < {threshold}").shape[0]
         if verbosity > 0:
-            print(f"Found reactions contain zeros fluxes: {n_all_zeros_rxn} rxns were removed from the plot")
+            logger.info("Found reactions contain zeros fluxes: %d rxns were removed from the plot", n_all_zeros_rxn)
         flux_df = flux_df.query(f"abs(fluxes) > {threshold}")
 
     flux_df = flux_df.reset_index().rename(columns={"fluxes": f'Flux {flux_unit}'})
@@ -176,7 +179,7 @@ def plot_sampling_catplot(flux_df,
                 x_pos = [flux_df[rxn_id].values.max() + (facet.ax.get_xlim()[1] - facet.ax.get_xlim()[0]) *
                          (num_significance + 1) * 0.1
                          for _ in range(2)]
-                print(x_pos)
+                logger.debug("x_pos: %s", x_pos)
                 y_pos = [ia, ib]
 
             draw_significance(facet.ax, x_pos, y_pos, n_stars)
@@ -190,7 +193,7 @@ def plot_sampling_catplot(flux_df,
                              (facet.ax.get_xlim()[1] - facet.ax.get_xlim()[0]) *
                              (num_significance + 1) * 0.1))
     if y_lim is not None:
-        print(y_lim, )
+        logger.debug("y_lim: %s", y_lim)
         facet.set(ylim=y_lim)
     if x_lim is not None:
         facet.set(xlim=x_lim)

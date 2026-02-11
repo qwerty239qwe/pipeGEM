@@ -10,6 +10,9 @@ from cobra.flux_analysis.moma import moma
 from cobra.core.solution import Solution
 from pipeGEM.utils import ObjectFactory
 from pipeGEM.analysis.results import Single_KO_Analysis, KO_Analysis
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def ko_once(model, g, method="FBA"):
@@ -102,7 +105,7 @@ class Single_KO_Analyzer(KO_Analyzer):
         result_df = get_ko_df(model=self.model.cobra_model,
                               gene_list=[g.id for g in self.model.genes],
                               method=method)
-        print(f"KO finished in {time() - s} secs.")
+        logger.info("KO finished in %s secs.", time() - s)
         return {"result_df": result_df}
 
 
