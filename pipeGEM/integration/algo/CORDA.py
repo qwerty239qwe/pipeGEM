@@ -12,6 +12,9 @@ from optlang.symbolics import Zero
 
 from pipeGEM.analysis import timing, CORDA_Analysis, measure_efficacy
 from pipeGEM.integration.utils import parse_predefined_threshold
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class CORDABuilder:

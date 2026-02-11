@@ -4,6 +4,9 @@ from collections import namedtuple
 from functools import reduce
 
 from pipeGEM.utils import flip_direction, get_rxn_set
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 

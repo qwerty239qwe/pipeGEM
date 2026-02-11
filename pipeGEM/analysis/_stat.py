@@ -144,7 +144,7 @@ class PairwiseTester(StatisticalTest):
             parametric, assump_test_results = self._to_use_parametric_test(data=data, dv=dep_var, group=between,
                                                                            **parametric_params)
 
-        method_pool = self.non_parametric_methods if parametric else self.non_parametric_methods
+        method_pool = self.parametric_methods if parametric else self.non_parametric_methods
         if method_pool[method][1] == "scikit_posthocs":
             # TODO: fix
             result = method_pool[method][0](data,

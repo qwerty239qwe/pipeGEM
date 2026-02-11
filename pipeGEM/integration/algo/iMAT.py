@@ -2,6 +2,9 @@ import numpy as np
 import pandas as pd
 from pipeGEM.integration.utils import *
 from pipeGEM.analysis import timing, iMAT_Analysis
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def get_ind_var_for_rxns(model, core_rxn_ids, non_core_rxn_ids):

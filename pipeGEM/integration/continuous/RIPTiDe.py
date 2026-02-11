@@ -6,6 +6,9 @@ import numpy as np
 import pandas as pd
 
 from pipeGEM.analysis import modified_pfba, add_mod_pfba, RIPTiDePruningAnalysis, RIPTiDeSamplingAnalysis, flux_analyzers, timing
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @timing

@@ -1,5 +1,8 @@
 from optlang.symbolics import Zero
 from optlang.exceptions import IndicatorConstraintsNotSupported
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 type_dic = {"c": "continuous", "b": "binary", "i": "integer"}

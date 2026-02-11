@@ -10,6 +10,9 @@ from pipeGEM.analysis import consistency_testers, timing, mCADRE_Analysis, \
     NumInequalityStoppingCriteria, IsInSetStoppingCriteria, measure_efficacy
 from pipeGEM.integration.utils import parse_predefined_threshold
 from tqdm import tqdm
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def calc_expr_score(data,

@@ -11,12 +11,16 @@ import numpy as np
 from anndata import AnnData
 
 from pipeGEM.core._base import GEMComposite
+from pipeGEM._logging import get_logger
+from pipeGEM.exceptions import ModelValidationError
 from pipeGEM.utils import save_model, load_model, check_rxn_scales, save_toml_file, parse_toml_file
 from pipeGEM.analysis import model_scaler_collection
 from pipeGEM.data import GeneData, MediumData, EnzymeData, MetaboliteData
 from pipeGEM.integration import integrator_factory
 from pipeGEM.analysis import flux_analyzers, consistency_testers, TaskAnalysis, ko_analyzers
 from pipeGEM.analysis.tasks import TaskHandler, TaskContainer
+
+logger = get_logger(__name__)
 
 
 class Model(GEMComposite):
@@ -54,7 +58,9 @@ class Model(GEMComposite):
                  **kwargs):
         super(Model, self).__init__(name_tag=name_tag or "Unnamed_model")
         if not isinstance(model, cobra.Model):
-            raise ValueError("input model should be a cobra model")
+            raise ModelValidationError(
+                f"'model' must be a cobra.Model, got {type(model).__name__}."
+            )
         self._model = model if model is not None else cobra.Model(name=name_tag)
         self._gene_data: Union[Dict[str, GeneData]] = {}
         self._enzyme_data: Optional[EnzymeData] = None  # this is a singleton obj in the model
@@ -87,7 +93,7 @@ class Model(GEMComposite):
     def rename(self, name_tag=None):
         if name_tag is not None:
             if not isinstance(name_tag, str):
-                TypeError("name_tag must be a string.")
+                raise TypeError("name_tag must be a string.")
             self._name_tag = name_tag
 
     @property
@@ -447,7 +453,7 @@ class Model(GEMComposite):
         activated_tasks = self.get_activated_tasks(data_name, task_analysis,
                                                    score_threshold=score_threshold,
                                                    **kwargs)
-        print(f"Found {len(activated_tasks)} activated tasks by mapping {data_name} to this model.")
+        logger.info("Found %d activated tasks by mapping %s to this model.", len(activated_tasks), data_name)
         return list(set(chain(*[task_analysis.get_task_support_rxns(task_id=task_id,
                                                                     include_supps=include_supp_rxns)
                                 for task_id in activated_tasks])))
@@ -708,7 +714,7 @@ class Model(GEMComposite):
                 to_be_restored.extend(list(r.merged_rxns.keys()))
                 to_be_pruned.append(r)
         if len(to_be_restored) == len(to_be_pruned) == 0:
-            print("No merged rxns found in this model")
+            logger.info("No merged rxns found in this model.")
             return
         self._model.add_reactions(to_be_restored)
         self._model.objective = self._original_objs

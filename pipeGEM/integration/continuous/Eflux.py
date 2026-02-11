@@ -7,6 +7,9 @@ import numpy as np
 from pipeGEM.utils import select_rxns_from_model
 from pipeGEM.utils.transform import exp_x, functions
 from pipeGEM.analysis import EFluxAnalysis, timing
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @timing

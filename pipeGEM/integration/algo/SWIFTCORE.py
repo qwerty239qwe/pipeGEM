@@ -7,6 +7,9 @@ from scipy.sparse.linalg import svds
 from pipeGEM.analysis import BlockedProblem, Problem
 from pipeGEM.analysis import ProblemAnalyzer
 from pipeGEM.utils import get_rev_arr
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def swiftcc(model,

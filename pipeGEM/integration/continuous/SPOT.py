@@ -7,6 +7,9 @@ import numpy as np
 import pandas as pd
 
 from pipeGEM.analysis import add_mod_pfba, add_norm_constraint, SPOTAnalysis
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def apply_SPOT(model: cobra.Model,

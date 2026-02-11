@@ -3,6 +3,9 @@ from tqdm import tqdm
 from pipeGEM.analysis import timing, MBA_Analysis, consistency_testers, \
     NumInequalityStoppingCriteria, IsInSetStoppingCriteria, measure_efficacy
 from pipeGEM.integration.utils import parse_predefined_threshold
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @timing
