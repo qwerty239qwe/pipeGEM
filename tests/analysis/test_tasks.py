@@ -7,4 +7,6 @@ def test_task_handler(ecoli_core, ecoli_Tasks):
     model.add_tasks(name="task", tasks=ecoli_Tasks)
     task_analysis = model.test_tasks("task", model_compartment_parenthesis="_{}",
                                      solver="glpk")
-    task_analysis.save("./task")
+    assert task_analysis is not None
+    assert hasattr(task_analysis, "result")
+    assert isinstance(task_analysis.result, dict)

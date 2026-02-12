@@ -18,6 +18,10 @@ def test_MBA(ecoli_core, ecoli_core_data):
                                       predefined_threshold=thres,
                                       threshold_kws={},
                                       protected_rxns=["BIOMASS_Ecoli_core_w_GAM"])
-    print("Kept: ", len(result.result_model.reactions))
-    print("Removed: ", len(result.removed_rxn_ids))
-    # result.save("./MBA")
+    assert result is not None
+    assert len(result.result_model.reactions) > 0
+    assert isinstance(result.removed_rxn_ids, (list, set, tuple))
+    # Kept reactions should be a subset of the original
+    kept_ids = {r.id for r in result.result_model.reactions}
+    original_ids = {r.id for r in ecoli_core.reactions}
+    assert kept_ids <= original_ids
