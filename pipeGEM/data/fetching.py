@@ -15,7 +15,7 @@ import pandas as pd
 import zeep.helpers
 from zeep.exceptions import TransportError
 from zeep import Client
-from biodbs.HPA import HPAdb
+from biodbs.fetch import hpa_search
 
 from pipeGEM.utils import load_model
 from pipeGEM._logging import get_logger
@@ -52,13 +52,14 @@ def fetch_HPA_data(data_name: str,
         data_path = Path(data_path)
 
     data_path.mkdir(parents=True, exist_ok=True)
-    if not (data_path / Path(data_name)).with_suffix(".tsv").exists():
+    tsv_path = (data_path / Path(data_name)).with_suffix(".tsv")
+    if not tsv_path.exists():
         logger.info("Fetching data...")
-        hpa = HPAdb()
-        hpa.download_HPA_data(options=[data_name], saved_path=data_path)
+        result = hpa_search(data_name)
+        result.to_csv(str(tsv_path))
     else:
         logger.info("The dataframe already exists.")
-    return {"data_path": (data_path / Path(data_name)).with_suffix(".tsv")}
+    return {"data_path": tsv_path}
 
 
 def _fetch_individual_kegg_gene(gene_id):

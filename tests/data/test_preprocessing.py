@@ -10,6 +10,9 @@ from pipeGEM.data.preprocessing import (
     get_gene_id_map,
     translate_gene_id,
     transform_HPA_data,
+    unify_score_column,
+    CORDA_THRESHOLDS,
+    HPA_SCORE_COLS,
 )
 
 
@@ -198,3 +201,71 @@ class TestTransformHPAData:
         })
         with pytest.raises(ValueError, match="at least one sample col"):
             transform_HPA_data(data_df, categories=[])
+
+
+# =====================================================================
+# unify_score_column
+# =====================================================================
+
+class TestUnifyScoreColumn:
+
+    def test_continuous_levels(self):
+        """Continuous: level_dic={'High': 2, 'Medium': 1}, compute weighted score."""
+        data_df = pd.DataFrame({
+            "gene": ["g1", "g2"],
+            "High": [6, 0],
+            "Medium": [4, 10],
+        })
+        level_dic = {"High": 2, "Medium": 1}
+        result = unify_score_column(data_df, level_dic, score_col_name="score")
+        rdf = result["data_df"]
+        # g1: (6*2 + 4*1) / (6+4) = 16/10 = 1.6
+        assert np.isclose(rdf.loc[0, "score"], 1.6)
+        # g2: (0*2 + 10*1) / (0+10) = 10/10 = 1.0
+        assert np.isclose(rdf.loc[1, "score"], 1.0)
+
+    def test_continuous_uses_continuous_thresholds(self):
+        """Continuous branch -> used_rxn_thres = CORDA_THRESHOLDS['continuous']."""
+        data_df = pd.DataFrame({"High": [1], "Medium": [2]})
+        result = unify_score_column(data_df, {"High": 2, "Medium": 1}, "score")
+        assert result["used_rxn_thres"] == CORDA_THRESHOLDS["continuous"]
+
+    def test_discrete_level_column(self):
+        """Discrete: 'Level' col -> values replaced by level_dic mapping."""
+        data_df = pd.DataFrame({
+            "gene": ["g1", "g2", "g3"],
+            "Level": ["HC", "MC", "NC"],
+        })
+        level_dic = {"HC": 3, "MC": 1, "NC": 0}
+        result = unify_score_column(data_df, level_dic, score_col_name="score")
+        rdf = result["data_df"]
+        assert "score" in rdf.columns
+        assert rdf.loc[0, "score"] == 3
+        assert rdf.loc[1, "score"] == 1
+        assert rdf.loc[2, "score"] == 0
+        assert result["used_rxn_thres"] == CORDA_THRESHOLDS["discrete"]
+
+    def test_hpa_column_renamed(self):
+        """HPA: df has 'pTPM' column, empty level_dic -> renamed to score_col_name."""
+        data_df = pd.DataFrame({"pTPM": [1.5, 2.5, 3.5]})
+        result = unify_score_column(data_df, {}, score_col_name="my_score")
+        rdf = result["data_df"]
+        assert "my_score" in rdf.columns
+        assert "pTPM" not in rdf.columns
+        assert result["used_rxn_thres"] is None
+
+    def test_level_columns_dropped(self):
+        """Level columns should be dropped after score computation."""
+        data_df = pd.DataFrame({"High": [5], "Medium": [3], "gene": ["g1"]})
+        result = unify_score_column(data_df, {"High": 2, "Medium": 1}, "score")
+        rdf = result["data_df"]
+        assert "High" not in rdf.columns
+        assert "Medium" not in rdf.columns
+        assert "score" in rdf.columns
+
+    def test_nx_column_used_as_hpa(self):
+        """NX column (second HPA score col) used when pTPM absent."""
+        data_df = pd.DataFrame({"NX": [10.0, 20.0]})
+        result = unify_score_column(data_df, {}, score_col_name="my_score")
+        rdf = result["data_df"]
+        assert "my_score" in rdf.columns
