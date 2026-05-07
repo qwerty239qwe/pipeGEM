@@ -140,20 +140,24 @@ def apply_rFASTCORMICS(model: cobra.Model,
                                    rxn_scaling_coefs=rxn_scaling_coefs,
                                    calc_efficacy=False)
 
-        core_rxns |= set(pr_result.rxn_ids)
+        core_rxns |= set(pr_result.kept_rxn_ids)
         unpenalized_rxns = unpenalized_rxns - core_rxns
 
         for r in rxn_in_model - core_rxns - unpenalized_rxns:
             model.reactions.get_by_id(r).bounds = (0, 0)
         consistency_tester = consistency_testers[consistent_checking_method](model=model)
-        consistency_tester.analyze(tol=threshold)
-        model = consistency_tester.consistent_model
+        cons_result = consistency_tester.analyze(tol=threshold)
+        model = cons_result.consistent_model
+        rxn_in_consistent_model = {r.id for r in model.reactions}
+        core_rxns &= rxn_in_consistent_model
+        unpenalized_rxns &= rxn_in_consistent_model
         pr_result = apply_FASTCORE(C=core_rxns,
                                    nonP=unpenalized_rxns,
                                    model=model,
                                    epsilon=threshold,
                                    return_model=True,
                                    copy_model=False,
+                                   raise_err=FASTCORE_raise_error,
                                    rxn_scaling_coefs=rxn_scaling_coefs)
         pr_result_obj.add_result(dict(fastcore_result=pr_result,
                                       core_rxns=core_rxns,

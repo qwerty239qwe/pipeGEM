@@ -101,6 +101,9 @@ def apply_EFlux(model: cobra.Model,
     assert max_ub > 0, "max_ub should be a positive number"
     assert min_lb >= 0, "min_lb should be zero or a positive number"
     assert max_ub - min_lb > 0, "max_ub should be larger than min_lb"
+    protected_rxns = [] if protected_rxns is None else (
+        [protected_rxns] if isinstance(protected_rxns, str) else list(protected_rxns)
+    )
     if protected_rxns:
         ignore_rxn_ids = select_rxns_from_model(model, protected_rxns, return_id=True)
         logger.info("Ignoring %d reactions (%s%s), no constraints will be applied on them",

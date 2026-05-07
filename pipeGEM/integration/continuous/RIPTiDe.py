@@ -11,6 +11,14 @@ from pipeGEM._logging import get_logger
 logger = get_logger(__name__)
 
 
+def _normalize_rxn_ids(rxn_ids):
+    if rxn_ids is None:
+        return []
+    if isinstance(rxn_ids, str):
+        return [rxn_ids]
+    return list(rxn_ids)
+
+
 @timing
 def apply_RIPTiDe_pruning(model,
                           rxn_expr_score: Dict[str, float],
@@ -82,8 +90,7 @@ def apply_RIPTiDe_pruning(model,
     analysis improves predictions with metabolic networks in complex environments. 
     PLoS computational biology, 16(4), e1007099.
     """
-    if protected_rxns is None:
-        protected_rxns = []
+    protected_rxns = _normalize_rxn_ids(protected_rxns)
     rxn_expr_score = {k: v if -max_inconsistency_score < v < max_inconsistency_score else max_inconsistency_score
                       if v > max_inconsistency_score else -max_inconsistency_score
                       for k, v in rxn_expr_score.items() if not np.isnan(v)}
@@ -93,9 +100,15 @@ def apply_RIPTiDe_pruning(model,
         raise ValueError("max_gw cannot be NaN")
     min_gw = min([i for i in rxn_expr_score.values() if np.isfinite(i)])
     logger.info("Max RAL: %s, Min RAL: %s", max_gw, min_gw)
-    obj_dict = {r_id: (max_gw - r_exp) * rxn_scaling_coefs[r_id] / (max_gw - min_gw)
-                if (max_gw + min_gw - r_exp) < max_inconsistency_score else rxn_scaling_coefs[r_id]
-                for r_id, r_exp in rxn_expr_score.items() if not (np.isnan(r_exp) or r_id in protected_rxns)}
+    gw_range = max_gw - min_gw
+    if gw_range == 0:
+        obj_dict = {r_id: rxn_scaling_coefs[r_id]
+                    for r_id, r_exp in rxn_expr_score.items()
+                    if not (np.isnan(r_exp) or r_id in protected_rxns)}
+    else:
+        obj_dict = {r_id: (max_gw - r_exp) * rxn_scaling_coefs[r_id] / gw_range
+                    if (max_gw + min_gw - r_exp) < max_inconsistency_score else rxn_scaling_coefs[r_id]
+                    for r_id, r_exp in rxn_expr_score.items() if not (np.isnan(r_exp) or r_id in protected_rxns)}
 
     if not all([0 <= v <= 1 for _, v in obj_dict.items()]):
         raise ValueError(f"Some of the obj values are invalid, {[v for _, v in obj_dict.items() if not (0 <= v <= 1)]}")
@@ -229,11 +242,16 @@ def apply_RIPTiDe_sampling(model,
     min_gw = np.nanmin(list(rxn_expr_score.values()))
     rxn_scaling_coefs = {r.id: 1 for r in model.reactions} if rxn_scaling_coefs is None else rxn_scaling_coefs
     logger.info("Max RAL: %s, Min RAL: %s", max_gw, min_gw)
-    protected_rxns = protected_rxns or []
+    protected_rxns = _normalize_rxn_ids(protected_rxns)
     if max_gw < max(rxn_expr_score.values()):
         raise ValueError("max_gw must be greater than or equal to the max rxn score")
-    obj_dict = {r_id: (r_exp - min_gw) * rxn_scaling_coefs[r_id] / (max_gw - min_gw)
-                for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)}
+    gw_range = max_gw - min_gw
+    if gw_range == 0:
+        obj_dict = {r_id: rxn_scaling_coefs[r_id]
+                    for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)}
+    else:
+        obj_dict = {r_id: (r_exp - min_gw) * rxn_scaling_coefs[r_id] / gw_range
+                    for r_id, r_exp in rxn_expr_score.items() if not np.isnan(r_exp)}
     obj_dict.update({r.id: rxn_scaling_coefs[r.id]
                      for r in model.reactions
                      if r.id in protected_rxns or (protect_no_expr and (r.id not in obj_dict))})  # same as the largest weight

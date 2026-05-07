@@ -9,6 +9,7 @@ from pipeGEM.integration.continuous.GIMME import apply_GIMME
 from pipeGEM.integration.continuous.RIPTiDe import apply_RIPTiDe_pruning, apply_RIPTiDe_sampling
 from pipeGEM.integration.continuous.Eflux import apply_EFlux
 from pipeGEM.integration._class import *
+from pipeGEM.integration.ec import apply_gecko_light, apply_gecko_full, auto_parameterize
 
 
 __all__ = ("integrator_factory", "GIMME", "RIPTiDe", "RIPTiDeSampling", "RIPTiDePruning",
@@ -17,4 +18,6 @@ __all__ = ("integrator_factory", "GIMME", "RIPTiDe", "RIPTiDeSampling", "RIPTiDe
            "apply_EFlux", "apply_GIMME", "apply_iMAT",
            "apply_mCADRE", "apply_CORDA", "apply_rFASTCORMICS",
            "apply_RIPTiDe_sampling", "apply_RIPTiDe_pruning",
-           "apply_SPOT")
+           "apply_SPOT",
+           "enzyme_integrator_factory",
+           "apply_gecko_light", "apply_gecko_full", "auto_parameterize")
