@@ -1,4 +1,5 @@
 import re
+from copy import deepcopy
 from warnings import warn
 from typing import Sequence, List
 
@@ -79,24 +80,80 @@ def make_irrev_rxn(mod,
                    add_inplace=True,
                    ignore_irrev=False,
                    forward_prefix="_F_",
-                   backward_prefix="_R_") -> List[cobra.Reaction]:
+                   backward_prefix="_R_",
+                   *,
+                   remove_original=False,
+                   copy_attributes=True) -> List[cobra.Reaction]:
+    """Create irreversible forward/backward copies of a reaction.
+
+    A reversible reaction ``lb < 0 < ub`` is represented as two non-negative
+    flux reactions: a forward copy with the original stoichiometry and a
+    backward copy with negated stoichiometry. This is the representation needed
+    for enzyme constraints because enzyme usage must be non-negative in both
+    directions.
+
+    Parameters
+    ----------
+    mod : cobra.Model
+        Model containing the reaction.
+    rxn_id : str
+        ID of the reaction to split.
+    add_inplace : bool
+        Add the generated reactions to *mod*.
+    ignore_irrev : bool
+        If True, skip only directions with zero feasible capacity.
+    forward_prefix, backward_prefix : str
+        Prefixes used to generate reaction IDs.
+    remove_original : bool
+        If True and ``add_inplace`` is True, remove the original reaction after
+        adding the irreversible copies.
+    copy_attributes : bool
+        Copy name, subsystem, GPR, notes, and annotation to generated reactions.
+    """
     rxn = mod.reactions.get_by_id(rxn_id)
+    can_forward = rxn.upper_bound > 0 or (not ignore_irrev and rxn.upper_bound == 0)
+    can_backward = rxn.lower_bound < 0 or (not ignore_irrev and rxn.lower_bound == 0)
+
+    def _copy_attrs(new_rxn, direction):
+        if not copy_attributes:
+            return
+        new_rxn.name = f"{rxn.name} ({direction})" if rxn.name else f"{rxn.id} ({direction})"
+        new_rxn.subsystem = getattr(rxn, "subsystem", "")
+        new_rxn.gene_reaction_rule = rxn.gene_reaction_rule
+        new_rxn.notes = deepcopy(rxn.notes)
+        new_rxn.annotation = deepcopy(rxn.annotation)
 
     new_rxns = []
-    if not (ignore_irrev and rxn.upper_bound == 0):
+    if can_forward:
         forward_rxn = cobra.Reaction(f"{forward_prefix}{rxn.id}", upper_bound=rxn.upper_bound, lower_bound=0)
+        _copy_attrs(forward_rxn, "forward")
         forward_rxn.add_metabolites({
             met: c for met, c in rxn.metabolites.items()
         })
         new_rxns.append(forward_rxn)
-    if not (ignore_irrev and rxn.lower_bound == 0):
+    if can_backward:
         reversed_rxn = cobra.Reaction(f"{backward_prefix}{rxn.id}", upper_bound=-rxn.lower_bound, lower_bound=0)
+        _copy_attrs(reversed_rxn, "backward")
         reversed_rxn.subtract_metabolites({
             met: c for met, c in rxn.metabolites.items()
         })
         new_rxns.append(reversed_rxn)
+
     if add_inplace:
+        existing_ids = {r.id for r in mod.reactions}
+        duplicate_ids = [r.id for r in new_rxns if r.id in existing_ids]
+        if duplicate_ids:
+            raise ValueError(f"Generated irreversible reaction IDs already exist: {duplicate_ids}")
+
+        obj_coef = rxn.objective_coefficient
         mod.add_reactions(new_rxns)
+        if obj_coef:
+            if can_forward:
+                forward_rxn.objective_coefficient = obj_coef
+            if can_backward:
+                reversed_rxn.objective_coefficient = -obj_coef
+        if remove_original:
+            mod.remove_reactions([rxn], remove_orphans=False)
     return new_rxns
 
 
