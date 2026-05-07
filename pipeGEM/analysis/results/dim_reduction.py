@@ -6,6 +6,13 @@ class PCA_Analysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
 
+    @property
+    def embedding_df(self):
+        """Return the coordinate dataframe for PCA/embedding analyses."""
+        if "PC" in self.result:
+            return self.result["PC"]
+        return self.result["embeddings"]
+
     def plot(self,
              dpi=150,
              color_by="default",

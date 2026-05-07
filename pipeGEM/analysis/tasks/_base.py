@@ -746,7 +746,7 @@ class TaskHandler:
         boundary = [r.id for r in self.model.exchanges] + \
                    [r.id for r in self.model.demands] + \
                    [r.id for r in self.model.sinks]
-        org_boundary = get_organic_exs(self.model, [], [])
+        org_boundary = [r.id for r in get_organic_exs(self.model, [], [])]
         ko_types = {"all": boundary, "organic": org_boundary}
 
         task_info = {}
@@ -759,7 +759,7 @@ class TaskHandler:
                     for r in ko_types[task.ko_output_type]:
                         model.reactions.get_by_id(r).upper_bound = 0
                 if task.knockout_input_flag:
-                    for r in ko_types[task.ko_output_type]:
+                    for r in ko_types[task.ko_input_type]:
                         model.reactions.get_by_id(r).lower_bound = 0
                 if verbosity >= 2:
                     logger.info("Checking Task %s", ID)

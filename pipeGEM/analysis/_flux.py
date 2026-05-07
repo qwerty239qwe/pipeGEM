@@ -87,6 +87,7 @@ class FVA_Analyzer(FluxAnalyzer):
     def analyze(self,
                 is_loopless=True,
                 fraction_of_optimum=0,
+                processes=1,
                 **kwargs):
         result = FVA_Analysis(log={"solver": self.solver_name,
                                    **kwargs, **self._log})
@@ -95,6 +96,7 @@ class FVA_Analyzer(FluxAnalyzer):
             self.model,
             loopless=is_loopless,
             fraction_of_optimum=fraction_of_optimum,
+            processes=processes,
             **kwargs)
         })
         return result

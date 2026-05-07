@@ -11,6 +11,8 @@ from pipeGEM.analysis._ko import *
 from pipeGEM.analysis.lp import *
 from pipeGEM.analysis._consistency import *
 from pipeGEM.analysis.scaling import *
+from pipeGEM.analysis._auto_stat import AutoStatTest
+from pipeGEM.analysis.pathway import PathwayAnalyzer, KEGGPathwayMapper
 
 
 THRESHOLD = [
@@ -96,12 +98,24 @@ GROUP_COMP = [
     "ComponentNumberAnalysis",
 ]
 
+EC_MODELS = [
+    "GECKOLightAnalysis",
+    "GECKOFullAnalysis",
+]
+
+PATHWAY = [
+    "PathwayAnalyzer",
+    "KEGGPathwayMapper",
+]
+
 __all__ = tuple(
     THRESHOLD + INTEGRATIONS + FLUX_ANALYSIS + SCALINGS + KO_ANALYSIS + DIM_REDUCTIONS + STATS +
-    CONSISTENCY + MAPPING + GROUP_COMP + [
+    CONSISTENCY + MAPPING + GROUP_COMP + EC_MODELS + PATHWAY + [
            "ProblemAnalyzer",
            "gapsplit",
            "TaskAnalysis",
            "CorrelationAnalysis",
+           "AutoStatTest",
+           "AutoStatResult",
            ]
 )
