@@ -1,75 +1,93 @@
 # Configuration file for the Sphinx documentation builder.
 #
-# This file only contains a selection of the most common options. For a full
-# list see the documentation:
+# Full list of options:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
-
-# -- Path setup --------------------------------------------------------------
-
-# If extensions (or modules to document with autodoc) are in another directory,
-# add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
-#
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
 
 import pathlib
 import sys
-import cobra
+
 sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 
-# -- Project information -----------------------------------------------------
+# ---------------------------------------------------------------------------
+# Project information
+# ---------------------------------------------------------------------------
 
 project = 'pipeGEM'
 copyright = '2025, Yu-Te Lin'
 author = 'Yu-Te Lin'
+release = '0.1.1'
 
-# The full version, including alpha/beta/rc tags
-release = '0.1.0'
+# ---------------------------------------------------------------------------
+# General configuration
+# ---------------------------------------------------------------------------
 
-
-# -- General configuration ---------------------------------------------------
-
-# Add any Sphinx extension module names here, as strings. They can be
-# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
-# ones.
 extensions = [
     'sphinx.ext.duration',
-    'sphinx.ext.doctest',
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',
-    "sphinx.ext.autosummary",
-    "myst_nb"
+    'sphinx.ext.autosummary',
+    'sphinx.ext.viewcode',
+    'sphinx.ext.intersphinx',
+    'myst_nb',
+    'sphinx_copybutton',
+    'sphinx_design',
 ]
 
-#nbsphinx_execute = 'never'
-jupyter_execute_notebooks = "off"
+autosummary_generate = True
 
-# Add any paths that contain templates here, relative to this directory.
+# Napoleon (NumPy docstring) settings
+napoleon_numpy_docstring = True
+napoleon_google_docstring = False
+napoleon_include_init_with_doc = False
+napoleon_use_rtype = False
+
+# Intersphinx: link to external docs
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://numpy.org/doc/stable', None),
+    'pandas': ('https://pandas.pydata.org/docs', None),
+    'cobra': ('https://cobrapy.readthedocs.io/en/latest', None),
+}
+
 templates_path = ['_templates']
 
-# List of patterns, relative to source directory, that match files and
-# directories to ignore when looking for source files.
-# This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = []
+# Exclude build artefacts and stray development files
+exclude_patterns = [
+    '_build',
+    '**.ipynb_checkpoints',
+    'tmp.ipynb',
+    'task_result.json',
+]
 
+# ---------------------------------------------------------------------------
+# Notebook execution (myst-nb 1.x)
+# ---------------------------------------------------------------------------
+# "auto": skip execution only if every code cell already has stored outputs;
+# execute the notebook if any cell is missing outputs.
+# Build with: uv run sphinx-build source build html   (from the docs/ dir)
+# This ensures the correct virtual-environment kernel is used.
+nb_execution_mode = 'auto'
+nb_execution_timeout = 300      # seconds per notebook
+nb_execution_allow_errors = False
+nb_execution_raise_on_error = True
 
-# -- Options for HTML output -------------------------------------------------
+# ---------------------------------------------------------------------------
+# HTML output
+# ---------------------------------------------------------------------------
 
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-#
 html_theme = 'pydata_sphinx_theme'
-
-# Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the builtin static files,
-# so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
 html_theme_options = {
-    "navbar_start": ["navbar-logo"],
-    "navbar_center": ["navbar-nav"],
-    "navbar_end": ["theme-switcher", "navbar-icon-links"],
-    "navbar_persistent": ["search-button"]
+    'navbar_start': ['navbar-logo'],
+    'navbar_center': ['navbar-nav'],
+    'navbar_end': ['theme-switcher', 'navbar-icon-links'],
+    'navbar_persistent': ['search-button'],
+    'icon_links': [
+        {
+            'name': 'GitHub',
+            'url': 'https://github.com/qwerty239qwe/pipeGEM',
+            'icon': 'fa-brands fa-github',
+        },
+    ],
 }
