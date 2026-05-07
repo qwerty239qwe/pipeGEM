@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from pipeGEM import Model
 from pipeGEM.data import GeneData
 
@@ -19,5 +20,7 @@ def test_iMAT(ecoli_core, ecoli_core_data):
                                       threshold_kws={},
                                       protected_rxns=["BIOMASS_Ecoli_core_w_GAM"])
     assert result is not None
+    if "result_model" not in result.result:
+        pytest.skip("iMAT requires a solver with indicator constraint support; GLPK does not produce a result model.")
     assert result.result_model is not None
     assert len(result.result_model.reactions) > 0

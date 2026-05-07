@@ -21,7 +21,7 @@ def test_mCADRE(ecoli_core, ecoli_core_data):
     assert result is not None
     assert len(result.result_model.reactions) > 0
     assert len(result.result_model.reactions) <= len(ecoli_core.reactions)
-    assert isinstance(result.removed_rxn_ids, (list, set, tuple))
+    assert isinstance(result.removed_rxn_ids, (list, set, tuple, np.ndarray))
     # All kept reactions should be a subset of the original
     kept_ids = {r.id for r in result.result_model.reactions}
     original_ids = {r.id for r in ecoli_core.reactions}

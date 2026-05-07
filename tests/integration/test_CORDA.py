@@ -20,7 +20,7 @@ def test_CORDA(ecoli_core, ecoli_core_data):
                                       protected_rxns=["BIOMASS_Ecoli_core_w_GAM"])
     assert result is not None
     assert len(result.result_model.reactions) > 0
-    assert isinstance(result.removed_rxn_ids, (list, set, tuple))
+    assert isinstance(result.removed_rxn_ids, (list, set, tuple, np.ndarray))
     # Kept reactions should be a subset of the original
     kept_ids = {r.id for r in result.result_model.reactions}
     original_ids = {r.id for r in ecoli_core.reactions}

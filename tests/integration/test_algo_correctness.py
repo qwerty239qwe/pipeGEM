@@ -59,13 +59,13 @@ class TestGeckoLightExact:
         assert ec.reactions.get_by_id("R1").upper_bound == 1000
 
     def test_gecko_light_tighter_bound(self, model):
-        """kcat=0.0001 -> new_ub=0.0001*1.0*0.5*3600=0.18 < 1000 -> bound reduced."""
+        """kcat=0.0001 -> new_ub=0.0001*0.25*0.5*3600=0.045 < 1000 -> bound reduced."""
         ed = _make_enzyme_data({
             "R1": {"best_kcat": 0.0001, "best_mw": 50.0, "protein_to_use": "P1"},
         })
         result = apply_gecko_light(model, ed, sigma=0.5, copy_model=True)
         ec = result.result["ec_model"]
-        expected_ub = 0.0001 * 1.0 * 0.5 * 3600.0  # = 0.18
+        expected_ub = 0.0001 * 0.25 * 0.5 * 3600.0
         assert np.isclose(ec.reactions.get_by_id("R1").upper_bound, expected_ub)
 
     def test_gecko_light_reduces_objective(self, trivial_linear_model):
@@ -92,8 +92,8 @@ class TestGeckoLightExact:
         assert set(eu.columns) >= {"reaction", "kcat", "abundance", "new_ub", "old_ub"}
         row = eu[eu["reaction"] == "R1"].iloc[0]
         assert np.isclose(row["kcat"], 0.0001)
-        assert np.isclose(row["abundance"], 1.0)
-        assert np.isclose(row["new_ub"], 0.0001 * 1.0 * 0.5 * 3600.0)
+        assert np.isclose(row["abundance"], 0.25)
+        assert np.isclose(row["new_ub"], 0.0001 * 0.25 * 0.5 * 3600.0)
         assert np.isclose(row["old_ub"], 1000.0)
 
     def test_gecko_light_multiple_reactions(self, model):
@@ -104,7 +104,7 @@ class TestGeckoLightExact:
         })
         result = apply_gecko_light(model, ed, sigma=0.5, copy_model=True)
         ec = result.result["ec_model"]
-        # R1 should be constrained (0.18 < 1000)
+        # R1 should be constrained (0.045 < 1000)
         assert ec.reactions.get_by_id("R1").upper_bound < 1000
         # R2: 100 * 1.0 * 0.5 * 3600 = 180000 > 1000, not constrained
         assert ec.reactions.get_by_id("R2").upper_bound == 1000

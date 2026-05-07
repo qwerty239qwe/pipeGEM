@@ -97,6 +97,27 @@ class TestGetGeneIdMap:
         assert result["map_df"]["ENSG001"] == "GeneA"
 
     @patch("pipeGEM.data.preprocessing.biomart_query")
+    def test_legacy_ds_kws_supported(self, mock_bq):
+        mock_result = MagicMock()
+        mock_result.as_dataframe.return_value = pd.DataFrame({
+            "ensembl_gene_id": ["ENSG001"],
+            "external_gene_name": ["GeneA"],
+        })
+        mock_bq.return_value = mock_result
+
+        result = get_gene_id_map(
+            gene_names=["ENSG001"],
+            from_id="ensembl_gene_id",
+            to_id="external_gene_name",
+            df_path=None,
+            ds_kws={"name": "legacy_dataset"},
+        )
+
+        assert "map_df" in result
+        mock_bq.assert_called_once()
+        assert mock_bq.call_args.kwargs["dataset"] == "legacy_dataset"
+
+    @patch("pipeGEM.data.preprocessing.biomart_query")
     def test_drop_unused_filters_by_model(self, mock_bq):
         mock_result = MagicMock()
         mock_result.as_dataframe.return_value = pd.DataFrame({
@@ -269,3 +290,18 @@ class TestUnifyScoreColumn:
         result = unify_score_column(data_df, {}, score_col_name="my_score")
         rdf = result["data_df"]
         assert "my_score" in rdf.columns
+
+
+class TestTransformHPADataExtra:
+    def test_gene_id_col_index(self):
+        """Lines 226-228: gene_id_col='index' copies index to a temporary column."""
+        data_df = pd.DataFrame({
+            "score": [1.0, 2.0, 3.0, 4.0],
+            "tissue": ["brain", "liver", "brain", "liver"],
+        }, index=["g1", "g1", "g2", "g2"])
+        result = transform_HPA_data(data_df, categories=["tissue"],
+                                     gene_id_col="index")
+        df = result["data_df"]
+        assert "brain" in df.columns
+        assert "liver" in df.columns
+        assert set(df.index) == {"g1", "g2"}

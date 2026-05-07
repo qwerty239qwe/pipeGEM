@@ -48,6 +48,27 @@ class TestBaseAnalysis:
         # Original keys still present
         assert "flux_df" in analysis.result
 
+    def test_schema_validation_rejects_unknown_when_strict(self):
+        class StrictAnalysis(BaseAnalysis):
+            RESULT_FIELDS = {"known": {"required": True}}
+            ALLOW_EXTRA_RESULT_FIELDS = False
+
+        result = StrictAnalysis(log={})
+        result.add_result({"known": 1})
+        assert result.known == 1
+        with pytest.raises(KeyError):
+            result.add_result({"unknown": 2})
+
+    def test_validate_result_checks_required_fields(self):
+        class StrictAnalysis(BaseAnalysis):
+            RESULT_FIELDS = {"known": {"required": True}}
+
+        result = StrictAnalysis(log={})
+        with pytest.raises(KeyError):
+            result.validate_result()
+        result.add_result({"known": 1})
+        result.validate_result()
+
     def test_add_running_time(self, analysis):
         analysis.add_running_time(1.234)
         s = analysis.format_str()

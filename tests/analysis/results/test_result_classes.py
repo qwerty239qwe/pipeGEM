@@ -41,6 +41,23 @@ class TestGECKOLightAnalysis:
         res = GECKOLightAnalysis(log={"sigma": 0.5, "ptot": 0.3})
         assert res.log["sigma"] == 0.5
 
+    def test_factory_validates_required_fields(self):
+        res = GECKOLightAnalysis.from_results(
+            log={"n_reactions_with_enzyme_data": 1, "n_bound_reductions": 1},
+            modified_bounds={"rxn1": (0, 100)},
+            kcat_mapping={"rxn1": 10.0},
+            enzyme_usage=pd.DataFrame({"reaction": ["rxn1"]}),
+            ec_model="mock_model",
+        )
+        assert res.ec_model == "mock_model"
+        assert res.n_reactions_with_enzyme_data == 1
+        assert res.n_bound_reductions == 1
+
+    def test_strict_schema_rejects_unknown_fields(self):
+        res = GECKOLightAnalysis(log={})
+        with pytest.raises(KeyError):
+            res.add_result({"unknown": 1})
+
 
 # =====================================================================
 # GECKOFullAnalysis
@@ -66,6 +83,22 @@ class TestGECKOFullAnalysis:
         assert res.protein_pool_id == "prot_pool"
         assert res.draw_reactions == []
         assert res.arm_reactions == []
+
+    def test_factory_and_constraint_count_property(self):
+        res = GECKOFullAnalysis.from_results(
+            log={"n_enzyme_constraints": 2},
+            ec_model="mock_model",
+            protein_pool_id="prot_pool",
+            draw_reactions=["draw_p1"],
+            arm_reactions=["R1", "R2"],
+        )
+        assert res.ec_model == "mock_model"
+        assert res.n_enzyme_constraints == 2
+
+    def test_strict_schema_rejects_unknown_fields(self):
+        res = GECKOFullAnalysis(log={})
+        with pytest.raises(KeyError):
+            res.add_result({"unknown": 1})
 
 
 # =====================================================================

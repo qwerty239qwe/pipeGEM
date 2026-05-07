@@ -1,0 +1,12 @@
+running_time = 0.0
+
+[log]
+p = [50, 10]
+exp_p = nan
+non_exp_p = nan
+
+[result_types]
+data = "numpy.NDArrayFloat"
+exp_th = "python.float64"
+non_exp_th = "python.float64"
+threshold_series = "pandas.Series"
