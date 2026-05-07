@@ -92,6 +92,22 @@ def _fetch_individual_kegg_gene(gene_id):
 
 
 def fetch_KEGG_gene_list(organism) -> pd.DataFrame:
+    """Fetch the list of genes for an organism from KEGG.
+
+    Returns a cached local copy if available; otherwise queries the
+    KEGG REST API and caches the result as a CSV file.
+
+    Parameters
+    ----------
+    organism : str
+        Organism name (e.g. ``"human"``, ``"mouse"``) or KEGG organism
+        code (e.g. ``"hsa"``, ``"mmu"``).
+
+    Returns
+    -------
+    pd.DataFrame
+        Two-column DataFrame with KEGG gene IDs and gene descriptions.
+    """
     if organism in _ORGANISM_KEGG:
         organism = _ORGANISM_KEGG[organism]
 
@@ -113,6 +129,27 @@ def fetch_KEGG_gene_list(organism) -> pd.DataFrame:
 
 
 def fetch_KEGG_gene_data(organism) -> pd.DataFrame:
+    """Fetch detailed gene data for every gene in a KEGG organism.
+
+    Iterates over the gene list returned by :func:`fetch_KEGG_gene_list`
+    and retrieves per-gene annotations (DBLINKS, BRITE hierarchy, etc.)
+    from the KEGG REST API.
+
+    .. warning::
+       This function makes one HTTP request per gene and can be very slow
+       for organisms with many genes.
+
+    Parameters
+    ----------
+    organism : str
+        Organism name or KEGG code (see :func:`fetch_KEGG_gene_list`).
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with one row per gene and columns for each parsed KEGG
+        field (e.g. ``"NAME"``, ``"DEFINITION"``, ``"KEGG ID"``).
+    """
     gene_list = fetch_KEGG_gene_list(organism)
     gene_data = []
     for i in range(gene_list.shape[0]):
@@ -123,10 +160,44 @@ def fetch_KEGG_gene_data(organism) -> pd.DataFrame:
 
 
 def fetch_brenda_ligand():
+    """Fetch ligand data from the BRENDA database.
+
+    .. note:: Not yet implemented.
+    """
     pass
 
 
 def fetch_brenda_data(account, pwd, organism, field):
+    """Fetch enzyme kinetic data from the BRENDA SOAP API.
+
+    Queries BRENDA for a specific data field across all EC numbers for
+    the given organism.  Requires a registered BRENDA account.
+
+    Parameters
+    ----------
+    account : str
+        BRENDA account e-mail address.
+    pwd : str
+        BRENDA account password (will be SHA-256 hashed before sending).
+    organism : str
+        Organism name key (e.g. ``"human"``).  Must exist in the
+        internal ``_ORGANISM_BRENDA`` mapping.
+    field : str
+        Data field to retrieve.  Supported values:
+
+        * ``"KM"`` — Michaelis constant
+        * ``"MW"`` — molecular weight
+        * ``"PATH"`` — pathway information
+        * ``"SEQ"`` — protein sequence
+        * ``"SA"`` — specific activity
+        * ``"KCAT"`` — turnover number
+        * ``"LIGAND"`` — ligand information
+
+    Returns
+    -------
+    list[dict]
+        A list of serialised SOAP response objects, one per EC number.
+    """
     wsdl = "https://www.brenda-enzymes.org/soap/brenda_zeep.wsdl"
     password = hashlib.sha256(pwd.encode("utf-8")).hexdigest()
     client = Client(wsdl)
@@ -170,17 +241,31 @@ def load_HPA_data(data_path: Union[str, Path],
                   gene_col: str,
                   df_query_kw: Dict[str, Union[str, List[str]]] = None,
                   ) -> dict:
-    """
-    Load and add translate column HPA data from a directory
+    """Load and filter a Human Protein Atlas TSV file.
+
+    Reads a tab-separated HPA data file and filters rows according to
+    *df_query_kw*.  Columns whose names appear as keys in *df_query_kw*
+    are kept only where their values match the specified whitelist (or
+    ``"all"`` to skip filtering for that column).
 
     Parameters
     ----------
-    data_path: str or pathlib.Path
-    gene_col: str
-    df_query_kw: dict[str, str or list of str]
+    data_path : str or pathlib.Path
+        Path to the HPA TSV file (e.g. downloaded by
+        :func:`fetch_HPA_data`).
+    gene_col : str
+        Column containing gene identifiers in the data file.
+    df_query_kw : dict, optional
+        Filtering criteria.  Keys are column names; values are either
+        ``"all"`` (keep everything) or a list of allowed values.
+        Defaults to a standard filter retaining ``"Enhanced"``,
+        ``"Approved"``, and ``"Supported"`` reliability entries.
 
     Returns
     -------
+    dict
+        ``{"data_df": pd.DataFrame, "gene_names": list[str]}`` —
+        the filtered DataFrame and a deduplicated list of gene names.
     """
     if df_query_kw is None:
         df_query_kw = {"Cancer": "all",
@@ -210,6 +295,15 @@ def _format_organism_name(raw: str):
 
 
 class DataBaseFetcherIniter:
+    """Registry that maps database names to fetcher classes and their API URLs.
+
+    Parameters
+    ----------
+    new_urls : dict, optional
+        Additional ``{database_name: url}`` entries to register alongside
+        the built-in BiGG and Metabolic Atlas endpoints.
+    """
+
     _database_urls = {"BiGG": "http://bigg.ucsd.edu/api/v2/models",
                       "metabolic atlas": "https://metabolicatlas.org/api/v2/repository/integrated_models"}
 
@@ -219,20 +313,57 @@ class DataBaseFetcherIniter:
             self._database_urls.update(new_urls)
 
     def register(self, name, fetcher):
+        """Register a :class:`DataBaseFetcher` subclass under *name*."""
         self.fetchers[name] = fetcher
 
     def init_fetcher(self, name):
+        """Instantiate and return the fetcher registered under *name*."""
         return self.fetchers[name](url=self._database_urls[name])
 
 
 class DataBaseFetcher:
+    """Base class for fetching model metadata from a remote database.
+
+    Subclasses must implement :meth:`manipulate_df` to convert the raw
+    JSON response into a standardised :class:`~pandas.DataFrame`.
+
+    Parameters
+    ----------
+    url : str
+        API endpoint URL.
+    """
+
     def __init__(self, url):
         self.url = url
 
     def manipulate_df(self, data) -> pd.DataFrame:
+        """Convert a raw JSON response into a DataFrame.
+
+        Must be overridden by subclasses.
+
+        Parameters
+        ----------
+        data : dict or list
+            Parsed JSON from the API response.
+
+        Returns
+        -------
+        pd.DataFrame
+        """
         raise NotImplementedError()
 
     def fetch_data(self) -> pd.DataFrame:
+        """Fetch model metadata from the remote API.
+
+        Sends a GET request to :attr:`url`, parses the JSON response,
+        and delegates to :meth:`manipulate_df` for schema normalisation.
+
+        Returns
+        -------
+        pd.DataFrame or None
+            Normalised DataFrame of model metadata, or ``None`` if the
+            request fails (errors are logged, not raised).
+        """
         try:
             headers = {
                 'User-Agent': 'FETCHER'
@@ -253,6 +384,8 @@ class DataBaseFetcher:
 
 
 class BiggDataBaseFetcher(DataBaseFetcher):
+    """Fetcher for the BiGG Models database API."""
+
     def __init__(self, url):
         super().__init__(url=url)
 
@@ -261,6 +394,8 @@ class BiggDataBaseFetcher(DataBaseFetcher):
 
 
 class AtlasDataBaseFetcher(DataBaseFetcher):
+    """Fetcher for the Metabolic Atlas repository API."""
+
     def __init__(self, url):
         super().__init__(url=url)
 
@@ -367,11 +502,46 @@ def load_remote_model(model_id,
 
 
 def download_model(model_id, file_path, format="mat"):
+    """Download a model from BiGG.
+
+    .. note:: Not yet implemented.
+
+    Parameters
+    ----------
+    model_id : str
+        BiGG model identifier.
+    file_path : str or Path
+        Destination file path.
+    format : str, optional
+        File format (default ``"mat"``).
+    """
     url = f"http://bigg.ucsd.edu/static/models/{model_id}.{format}"
     raise NotImplementedError("haven't finished")
 
 
 def download_atlas_model(model_id="Human-GEM", format="mat", branch="main", download_dest="default") -> str:
+    """Download a GEM from the Metabolic Atlas GitHub repository.
+
+    If the model file already exists locally, the download is skipped.
+
+    Parameters
+    ----------
+    model_id : str, optional
+        Repository / model name (default ``"Human-GEM"``).
+    format : str, optional
+        File extension (default ``"mat"``).  Must match the filename in
+        the repository's ``model/`` directory.
+    branch : str, optional
+        Git branch to download from (default ``"main"``).
+    download_dest : str or Path, optional
+        Destination directory.  ``"default"`` saves to
+        ``<project_root>/models/<branch>/``.
+
+    Returns
+    -------
+    pathlib.Path
+        Path to the downloaded (or already-existing) model file.
+    """
     download_dest = Path(__file__).resolve().parent.parent.parent / "models" / branch \
         if download_dest == "default" else download_dest
     download_dest.mkdir(parents=True, exist_ok=True)

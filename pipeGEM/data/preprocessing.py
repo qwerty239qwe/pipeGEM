@@ -1,11 +1,11 @@
 from pathlib import Path
 from os import PathLike
-from typing import Dict, List, Any, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import cobra
 import pandas as pd
-from biodbs.BioMart import Dataset
+from biodbs.fetch import biomart_query
 
 from pipeGEM._logging import get_logger
 
@@ -21,43 +21,66 @@ def get_gene_id_map(gene_names: List[str],
                     from_id: str,
                     to_id: str,
                     df_path: Union[PathLike, str],
-                    ds_kws: Dict[str, Any],
+                    dataset: Union[str, Dict] = "hsapiens_gene_ensembl",
+                    ds_kws: Optional[Dict] = None,
                     map_type: str = "df",
                     drop_unused: bool = False,
                     ref_model: Optional[cobra.Model] = None):
     """
-    Get a gene ID mapper from local path or Biomart
+    Get a gene ID mapper from local path or BioMart.
 
     Parameters
     ----------
-    gene_names: list of str
-        The gene names / IDs to be translated into another gene names or IDs
-    from_id: str
-        The name of the current IDs
-    to_id: str
-        The name of the transformed IDs
-    df_path: pathlike or str
-
-    ds_kws
-    map_type
-    drop_unused
-    ref_model
+    gene_names : list of str
+        The gene names / IDs to be translated into another gene names or IDs.
+    from_id : str
+        The name of the current IDs (e.g. ``"ensembl_gene_id"``).
+    to_id : str
+        The name of the transformed IDs (e.g. ``"external_gene_name"``).
+    df_path : path-like or str
+        Path to cache the mapping DataFrame as a TSV file.  If ``None``,
+        the mapping is fetched from BioMart without caching.
+    dataset : str
+        BioMart dataset name (default ``"hsapiens_gene_ensembl"``).
+    ds_kws : dict, optional
+        Backward-compatible dataset keyword dictionary used by earlier
+        versions. If supplied, ``name``, ``dataset``, or ``dataset_name`` is
+        used as the BioMart dataset name.
+    map_type : str
+        ``"df"`` to return a DataFrame, ``"dict"`` to return a dict.
+    drop_unused : bool
+        If ``True``, drop genes not present in *ref_model*.
+    ref_model : cobra.Model, optional
+        Reference model used when *drop_unused* is ``True``.
 
     Returns
     -------
-
+    dict
+        ``{"map_df": ...}`` where the value is a DataFrame or dict.
     """
+    if isinstance(dataset, dict) and ds_kws is None:
+        ds_kws = dataset
+        dataset = "hsapiens_gene_ensembl"
+    if ds_kws is not None:
+        dataset = ds_kws.get("dataset", ds_kws.get("dataset_name", ds_kws.get("name", dataset)))
+
     assert drop_unused == (ref_model is not None), "ref_model should be assigned when drop_unused is True"
     if df_path is None:
-        ds = Dataset(**ds_kws)
-        filter_kwargs = {from_id: gene_names}
-        map_df = ds.get_data(attribs=[to_id, from_id], **filter_kwargs)
+        result = biomart_query(
+            dataset=dataset,
+            attributes=[to_id, from_id],
+            filters={from_id: gene_names},
+        )
+        map_df = result.as_dataframe()
     else:
         df_path = Path(df_path)
         if not df_path.is_file():  # save df at the given path
-            ds = Dataset(**ds_kws)
-            filter_kwargs = {from_id: gene_names}
-            map_df = ds.get_data(attribs=[to_id, from_id], **filter_kwargs)
+            result = biomart_query(
+                dataset=dataset,
+                attributes=[to_id, from_id],
+                filters={from_id: gene_names},
+            )
+            map_df = result.as_dataframe()
             map_df.to_csv(df_path, sep='\t')  # save df
         map_df = pd.read_csv(df_path, sep='\t', dtype=str)
     if drop_unused:
@@ -73,10 +96,36 @@ def translate_gene_id(data_df: pd.DataFrame,
                       map_df: pd.DataFrame,
                       gene_col: str,
                       to_id: str):
-    data_df[to_id] = data_df[gene_col].map(map_df, na_action="") \
-        if gene_col != "index" else data_df.index.map(map_df, na_action="")
+    """Translate gene identifiers in a DataFrame using a mapping.
 
-    data_df = data_df[data_df[to_id] != ""]
+    Adds a new column (or replaces the index) with the translated IDs
+    and drops rows that could not be mapped.
+
+    Parameters
+    ----------
+    data_df : pd.DataFrame
+        DataFrame containing the original gene identifiers.
+    map_df : pd.DataFrame or dict
+        Mapping from original IDs to target IDs.  If a DataFrame, it is
+        used via :meth:`pandas.Series.map`; if a dict, keys are original
+        IDs and values are translated IDs.
+    gene_col : str
+        Column in *data_df* that holds the source gene IDs.  Use
+        ``"index"`` to translate the DataFrame index instead.
+    to_id : str
+        Name for the new translated-ID column.  If ``"index"``, the
+        translated IDs replace the DataFrame index.
+
+    Returns
+    -------
+    dict
+        ``{"data_df": pd.DataFrame, "gene_id_col": str}`` — the
+        updated DataFrame and the name of the translated-ID column.
+    """
+    data_df[to_id] = data_df[gene_col].map(map_df, na_action=None) \
+        if gene_col != "index" else data_df.index.map(map_df, na_action=None)
+
+    data_df = data_df[data_df[to_id].notna() & (data_df[to_id] != "")]
     if to_id == "index":
         data_df.index = data_df[to_id]
         data_df = data_df.drop(columns=[to_id])
@@ -86,8 +135,36 @@ def translate_gene_id(data_df: pd.DataFrame,
 def unify_score_column(data_df: pd.DataFrame,
                        level_dic: Dict[str, float],
                        score_col_name: str) -> (pd.DataFrame, Dict[str, Dict[str, Tuple[float, float]]]):
-    # unify value column (for pathology data)
+    """Convert heterogeneous HPA expression columns into a single score.
 
+    Handles three cases depending on which columns are present:
+
+    1. **Level count columns** (e.g. ``"High"``, ``"Medium"``, ``"Low"``):
+       compute a weighted average using *level_dic* as weights and return
+       continuous CORDA thresholds.
+    2. **A ``"Level"`` column** with discrete labels: map labels to numeric
+       scores via *level_dic* and return discrete CORDA thresholds.
+    3. **Quantitative columns** (``"pTPM"`` or ``"NX"``): rename the first
+       matching column to *score_col_name* and return ``None`` thresholds
+       (thresholding left to downstream methods).
+
+    Parameters
+    ----------
+    data_df : pd.DataFrame
+        HPA expression DataFrame (one row per gene × tissue/cell-type).
+    level_dic : dict[str, float]
+        Mapping from expression-level labels (e.g. ``"High"``) to numeric
+        weights.  Also used to map discrete ``"Level"`` labels.
+    score_col_name : str
+        Name for the unified score column added to the returned DataFrame.
+
+    Returns
+    -------
+    dict
+        ``{"data_df": pd.DataFrame, "used_rxn_thres": dict or None}`` —
+        the updated DataFrame and the CORDA threshold dictionary (or
+        ``None`` when quantitative data is used).
+    """
     data_df = data_df.copy()
     score_series, total_series = pd.Series({}, index=data_df.index).fillna(0), \
                                  pd.Series({}, index=data_df.index).fillna(0)
@@ -102,7 +179,7 @@ def unify_score_column(data_df: pd.DataFrame,
         logger.info("Using thresholds for continuous data")
         used_rxn_thres = CORDA_THRESHOLDS["continuous"]
         score_series /= total_series
-        data_df = data_df.drop(level_cols)
+        data_df = data_df.drop(columns=level_cols)
         data_df["score"] = score_series
     elif "Level" in data_df.columns:
         logger.info("Using thresholds for discrete data")
@@ -125,7 +202,37 @@ def transform_HPA_data(data_df,
                        categories: List[str],
                        gene_id_col: str = "entrezgene",
                        score_col_name: str = "score"):
-    # groupby (merge data in interested cols)
+    """Pivot HPA data into a gene × sample expression matrix.
+
+    Groups rows by *gene_id_col* and the specified *categories*, averages
+    duplicate entries, then pivots so that each unique combination of
+    category values becomes a column (sample).
+
+    Parameters
+    ----------
+    data_df : pd.DataFrame
+        Filtered HPA DataFrame (e.g. output of :func:`unify_score_column`).
+    categories : list of str
+        Column names that together define a "sample" (e.g.
+        ``["Tissue", "Cell type"]``).  Multiple columns are joined with
+        ``"_"`` to form a single sample label.
+    gene_id_col : str, optional
+        Column (or ``"index"``) holding gene identifiers
+        (default ``"entrezgene"``).
+    score_col_name : str, optional
+        Column with numeric expression scores (default ``"score"``).
+
+    Returns
+    -------
+    dict
+        ``{"data_df": pd.DataFrame}`` — a genes × samples matrix where
+        rows are genes and columns are sample labels.
+
+    Raises
+    ------
+    ValueError
+        If *categories* is empty (at least one sample column is required).
+    """
     data_df = data_df.copy()
     if gene_id_col == "index":
         data_df["index_"] = data_df.index
@@ -135,8 +242,8 @@ def transform_HPA_data(data_df,
     sample_cols = [col for col in data_df if col not in [gene_id_col, score_col_name]]
     if len(sample_cols) > 1:
         # sample multiindex
-        data_df["sample"] = data_df.apply(lambda x: "_".join([x[c] for c in sample_cols]))
-        data_df.drop(sample_cols)
+        data_df["sample"] = data_df.apply(lambda x: "_".join([x[c] for c in sample_cols]), axis=1)
+        data_df = data_df.drop(columns=sample_cols)
     elif len(sample_cols) == 1:
         data_df.rename(columns={sample_cols[0]: "sample"}, inplace=True)
     else:

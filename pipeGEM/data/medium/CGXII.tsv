@@ -1,0 +1,14 @@
+	mmol/L	BiGG
+D-Glucose	222.0	glc__D
+Ammonium	302.7	nh4
+Urea	83.3	urea
+Phosphate	13.08	pi
+Potassium	18.82	k
+Sulfate	152.4	so4
+Chloride	0.155	cl
+Magnesium	1.015	mg2
+Calcium	0.0775	ca2
+Iron(II)	0.036	fe2
+Biotin	8.2e-04	btn
+Water	inf	h2o
+Oxygen	0.25	o2

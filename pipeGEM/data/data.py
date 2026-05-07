@@ -1,4 +1,5 @@
 import warnings
+from importlib import import_module
 from typing import Dict, Union, Literal, List, Optional
 from pathlib import Path
 
@@ -29,28 +30,59 @@ dis_trans = {"HPA": HPA_scores}
 
 
 class GeneData(BaseData):
-    """
-    A GeneData object stores gene data using a dict. It can also calculate rxn scores for a given model.
+    """Store gene-expression data and compute reaction activity scores.
+
+    ``GeneData`` wraps a mapping of gene IDs to expression values and
+    provides methods to:
+
+    * align the data with a COBRA model via a :class:`~pipeGEM.analysis.RxnMapper`,
+    * compute per-reaction activity scores using gene–protein–reaction (GPR)
+      rules,
+    * apply global or local thresholding strategies,
+    * aggregate data across multiple samples.
 
     Parameters
     ----------
-    data: pd.Series, ad.AnnData, or dict
-        Data contains pairs of gene IDs and expression values.
-    convert_to_str: bool
-        Convert the gene names into strings
-    expression_threshold: float
-        The absent_expression will be assigned to the expression values below this threshold
-    absent_expression: float
-        The value assigned to the low-expressed genes
-    data_transform: callable
-        Transformation applied to the rxn_scores and the transformed_gene_data. e.g. np.log2
-    discrete_transform: str, dict, or callable
-        Discrete data transformation applied to the rxn_scores.
-    ordered_thresholds: list
-        Ascending thresholds indicating how the gene level will be transformed discretely
+    data : pd.Series, anndata.AnnData, or dict
+        Gene-expression values keyed by gene ID.  For ``AnnData``, the object
+        must contain exactly one observation (row).
+    convert_to_str : bool, optional
+        If ``True`` (default), gene IDs are cast to strings.
+    expression_threshold : float, optional
+        Genes with expression below this value are set to *absent_expression*.
+        Default is ``1e-4``.
+    absent_expression : float, optional
+        Value assigned to genes below *expression_threshold*.  Default is ``0``.
+    data_transform : callable or str, optional
+        Transformation applied to expression values when computing reaction
+        scores (e.g. ``np.log2``, ``"log2"``).  ``None`` means identity.
+    discrete_transform : str, dict, or callable, optional
+        Maps raw expression values to discrete levels before storing.
+        Recognised strings: ``"HPA"`` (Human Protein Atlas scoring).
+        A *dict* is used as a direct look-up table.
+    ordered_thresholds : list of float, optional
+        Ascending cut-offs for digitising expression into integer bins
+        centred around zero.
+
+    Attributes
+    ----------
+    gene_data : dict[str, float]
+        Mapping of gene IDs to (possibly transformed) expression values.
+    genes : list[str]
+        Sorted list of gene IDs.
+    rxn_mapper : RxnMapper or None
+        Reaction mapper created by :meth:`align`; ``None`` before alignment.
+    data_transform : callable
+        The transformation applied to values when accessing
+        :attr:`rxn_scores` or :attr:`transformed_gene_data`.
 
     Examples
-    ----------
+    --------
+    >>> gd = GeneData({"geneA": 10.5, "geneB": 0.0})
+    >>> gd["geneA"]
+    10.5
+    >>> gd.align(model)
+    >>> gd.rxn_scores  # reaction → score mapping
     """
 
     def __init__(self,
@@ -306,21 +338,26 @@ class GeneData(BaseData):
                       name: str,
                       transform: bool = True,
                       **kwargs) -> ALL_THRESHOLD_ANALYSES:
-        """
-        Calculate thresholds for classifying expressed and non-expressed reactions.
+        """Calculate expression thresholds for classifying genes.
 
         Parameters
         ----------
-        name: str
-            Thresholding method applied on the gene data.
-        transform: bool
-            To transform the data before finding thresholds (if True) or not (if False).
-        kwargs: dict
-            Keyword arguments for applying thresholding methods.
+        name : str
+            Thresholding method name (e.g. ``"percentile"``,
+            ``"rFastCormic"``, ``"local"``).  Passed to
+            :func:`~pipeGEM.analysis.threshold_finders.create`.
+        transform : bool, optional
+            If ``True`` (default), apply :attr:`data_transform` to the gene
+            data before computing thresholds.
+        **kwargs
+            Additional keyword arguments forwarded to the threshold finder's
+            ``find_threshold`` method.
 
         Returns
         -------
-
+        ThresholdAnalysis
+            A result object whose type depends on *name* (e.g.
+            ``PercentileThresholdAnalysis``, ``rFastCormicThresholdAnalysis``).
         """
         tf = threshold_finders.create(name)
         logger.debug("transform: %s", transform)
@@ -333,29 +370,28 @@ class GeneData(BaseData):
                                method: Literal["binary", "ratio", "diff", "rdiff"] = "binary",
                                group: str = None,
                                **kwargs) -> None:
-        """
-        Assign local threshold result to this object.
-        This will change the gene data based on the passed method.
-            binary: gene data will be changed to either True or False,
-                indicating if the gene data is above (True) or below (False) the threshold.
-            ratio: gene data will be changed to a fraction calculated by dividing data by threshold.
-            diff: gene data will be changed to data - threshold.
-            rdiff: gene data will be changed to threshold - data.
+        """Replace gene-expression values using per-gene local thresholds.
+
+        Modifies :attr:`gene_data` in place according to *method*:
+
+        * ``"binary"`` — ``1`` if expression > threshold, else ``0``.
+        * ``"ratio"``  — expression / threshold.
+        * ``"diff"``   — threshold − expression (positive ⇒ under-expressed).
+        * ``"rdiff"``  — expression − threshold (positive ⇒ over-expressed).
 
         Parameters
         ----------
-        local_threshold_result: LocalThresholdAnalysis
-            Assigned threshold object
-        transform: bool
-            If true, apply data_transform to gene data and thresholds.
-        method: str
-            Method to assign the new gene data
-        group: str
-            Group to select from exp_ths's columns of the local_threshold_result.
-
-        Returns
-        -------
-
+        local_threshold_result : LocalThresholdAnalysis
+            Result object containing per-gene thresholds (from
+            :func:`find_local_threshold`).
+        transform : bool, optional
+            If ``True`` (default), apply :attr:`data_transform` to both
+            gene values and thresholds before comparison.
+        method : {"binary", "ratio", "diff", "rdiff"}, optional
+            Comparison strategy (default ``"binary"``).
+        group : str, optional
+            Column to select from ``local_threshold_result.exp_ths``.
+            Defaults to ``"exp_th"``.
         """
         assert method in ["binary", "ratio", "diff", "rdiff"]
         group = group if group is not None else 'exp_th'
@@ -379,35 +415,43 @@ class GeneData(BaseData):
                   prop: Literal["data", "score"] = "data",
                   absent_expression: float = 0,
                   group_annotation: pd.DataFrame = None) -> DataAggregation:
-        """
-        Aggregate data from multiple sources.
+        """Aggregate gene data or reaction scores from multiple sources.
+
+        Combines multiple :class:`GeneData` objects into a single
+        :class:`~pipeGEM.analysis.DataAggregation` result, either by
+        concatenation or by applying a pandas aggregation method
+        (e.g. ``"mean"``, ``"median"``).
 
         Parameters
         ----------
-        data (Dict[str, Dict[str, Union[Dict[str, Any], pd.DataFrame]]]):
-            A dictionary containing data to aggregate.
-            Outer keys represent different sources, and inner keys represent different datasets within each source.
-            Values can either be dictionaries containing 'gene_data' and 'rxn_scores', or Pandas DataFrames.
-        method (str, optional):
-            The method to use for aggregation. Defaults to "concat".
-        prop (Literal["data", "score"], optional):
-            The property to aggregate. Should be either "data" or "score". Defaults to "data".
-        absent_expression (float, optional):
-            Value to fill NaN entries with. Defaults to 0.
-        group_annotation (pd.DataFrame, optional):
-            DataFrame containing group annotations. Defaults to None.
-
+        data : dict[str, dict[str, GeneData]] or dict[str, GeneData]
+            Gene-data objects to aggregate.  When nested (two-level dict),
+            columns are named ``"outer_key:inner_key"``.
+        method : str, optional
+            Aggregation method.  ``"concat"`` (default) keeps all columns;
+            any other value is called as a pandas DataFrame method along
+            ``axis=1`` (e.g. ``"mean"``, ``"median"``).
+        prop : {"data", "score"}, optional
+            Which property to extract from each ``GeneData``:
+            ``"data"`` → :attr:`gene_data`, ``"score"`` → :attr:`rxn_scores`.
+        absent_expression : float, optional
+            Fill value for missing genes (default ``0``).
+        group_annotation : pd.DataFrame, optional
+            Sample-level group labels.  Its index must match the resulting
+            column names when *method* is ``"concat"``.
 
         Returns
         -------
-        aggregated_data (DataAggregation):
-            An object containing the aggregated data along with relevant metadata.
+        DataAggregation
+            Result object wrapping the aggregated DataFrame.
 
         Raises
-        -------
-        AssertionError: If `prop` is not either "data" or "score".
-        ValueError: If `group_annotation` does not match the aggregated data.
-
+        ------
+        AssertionError
+            If *prop* is not ``"data"`` or ``"score"``.
+        ValueError
+            If *group_annotation* index does not overlap with aggregated
+            column names.
         """
         assert prop in ["data", "score"], "prop should be either data or score"
         obj_prop = {"data": "gene_data", "score": "rxn_scores"}
@@ -446,6 +490,31 @@ def _data_parse_group_models(data_group) -> dict:
 
 
 def find_local_threshold(data_df, **kwargs) -> ALL_THRESHOLD_ANALYSES:
+    """Compute per-gene local expression thresholds across multiple samples.
+
+    This is a convenience wrapper that creates a ``"local"`` threshold
+    finder and calls its :meth:`find_threshold` method.
+
+    Parameters
+    ----------
+    data_df : pd.DataFrame
+        Expression matrix with genes as rows and samples (or groups) as
+        columns.
+    **kwargs
+        Forwarded to the local threshold finder (e.g. ``groups``,
+        ``group_dic``).
+
+    Returns
+    -------
+    LocalThresholdAnalysis
+        Result object containing per-gene threshold values accessible via
+        its ``exp_ths`` attribute.
+
+    See Also
+    --------
+    GeneData.get_threshold : Instance method that delegates to any
+        registered threshold finder.
+    """
     tf = threshold_finders.create("local")
     return tf.find_threshold(data_df, **kwargs)
 
@@ -526,6 +595,7 @@ class MediumData(BaseData):
         else:
              self.name_dict = {} # Initialize empty if no names provided/found
 
+        self._conc_unit_str = conc_unit
         self._u = UnitRegistry()
         try:
             self.conc_unit = self._u.Quantity(conc_unit)
@@ -795,6 +865,244 @@ class MediumData(BaseData):
 
 
     @classmethod
+    def from_catalog(cls, medium, **kwargs):
+        """Load a medium from the built-in :class:`~pipeGEM.data.MediumCatalog`.
+
+        Parameters
+        ----------
+        medium : MediumCatalog or str
+            A :class:`~pipeGEM.data.MediumCatalog` member **or** a
+            case-insensitive string matching the enum name (e.g. ``'M9'``,
+            ``'lb'``, ``'DMEM_HIGH_FFA'``).
+        **kwargs :
+            Keyword arguments forwarded to :meth:`from_file` / ``__init__``.
+            ``id_col_label`` and ``name_index`` default to the values stored in
+            the catalog entry but can be overridden here.
+
+        Returns
+        -------
+        MediumData
+
+        Raises
+        ------
+        ValueError
+            If *medium* is a string that does not match any catalog entry.
+        TypeError
+            If *medium* is neither a ``MediumCatalog`` member nor a string.
+
+        Examples
+        --------
+        >>> m9 = MediumData.from_catalog('M9')
+        >>> m9 = MediumData.from_catalog(MediumCatalog.M9)
+        """
+        from .medium_registry import MediumCatalog
+
+        if isinstance(medium, str):
+            medium_key = medium.upper()
+            try:
+                medium = MediumCatalog[medium_key]
+            except KeyError:
+                # Fall back to case-insensitive match on MediumInfo.name
+                match = next(
+                    (m for m in MediumCatalog if m.value.name.upper() == medium_key),
+                    None,
+                )
+                if match is None:
+                    available = [m.name for m in MediumCatalog]
+                    raise ValueError(
+                        f"Unknown medium '{medium}'. Available entries: {available}"
+                    )
+                medium = match
+
+        if not hasattr(medium, 'value'):
+            raise TypeError(
+                f"'medium' must be a MediumCatalog member or string, got {type(medium).__name__}"
+            )
+
+        info = medium.value
+        kwargs.setdefault('id_col_label', info.default_id_col)
+        kwargs.setdefault('name_index', True)
+        return cls.from_file(info.name, **kwargs)
+
+    def supplement(self, met_id, concentration, name=None):
+        """Add or update a metabolite in the medium.
+
+        Parameters
+        ----------
+        met_id : str
+            BiGG (or other scheme) metabolite identifier.
+        concentration : float
+            Concentration in the unit stored in :attr:`conc_unit`.
+            Use ``float('inf')`` for unconstrained species.
+        name : str, optional
+            Human-readable name.  If omitted, *met_id* is used as the name.
+
+        Returns
+        -------
+        MediumData
+            ``self``, to allow method chaining.
+
+        Warns
+        -----
+        UserWarning
+            If :attr:`rxn_dict` is non-empty (the alignment may be stale).
+        """
+        if self.rxn_dict:
+            warnings.warn(
+                f"rxn_dict is non-empty; alignment may be stale after supplementing '{met_id}'.",
+                UserWarning,
+                stacklevel=2,
+            )
+        self.data_dict[met_id] = concentration
+        self.name_dict[met_id] = name if name is not None else met_id
+        return self
+
+    def remove(self, met_id):
+        """Remove a metabolite from the medium.
+
+        Parameters
+        ----------
+        met_id : str
+            Metabolite identifier to remove.
+
+        Returns
+        -------
+        MediumData
+            ``self``, to allow method chaining.
+
+        Raises
+        ------
+        KeyError
+            If *met_id* is not present in :attr:`data_dict`.
+
+        Warns
+        -----
+        UserWarning
+            If :attr:`rxn_dict` is non-empty (the alignment may be stale).
+        """
+        if met_id not in self.data_dict:
+            raise KeyError(f"Metabolite '{met_id}' not found in medium data.")
+        if self.rxn_dict:
+            warnings.warn(
+                f"rxn_dict is non-empty; alignment may be stale after removing '{met_id}'.",
+                UserWarning,
+                stacklevel=2,
+            )
+        del self.data_dict[met_id]
+        self.name_dict.pop(met_id, None)
+        return self
+
+    def combine(self, other, mode='union', conflict='max'):
+        """Combine two media into a new :class:`MediumData` instance.
+
+        Concentrations in *other* are unit-converted to match ``self`` before
+        combining.  The original instances are not modified.
+
+        Parameters
+        ----------
+        other : MediumData
+            The second medium.
+        mode : {'union', 'intersection'}, default ``'union'``
+            ``'union'``        — include metabolites from either medium.
+            ``'intersection'`` — include only metabolites present in both.
+        conflict : {'max', 'min', 'sum', 'first', 'second'}, default ``'max'``
+            How to resolve a metabolite present in both media:
+
+            * ``'max'``    — use the larger concentration.
+            * ``'min'``    — use the smaller concentration.
+            * ``'sum'``    — add both concentrations.
+            * ``'first'``  — keep ``self``'s value.
+            * ``'second'`` — use ``other``'s value.
+
+        Returns
+        -------
+        MediumData
+            New instance with the combined composition (unit = ``self``'s unit).
+
+        Raises
+        ------
+        TypeError
+            If *other* is not a :class:`MediumData` instance.
+        ValueError
+            If *mode* or *conflict* is invalid, or if units are incompatible.
+        """
+        if not isinstance(other, MediumData):
+            raise TypeError(
+                f"'other' must be a MediumData instance, got {type(other).__name__}"
+            )
+        if mode not in {'union', 'intersection'}:
+            raise ValueError(
+                f"'mode' must be 'union' or 'intersection', got '{mode}'"
+            )
+        if conflict not in {'max', 'min', 'sum', 'first', 'second'}:
+            raise ValueError(
+                f"'conflict' must be one of max/min/sum/first/second, got '{conflict}'"
+            )
+
+        # Unit conversion: use a fresh registry to avoid cross-registry issues
+        try:
+            _ureg = UnitRegistry()
+            other_unit_q = _ureg.Quantity(1, other._conc_unit_str)
+            factor = float(other_unit_q.to(self._conc_unit_str).magnitude)
+        except Exception as e:
+            raise ValueError(
+                f"Cannot convert concentration units "
+                f"'{other._conc_unit_str}' → '{self._conc_unit_str}': {e}"
+            )
+
+        self_keys = set(self.data_dict.keys())
+        other_keys = set(other.data_dict.keys())
+
+        all_keys = self_keys | other_keys if mode == 'union' else self_keys & other_keys
+
+        combined_data = {}
+        combined_names = {}
+
+        for key in sorted(all_keys):
+            in_self = key in self_keys
+            in_other = key in other_keys
+
+            s_conc = self.data_dict.get(key)
+            o_conc_raw = other.data_dict.get(key)
+            o_conc = o_conc_raw * factor if o_conc_raw is not None else None
+
+            if in_self and in_other:
+                if conflict == 'max':
+                    combined_data[key] = max(s_conc, o_conc)
+                elif conflict == 'min':
+                    combined_data[key] = min(s_conc, o_conc)
+                elif conflict == 'sum':
+                    combined_data[key] = s_conc + o_conc
+                elif conflict == 'first':
+                    combined_data[key] = s_conc
+                else:  # 'second'
+                    combined_data[key] = o_conc
+                combined_names[key] = self.name_dict.get(
+                    key, other.name_dict.get(key, key)
+                )
+            elif in_self:
+                combined_data[key] = s_conc
+                combined_names[key] = self.name_dict.get(key, key)
+            else:
+                combined_data[key] = o_conc
+                combined_names[key] = other.name_dict.get(key, key)
+
+        ids = list(combined_data.keys())
+        df = pd.DataFrame({
+            '_id': ids,
+            self._conc_unit_str: [combined_data[k] for k in ids],
+            '_name': [combined_names.get(k, k) for k in ids],
+        })
+        return type(self)(
+            df,
+            id_col_label='_id',
+            conc_col_label=self._conc_unit_str,
+            name_col_label='_name',
+            name_index=False,
+            conc_unit=self._conc_unit_str,
+        )
+
+    @classmethod
     def from_file(cls, file_name="DMEM", csv_kw=None, **kwargs):
         """
         Loads medium data from a file.
@@ -837,10 +1145,23 @@ class MediumData(BaseData):
         data = None
         used_path = None
 
-        # Prioritize TSV in default directory
-        if potential_tsv_path.is_file():
+        # Explicit file paths should keep their own CSV/TSV shape. Bundled
+        # medium TSVs are handled below and use the first column as names.
+        if direct_path.is_file():
+             try:
+                 csv_kw = csv_kw or {}
+                 if 'sep' not in csv_kw and direct_path.suffix.lower() == '.tsv':
+                     csv_kw['sep'] = '\t'
+                 data = pd.read_csv(direct_path, **csv_kw)
+                 used_path = direct_path
+             except Exception as e:
+                 raise IOError(f"Error reading file '{direct_path}': {e}")
+
+        # Prioritize TSV in default directory. Bundled medium TSVs use the
+        # first column as metabolite names.
+        elif potential_tsv_path.is_file():
             try:
-                data = pd.read_csv(potential_tsv_path, sep='\t') # Assume no index col by default for tsv
+                data = pd.read_csv(potential_tsv_path, sep='\t', index_col=0)
                 used_path = potential_tsv_path
                 # Allow overriding sep/index with csv_kw if explicitly provided for tsv
                 if csv_kw:
@@ -859,20 +1180,6 @@ class MediumData(BaseData):
                  except Exception as e:
                      raise IOError(f"Error reading CSV file '{path_to_try}': {e}")
 
-        # Else, try the direct path provided in file_name
-        elif direct_path.is_file():
-             try:
-                 csv_kw = csv_kw or {} # Ensure csv_kw is a dict
-                 # Determine separator based on extension if not in csv_kw
-                 if 'sep' not in csv_kw:
-                     if direct_path.suffix.lower() == '.tsv':
-                         csv_kw['sep'] = '\t'
-                     # else assume comma or let pandas detect
-                 data = pd.read_csv(direct_path, **csv_kw)
-                 used_path = direct_path
-             except Exception as e:
-                 raise IOError(f"Error reading file '{direct_path}': {e}")
-
         # If data is still None, file not found
         if data is None:
             raise FileNotFoundError(f"Medium file '{file_name}' not found in default directory "
@@ -884,6 +1191,33 @@ class MediumData(BaseData):
 
 
 class MetaboliteData(BaseData):
+    """Store metabolite structural data (SMILES) for enzyme-constrained modelling.
+
+    Used by :class:`EnzymeData` when running DLKcat predictions, which
+    require substrate SMILES strings alongside protein sequences.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        DataFrame containing at least a SMILES column.  Rows represent
+        metabolites.
+    met_id_col : str, optional
+        Column whose values should be used as the DataFrame index
+        (metabolite IDs).  If ``None``, the existing index is kept.
+    smiles_col : str, optional
+        Name of the column holding SMILES strings (default ``"SMILES"``).
+
+    Raises
+    ------
+    KeyError
+        If *smiles_col* is not found among the DataFrame columns.
+
+    Attributes
+    ----------
+    smiles_col : str
+        Column name used for SMILES look-ups.
+    """
+
     def __init__(self,
                  data: Union[pd.DataFrame],
                  met_id_col: Optional[str] = None,
@@ -898,11 +1232,25 @@ class MetaboliteData(BaseData):
             raise KeyError(f"A column named {self.smiles_col} containing SMILES is required")
 
     def get_smiles(self, ids):
+        """Retrieve SMILES string(s) for the given metabolite ID(s).
+
+        Parameters
+        ----------
+        ids : str or list of str
+            One or more metabolite IDs.
+
+        Returns
+        -------
+        str or numpy.ndarray
+            A single SMILES string when *ids* is a ``str``, or a NumPy
+            array of strings when *ids* is a list.
+        """
         if isinstance(ids, str):
             return self._add_met_df.loc[ids, self.smiles_col]
         return self._add_met_df.loc[ids, self.smiles_col].values
 
     def __getitem__(self, item):
+        """Return a ``{metabolite_id: SMILES}`` dict for the given ID(s)."""
         if isinstance(item, str):
             item = [item]
             smiles = [self.get_smiles(item)]
@@ -912,6 +1260,24 @@ class MetaboliteData(BaseData):
 
 
 class ProteinAbundanceData(BaseData):
+    """Store protein abundance measurements for enzyme-constrained models.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        DataFrame with protein abundance values.  Rows represent proteins.
+    prot_id_col : str, optional
+        Column to use as the index (protein IDs).  If ``None``, the
+        existing index is kept.
+    abundance_col : str, optional
+        Column containing abundance values (default ``"abundance"``).
+
+    Raises
+    ------
+    KeyError
+        If *abundance_col* is not found in the DataFrame.
+    """
+
     def __init__(self,
                  data: Union[pd.DataFrame],
                  prot_id_col: Optional[str] = None,
@@ -925,10 +1291,59 @@ class ProteinAbundanceData(BaseData):
                            f"possible column names = {self._prot_abund_df.columns}")
 
     def calc_f_coef(self):
+        """Calculate fractional protein coefficients.
+
+        .. note:: Not yet implemented.
+        """
         pass
 
 
 class EnzymeData(BaseData):
+    """Store enzyme kinetic parameters for enzyme-constrained model construction.
+
+    Wraps a DataFrame of per-gene (or per-protein) kinetic data — kcat,
+    molecular weight (MW), EC numbers, protein sequences, etc. — and
+    provides methods to align it with a COBRA model and optionally run
+    DLKcat for *in-silico* kcat prediction.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Enzyme kinetic data.  Each row represents one gene/protein entry.
+    gene_id_col : str, optional
+        Column to use as gene IDs (index).  If ``None``, the existing
+        DataFrame index is used.
+    prot_id_col : str, optional
+        Column containing protein/UniProt IDs.  If ``None``, gene IDs are
+        used as protein identifiers and a warning is issued.
+    rxn_id_col : str, optional
+        Column containing reaction IDs.  If ``None``, reaction mapping is
+        inferred during :meth:`align` via the model's GPR rules.
+    met_id_col : str, optional
+        Column containing metabolite IDs associated with each reaction.
+    mw_col : str, optional
+        Column for molecular weight values (default ``"MW"``).  If absent,
+        MW is inferred from *prot_seq_col*.
+    kcat_col : str, optional
+        Column for experimentally measured kcat values (default ``"Kcat"``).
+    alt_kcat_col : str, optional
+        Column for alternative (predicted) kcat values, e.g. from DLKcat
+        (default ``"DLKcat"``).
+    prot_seq_col : str, optional
+        Column for amino-acid sequences (default ``"Sequence"``).
+    ec_num_col : str, optional
+        Column for EC numbers (default ``"EC"``).
+    sa_col : str, optional
+        Column for specific activity values (default ``"SA"``).
+
+    Attributes
+    ----------
+    prot_id_col : str or None
+        Protein ID column name.
+    mw_col, kcat_col, alt_kcat_col, prot_seq_col, ec_num_col, sa_col : str
+        Column names for the respective fields.
+    """
+
     def __init__(self,
                  data: Union[pd.DataFrame],
                  gene_id_col: Optional[str] = None,
@@ -941,7 +1356,7 @@ class EnzymeData(BaseData):
                  prot_seq_col: str = "Sequence",
                  ec_num_col: str = "EC",
                  sa_col: str = "SA",
-                 ) -> None: # Added return type annotation
+                 ) -> None:
         super().__init__("genes")
         self._enzyme_df = data.copy()
         if gene_id_col is not None:
@@ -969,6 +1384,22 @@ class EnzymeData(BaseData):
 
     @staticmethod
     def calc_molecular_weight(seq: str) -> float:
+        """Estimate protein molecular weight from an amino-acid sequence.
+
+        Uses average amino-acid residue masses and adds 18.02 Da for the
+        terminal water molecule.  Non-standard characters are silently
+        skipped.
+
+        Parameters
+        ----------
+        seq : str
+            One-letter amino-acid sequence.
+
+        Returns
+        -------
+        float
+            Approximate molecular weight in Daltons.
+        """
         aa_codes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
                     'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
         aa_MWs = [71.08, 114.60, 103.14, 115.09, 129.11, 147.17, 57.05, 137.14,
@@ -1087,8 +1518,6 @@ class EnzymeData(BaseData):
         """
         Runs the DLKcat tool to predict kcat values.
 
-        (Placeholder - Requires implementation of DLKcat integration)
-
         Parameters
         ----------
         met_data : MetaboliteData
@@ -1098,26 +1527,69 @@ class EnzymeData(BaseData):
 
         Notes
         -----
-        - This method currently only imports the DLKcat function.
-        - Actual prediction logic needs to be implemented.
-        - It likely needs to prepare input data (protein sequences, metabolite SMILES)
-          from `self._enzyme_df` and `met_data`.
-        - Predicted kcat values should probably be stored, potentially in the
-          `alt_kcat_col` of `_enzyme_df`.
+        Predictions are stored in ``alt_kcat_col``. Existing positive values
+        in ``kcat_col`` are treated as curated values and are not overwritten.
         """
         try:
-            from pipeGEM.extensions.DLKcat import predict_Kcat
-            # --- Implementation needed ---
-            # 1. Prepare input data for predict_Kcat from self._enzyme_df
-            #    (sequences, potentially EC numbers, reaction/metabolite info)
-            #    and met_data (SMILES).
-            # 2. Call predict_Kcat(prepared_data, device=device)
-            # 3. Store results back into self._enzyme_df[self.alt_kcat_col]
-            warnings.warn("DLKcat prediction logic is not yet implemented in run_DLKcat.")
-            pass
+            predict_Kcat = import_module("pipeGEM.extensions.DLKcat.main").predict_Kcat
         except ImportError:
             warnings.warn("DLKcat extension not found. Cannot run kcat prediction. "
-                          "Please ensure it's installed correctly.")
+                          "Install optional dependencies with pipeGEM[dlkcat].")
+            return
+
+        required_cols = [self._rxn_id_col, self._met_id_col, self.prot_seq_col]
+        missing_cols = [col for col in required_cols if col is None or col not in self._enzyme_df.columns]
+        if missing_cols:
+            warnings.warn(f"Cannot run DLKcat: missing aligned columns {missing_cols}.")
+            return
+
+        if self.alt_kcat_col not in self._enzyme_df.columns:
+            self._enzyme_df[self.alt_kcat_col] = np.nan
+
+        kcat_values = pd.to_numeric(self._enzyme_df.get(self.kcat_col), errors="coerce")
+        needs_prediction = kcat_values.isna() | (kcat_values <= 0)
+        if not needs_prediction.any():
+            return
+
+        records = []
+        for gene_id, row in self._enzyme_df.loc[needs_prediction].iterrows():
+            met_id = row[self._met_id_col]
+            seq = row[self.prot_seq_col]
+            if pd.isna(met_id) or pd.isna(seq) or str(seq) == "":
+                continue
+            try:
+                smiles = met_data.get_smiles(met_id)
+            except KeyError:
+                warnings.warn(f"Cannot run DLKcat for metabolite '{met_id}': missing SMILES.")
+                continue
+            records.append({
+                "rxn": row[self._rxn_id_col],
+                "genes": gene_id,
+                "mets": met_id,
+                "Smiles": smiles,
+                "Seq": seq,
+            })
+
+        if not records:
+            warnings.warn("No valid enzyme-metabolite rows are available for DLKcat prediction.")
+            return
+
+        prediction_input = pd.DataFrame.from_records(records)
+        prediction_df = predict_Kcat(prediction_input, device=device)
+        if "kcat" not in prediction_df.columns:
+            raise ValueError("DLKcat prediction output must contain a 'kcat' column.")
+
+        for _, pred in prediction_df.iterrows():
+            value = pd.to_numeric(pred["kcat"], errors="coerce")
+            if pd.isna(value) or value <= 0:
+                continue
+            matched = (
+                needs_prediction
+                & (self._enzyme_df.index == pred["gene"])
+                & (self._enzyme_df[self._rxn_id_col] == pred["rxn"])
+                & (self._enzyme_df[self._met_id_col] == pred["met"])
+            )
+            self._enzyme_df.loc[matched, self.alt_kcat_col] = float(value)
 
 
     def align(self,
@@ -1125,31 +1597,91 @@ class EnzymeData(BaseData):
               check_and_raise=True,
               run_DLKcat=True,
               device="cpu"):
+        """Align enzyme data with a metabolic model.
+
+        Maps genes in the enzyme DataFrame to their corresponding reactions
+        and metabolites using the model's GPR rules.  Optionally runs DLKcat
+        to predict missing kcat values.
+
+        Parameters
+        ----------
+        model : cobra.Model or pipeGEM.Model
+            The metabolic model to align against.
+        check_and_raise : bool, optional
+            If ``True`` (default) and ``rxn_id_col`` was provided at
+            construction, raise on gene–reaction mismatches.
+        run_DLKcat : bool, optional
+            If ``True`` (default), attempt to predict kcat values via the
+            DLKcat deep-learning model.
+        device : str, optional
+            PyTorch device for DLKcat (``"cpu"`` or ``"cuda"``).
+        """
+        def _as_list(value):
+            if isinstance(value, (list, tuple, set, np.ndarray, pd.Series)):
+                return list(value)
+            if pd.isna(value):
+                return []
+            return [value]
+
+        def _reaction_metabolite_ids(rxn):
+            substrate_ids = [met.id for met, coef in rxn.metabolites.items() if coef < 0]
+            if substrate_ids:
+                return substrate_ids
+            return [met.id for met in rxn.metabolites]
+
+        rxn_col_was_provided = self._rxn_id_col is not None
         if self._rxn_id_col is not None:
             warnings.warn("Trying to compare the previous rxn ID and the current model's rxn IDs")
             self.check_gene_rxn_pair(ref_model=model,
                                      raise_err=check_and_raise)
             if self._met_id_col is None:
                 self._met_id_col = "Metabolite" if "Metabolite" not in self._enzyme_df.columns else "_Metabolite"
-                self._enzyme_df[self._met_id_col] = self._enzyme_df[self._rxn_id_col].apply(lambda x:
-                                                                                            [m.id for m in
-                                                                                             model.reactions.get_by_id(
-                                                                                                 x).metabolites])
         elif self._met_id_col is not None:
             raise NotImplementedError()
 
         else:
             self._rxn_id_col = "Reaction" if "Reaction" not in self._enzyme_df.columns else "_Reaction"
             self._met_id_col = "Metabolite" if "Metabolite" not in self._enzyme_df.columns else "_Metabolite"
-            self._enzyme_df[self._rxn_id_col] = self._enzyme_df.index.to_series().apply(lambda x:
-                                                                                        [r.id for r in
-                                                                                         model.genes.get_by_id(
-                                                                                             x).reactions])
-            self._enzyme_df[self._met_id_col] = self._enzyme_df[self._rxn_id_col].apply(lambda x:
-                                                                                        [m.id for m in
-                                                                                         model.reactions.get_by_id(
-                                                                                             x).metabolites])
-            self._enzyme_df = self._enzyme_df.explode([self._rxn_id_col, self._met_id_col])
+
+        model_reaction_ids = {rxn.id for rxn in model.reactions}
+        model_gene_ids = {gene.id for gene in model.genes}
+        aligned_rows = []
+        for gene_id, row in self._enzyme_df.iterrows():
+            if rxn_col_was_provided:
+                rxn_ids = _as_list(row[self._rxn_id_col])
+            else:
+                if gene_id not in model_gene_ids:
+                    warnings.warn(f"Gene '{gene_id}' not found in model. Skipping enzyme row.")
+                    continue
+                rxn_ids = [rxn.id for rxn in model.genes.get_by_id(gene_id).reactions]
+
+            for rxn_id in rxn_ids:
+                if rxn_id not in model_reaction_ids:
+                    if check_and_raise:
+                        raise KeyError(f"Reaction ID '{rxn_id}' from enzyme data not found in the reference model.")
+                    warnings.warn(f"Reaction ID '{rxn_id}' from enzyme data not found in the reference model.")
+                    continue
+                rxn = model.reactions.get_by_id(rxn_id)
+                if self._met_id_col in row.index:
+                    met_ids = _as_list(row[self._met_id_col])
+                else:
+                    met_ids = []
+                if not met_ids:
+                    met_ids = _reaction_metabolite_ids(rxn)
+
+                for met_id in met_ids:
+                    aligned = row.copy()
+                    aligned[self._rxn_id_col] = rxn_id
+                    aligned[self._met_id_col] = met_id
+                    aligned_rows.append((gene_id, aligned))
+
+        if aligned_rows:
+            self._enzyme_df = pd.DataFrame(
+                [row for _, row in aligned_rows],
+                index=[gene_id for gene_id, _ in aligned_rows],
+            )
+        else:
+            self._enzyme_df = self._enzyme_df.iloc[0:0].copy()
 
         if run_DLKcat:
             if not hasattr(model, 'metabolite_data') or model.metabolite_data is None:
@@ -1162,3 +1694,34 @@ class EnzymeData(BaseData):
                 if self.alt_kcat_col not in self._enzyme_df.columns:
                     self._enzyme_df[self.alt_kcat_col] = np.nan
                 self.run_DLKcat(model.metabolite_data, device=device)
+
+        protein_ids = (
+            self._enzyme_df[self.prot_id_col]
+            if self.prot_id_col is not None and self.prot_id_col in self._enzyme_df.columns
+            else self._enzyme_df.index.to_series()
+        )
+        kcat_source = self._enzyme_df.get(self.kcat_col, pd.Series(np.nan, index=self._enzyme_df.index))
+        alt_source = self._enzyme_df.get(self.alt_kcat_col, pd.Series(np.nan, index=self._enzyme_df.index))
+        kcat = pd.to_numeric(kcat_source, errors="coerce")
+        alt_kcat = pd.to_numeric(alt_source, errors="coerce")
+        best_kcat = kcat.where(kcat > 0, alt_kcat)
+        mw = pd.to_numeric(self._enzyme_df.get(self.mw_col), errors="coerce")
+
+        matched = pd.DataFrame({
+            "rxn": self._enzyme_df[self._rxn_id_col],
+            "protein": protein_ids.values,
+            "kcat": best_kcat.values,
+            "mw": mw.values,
+        }, index=self._enzyme_df.index)
+        matched = matched[(matched["kcat"] > 0) & (matched["mw"] > 0)]
+        if matched.empty:
+            self._best_matched_df = matched
+            return
+
+        matched["protein_cost"] = matched["mw"] / matched["kcat"]
+        self._best_matched_df = (
+            matched.sort_values("protein_cost")
+            .drop_duplicates("rxn", keep="first")
+            .drop(columns=["protein_cost"])
+            .reset_index(drop=True)
+        )
