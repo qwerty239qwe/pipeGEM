@@ -11,7 +11,7 @@ sphinx-issues>=4.0
 
 # --- Notebook support ---
 myst-nb>=1.1          # includes myst-parser; handles .ipynb + MyST Markdown
-nbconvert>=7.16
+nbconvert>=7.17.1
 ipykernel
 ipywidgets
 
