@@ -41,46 +41,63 @@ class BasePlotter:
 
     @staticmethod
     def _save_fig(file_name, prefix, dpi=150, g=None):
+        """Save a matplotlib figure or seaborn grid to disk.
+
+        Parameters
+        ----------
+        file_name : str or Path
+            Output file name or full path.
+        prefix : str or None
+            Prefix prepended to the file name.
+        dpi : int, optional
+            Resolution in dots per inch, by default 150.
+        g : matplotlib Figure or seaborn grid, optional
+            The figure-like object to save.  If *None*, ``plt.savefig`` is used.
+        """
         if prefix is None:
             prefix = ""
 
-        if isinstance(file_name, str) and "/" in file_name:
-            file_path = Path("/".join(file_name.split("/")[:-1]))
-            file_name = Path(prefix + file_name.split("/")[-1])
-        else:
-            file_name, file_path = Path(prefix + str(file_name)), Path("./")
+        file_name = Path(file_name)
+        file_path = file_name.parent if file_name.parent != Path(".") else Path("./")
+        file_name = Path(prefix + file_name.name)
 
         if g is None:
-            #plt.close()
             plt.savefig(file_path / file_name, dpi=dpi, bbox_inches='tight')
         else:
-            #plt.close(g)
             g.savefig(file_path / file_name, dpi=dpi, bbox_inches='tight')
+        plt.close("all")
 
     def plot(self, *args, **kwargs):
-        """
-        This is a wrapper function for dealing with styling, file saving, and some other stuffs
+        """Wrapper that handles styling, delegates to :meth:`plot_func`, and saves/shows the figure.
+
+        All keyword arguments not consumed by ``plot_func`` are forwarded.
+        Extra keys recognised here:
+
+        * **file_name** — destination path; if *None* the figure is shown interactively.
+        * **prefix** — prepended to *file_name* (default from ``self.prefix``).
+        * **dpi** — resolution (default from ``self.dpi``).
 
         Returns
         -------
-
+        dict or None
+            The info dict returned by ``plot_func``.
         """
-
         plotting_kws = self.extract_kws(kwargs,
                                         ["file_name", "prefix", "dpi"],
                                         default_kws={"dpi": self.dpi, "prefix": self.prefix})
         self.add_style()
         info_kws = self.plot_func(*args, **kwargs)
+        if info_kws is None:
+            return info_kws
         name_format = info_kws.pop("name_format") if "name_format" in info_kws else "{file_name}"
-        if info_kws is not None:
-            plotting_kws.update(info_kws)
-            updated_name = self.format_file_name(name_format, plotting_kws)
-            plotting_kws["file_name"] = updated_name
-            if plotting_kws["file_name"] is not None:
-                logger.info("Saving %s", plotting_kws["file_name"])
-                self._save_fig(**plotting_kws)
-            else:
-                plt.show()
+        plotting_kws.update(info_kws)
+        updated_name = self.format_file_name(name_format, plotting_kws)
+        plotting_kws["file_name"] = updated_name
+        if plotting_kws["file_name"] is not None:
+            logger.info("Saving %s", plotting_kws["file_name"])
+            self._save_fig(**plotting_kws)
+        else:
+            plt.show()
         return info_kws
 
     def plot_func(self, *args, **kwargs):

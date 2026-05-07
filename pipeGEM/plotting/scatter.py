@@ -119,49 +119,48 @@ def plot_embedding(embedding_df: pd.DataFrame,
                    sheet_file_name: str = None,
                    **kwargs: dict
                    ) -> dict:
-    """
-    Plot embeddings in 2D or 3D.
+    """Plot embeddings in 2D or 3D.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     embedding_df : pd.DataFrame
-        A pandas DataFrame with the embeddings. The rows should be named "embedding 1", "embedding 2", and "embedding 3"
-        if plotting in 3D. The columns should be named after the samples or models.
+        DataFrame with embeddings. Columns should include ``"embedding 1"``,
+        ``"embedding 2"`` (and ``"embedding 3"`` for 3-D). Index holds sample names.
     groups : dict, optional
-        A dictionary with group names as keys and lists of model names as values.
+        Mapping of group names to lists of sample names.  If *None*, each
+        sample is its own group.
     title : str, optional
-        A title for the plot.
+        Figure title.
     palette : str, optional
-        A seaborn color palette for the groups.
+        Seaborn colour palette name.
     plot_2D : bool, optional
-        If True, plot the embeddings in 2D. If False, plot in 3D.
+        If *True*, plot in 2-D; otherwise 3-D.
     reducer : str, optional
-        The dimensionality reduction method used to generate the embeddings.
+        Dimensionality-reduction method name (used for axis labels).
     figsize : tuple, optional
-        A tuple with the figure size (width, height) in inches.
+        Figure size ``(width, height)`` in inches.
     sheet_file_name : str, optional
-        A file name to save the embedding_df as a csv file.
-    **kwargs : dict, optional
-        Additional keyword arguments to pass to the plotting functions.
+        If provided, save the embedding DataFrame as CSV.
 
-    Returns:
-    --------
-    plotting_kws : dict
-        A dictionary with keyword arguments passed to the plotting function.
+    Returns
+    -------
+    dict
+        Dictionary with ``"g"`` key holding the matplotlib Figure.
     """
     plotting_kws = {k: v for k, v in kwargs.items()
                     if k in ["file_name", "dpi", "prefix"]} if kwargs is not None else {}
     for k in ["file_name", "dpi", "prefix"]:
         if k in kwargs:
             del kwargs[k]
+
+    if groups is None:
+        groups = {m: [m] for m in embedding_df.index}
+
     colors = handle_colors(palette=palette,
                            n_colors_used=len(groups))
     fig, ax = plt.subplots(figsize=figsize)
     if sheet_file_name is not None:
         embedding_df.to_csv(sheet_file_name)
-
-    if groups is None:
-        groups = {m: [m] for m in embedding_df.index}
 
     for i, (group_name, model_names) in enumerate(groups.items()):
         em1, em2 = np.array([embedding_df.loc[name, 'embedding 1'] for name in model_names]), \
@@ -238,8 +237,8 @@ def plot_2D_PCA_score(pca_df,
     pc1_exp, pc2_exp = None, None
     if 'exp_var_df' in kwargs:
         pc1_exp, pc2_exp = kwargs['exp_var_df'].iloc[0, 0], kwargs['exp_var_df'].iloc[1, 0]
-    x_label = f'Principle Component 1' + f'(explain {pc1_exp * 100:.2f}% variance)' if pc1_exp else ''
-    y_label = f'Principle Component 2' + f'(explain {pc2_exp * 100:.2f}% variance)' if pc2_exp else ''
+    x_label = 'Principal Component 1' + (f' (explain {pc1_exp * 100:.2f}% variance)' if pc1_exp else '')
+    y_label = 'Principal Component 2' + (f' (explain {pc2_exp * 100:.2f}% variance)' if pc2_exp else '')
     title = f'PCA_score{("_" + fig_title) if fig_title is not None else ""}'
     ax = _set_default_ax(ax, x_label=x_label, y_label=y_label, title=title)
     plotting_kws = {k: v for k, v in kwargs.items() if k in ["file_name", "dpi", "prefix"]}
@@ -289,9 +288,9 @@ def plot_3D_PCA_score(pca_df: pd.DataFrame,
     pc1_exp, pc2_exp, pc3_exp = None, None, None
     if 'exp_var_df' in kwargs:
         pc1_exp, pc2_exp, pc3_exp = kwargs['exp_var_df'].iloc[0, 0], kwargs['exp_var_df'].iloc[1, 0], kwargs['exp_var_df'].iloc[2, 0]
-    x_label = f'PC1' + f'(explain {pc1_exp * 100:.2f}% variance)' if pc1_exp else ''
-    y_label = f'PC2' + f'(explain {pc2_exp * 100:.2f}% variance)' if pc2_exp else ''
-    z_label = f'PC3' + f'(explain {pc3_exp * 100:.2f}% variance)' if pc3_exp else ''
+    x_label = 'PC1' + (f' (explain {pc1_exp * 100:.2f}% variance)' if pc1_exp else '')
+    y_label = 'PC2' + (f' (explain {pc2_exp * 100:.2f}% variance)' if pc2_exp else '')
+    z_label = 'PC3' + (f' (explain {pc3_exp * 100:.2f}% variance)' if pc3_exp else '')
     title = f'PCA_score{("_" + fig_title) if fig_title is not None else ""}'
 
     ax = _set_default_ax(ax, x_label=x_label, y_label=y_label, z_label=z_label, title=title)
@@ -336,8 +335,8 @@ def plot_PCA_screeplot(exp_var_df: pd.DataFrame,
     ax.plot(X, cumsum, marker='o', color=colors[1], label="Cumulative (%)")
 
     ax = _set_default_ax(ax, title=f'{fig_title}' if fig_title is not None else fig_title,
-                         x_label='Principle Component',
-                         y_label='Variance Explaned (%)')
+                         x_label='Principal Component',
+                         y_label='Variance Explained (%)')
 
     ax.set_xticks(X)
     ax.set_yticks(np.linspace(0, 1, 11))
@@ -395,34 +394,33 @@ def plot_PCA_loading(component_df: pd.DataFrame,
 
 
 def plot_Eflux_scatter(r_exp, r_bound):
-    """
-    Create a scatter plot showing the relationship between reaction expression levels and lower/upper bounds.
+    """Create scatter plots of reaction expression vs. lower/upper bounds.
 
     Parameters
     ----------
     r_exp : dict
-        A dictionary containing reaction expression levels. Keys are reaction IDs and values are expression levels.
+        ``{reaction_id: expression_level}``
     r_bound : dict
-        A dictionary containing lower and upper bounds for each reaction. Keys are reaction IDs and values are lists
-        containing the lower and upper bounds.
+        ``{reaction_id: [lower_bound, upper_bound]}``
 
     Returns
     -------
-    None
+    dict
+        ``{"g": fig}`` — the matplotlib Figure.
     """
     fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(8, 12))
     axes[0].scatter([r_exp[r_id] for r_id in list(r_exp.keys())],
                     [r_bound[r_id][0] for r_id in list(r_exp.keys())])
     axes[1].scatter([r_exp[r_id] for r_id in list(r_exp.keys())],
                     [r_bound[r_id][1] for r_id in list(r_exp.keys())])
-    _set_default_ax(axes[0], title=f'Expression to lower bound',
+    _set_default_ax(axes[0], title='Expression to lower bound',
                     x_label='Expression value',
                     y_label='Lower bound', with_legend=False)
 
-    _set_default_ax(axes[1], title=f'Expression to upper bound',
+    _set_default_ax(axes[1], title='Expression to upper bound',
                     x_label='Expression value',
                     y_label='Upper bound', with_legend=False)
-    plt.show()
+    return {"g": fig}
 
 
 def plot_volcano(data,

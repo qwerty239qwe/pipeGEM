@@ -14,6 +14,34 @@ def plot_data_cat(long_data: pd.DataFrame,
                   palette: Union[str] = "deep",
                   log_scale=False,
                   ):
+    """Plot categorical data using seaborn catplot.
+
+    Parameters
+    ----------
+    long_data : pd.DataFrame
+        Long-form DataFrame.
+    id_col : str
+        Column identifying categories (e.g., reaction IDs).
+    val_col : str
+        Column with numeric values to plot.
+    ids : list of str
+        Subset of *id_col* values to include.
+    group_col : str, optional
+        Column for hue grouping.
+    vertical : bool, optional
+        If *True*, categories on x-axis and values on y-axis.
+    kind : str, optional
+        Seaborn catplot kind, by default ``"bar"``.
+    palette : str, optional
+        Seaborn palette name.
+    log_scale : bool, optional
+        Apply log scale to the value axis.
+
+    Returns
+    -------
+    dict
+        ``{"g": FacetGrid}``
+    """
     if vertical:
         x, y = id_col, val_col
     else:
@@ -93,6 +121,34 @@ def plot_local_threshold_boxplot(data,
                                  figsize: Tuple[float, float] = (8, 6),
                                  **kwargs
                                  ):
+    """Plot expression boxplots overlaid with local and global thresholds.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Expression matrix (genes × samples).
+    genes : list of str
+        Gene IDs to include.
+    groups : list of str or ``"all"``
+        Group names to include (or ``"all"`` for all groups).
+    group_dic : dict
+        ``{group_name: [sample_names]}``.
+    local_th : pd.DataFrame
+        Local thresholds (genes × groups).
+    global_on_th : pd.Series
+        Global "on" threshold per group.
+    global_off_th : pd.Series
+        Global "off" threshold per group.
+    width : float, optional
+        Box width, by default 0.8.
+    figsize : tuple, optional
+        Figure size, by default ``(8, 6)``.
+
+    Returns
+    -------
+    dict
+        ``{"g": Figure}``
+    """
     fig, ax = plt.subplots(figsize=figsize)
     if groups == "all":
         groups = [g for g in group_dic]
@@ -119,16 +175,21 @@ def plot_local_threshold_boxplot(data,
     actual_width = (1 / x1_ - 2 * gap) / x2_
     x_lims = ax.get_xlim()
     for gpi, g in enumerate(groups):
+        # Only add labels on the first group to avoid duplicate legend entries
+        on_label = "Global-on threshold" if gpi == 0 else None
+        off_label = "Global-off threshold" if gpi == 0 else None
         ax.axhline(y=global_on_th.loc[g], xmin=block_w * gpi, xmax=block_w * (gpi + 1),
-                   label="Global-on threshold", lw=2, ls=":", color="k")
+                   label=on_label, lw=2, ls=":", color="k")
         ax.axhline(y=global_off_th.loc[g], xmin=block_w * gpi, xmax=block_w * (gpi + 1),
-                   label="Global-off threshold", lw=2, ls=":", color="b")
+                   label=off_label, lw=2, ls=":", color="b")
         local_width_init = block_w * gpi + gap
         for gni, gene in enumerate(genes):
+            local_label = "Local threshold" if gpi == 0 and gni == 0 else None
             ax.axhline(y=local_th.loc[gene, g],
                        xmax=local_width_init + actual_width * (gni + 1),
                        xmin=local_width_init + actual_width * gni,
-                       label="Local threshold", lw=2, ls="-", color="r")
+                       label=local_label, lw=2, ls="-", color="r")
     ax.set_xlim(*x_lims)
+    ax.legend()
 
     return {"g": fig}

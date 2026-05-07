@@ -53,19 +53,32 @@ def _set_default_ax(ax,
 
 
 def _save_fig(file_name, prefix, dpi=150, g=None):
+    """Save a matplotlib figure or seaborn grid to disk.
+
+    Parameters
+    ----------
+    file_name : str or Path
+        Output file name or full path. If it contains a directory component,
+        the file is saved in that directory.
+    prefix : str or None
+        Prefix prepended to the file name (e.g., ``"FBA_"``).
+    dpi : int, optional
+        Resolution in dots per inch, by default 150.
+    g : matplotlib Figure or seaborn grid, optional
+        The figure-like object to save. If *None*, ``plt.savefig`` is used.
+    """
     if prefix is None:
         prefix = ""
 
-    if isinstance(file_name, str) and "/" in file_name:
-        file_path = Path("/".join(file_name.split("/")[:-1]))
-        file_name = Path(prefix + file_name.split("/")[-1])
-    else:
-        file_name, file_path = Path(prefix + str(file_name)), Path("./")
+    file_name = Path(file_name)
+    file_path = file_name.parent if file_name.parent != Path(".") else Path("./")
+    file_name = Path(prefix + file_name.name)
 
     if g is None:
         plt.savefig(file_path / file_name, dpi=dpi, bbox_inches='tight')
     else:
         g.savefig(file_path / file_name, dpi=dpi, bbox_inches='tight')
+    plt.close("all")
 
 
 def extract_kws(kws: dict, keys, default_kws):
@@ -89,6 +102,23 @@ def format_file_name(name_format, plotting_kws):
 
 
 def save_fig(func=None, *, prefix="", dpi=150, name_format="{file_name}"):
+    """Decorator that wraps a plotting function with automatic file saving.
+
+    The decorated function should return a ``dict`` containing at least a
+    ``"g"`` key with the figure object, and optionally ``"name_format"`` for
+    customised file naming.
+
+    Parameters
+    ----------
+    func : callable, optional
+        The plotting function to wrap.
+    prefix : str, optional
+        Default filename prefix, by default ``""``.
+    dpi : int, optional
+        Default resolution, by default 150.
+    name_format : str, optional
+        Default format template for the filename, by default ``"{file_name}"``.
+    """
     if func is None:
         return partial(save_fig, prefix=prefix, dpi=dpi, name_format=name_format)
 
@@ -99,14 +129,16 @@ def save_fig(func=None, *, prefix="", dpi=150, name_format="{file_name}"):
                                    default_kws={"dpi": dpi, "prefix": prefix})
 
         info_kws = func(*args, **kwargs)
+        if info_kws is None:
+            return info_kws
         name_format = info_kws.pop("name_format") if "name_format" in info_kws else "{file_name}"
-        if info_kws is not None:
-            plotting_kws.update(info_kws)
-            updated_name = format_file_name(name_format, plotting_kws)
-            plotting_kws["file_name"] = updated_name
-            if plotting_kws["file_name"] is not None:
-                logger.info("saving %s", plotting_kws["file_name"])
-                _save_fig(**plotting_kws)
+        plotting_kws.update(info_kws)
+        updated_name = format_file_name(name_format, plotting_kws)
+        plotting_kws["file_name"] = updated_name
+        if plotting_kws["file_name"] is not None:
+            logger.info("saving %s", plotting_kws["file_name"])
+            _save_fig(**plotting_kws)
+        else:
             plt.show()
         return info_kws
     return plot_the_result
@@ -136,10 +168,33 @@ def handle_colors(palette: str = "deep",
                   alt_palette: str = "Spectral",
                   n_colors_used: int = 10,
                   warn_when_switch=True):
-    colors = sns.color_palette(palette, n_colors=sns.palettes.QUAL_PALETTE_SIZES[palette])
+    """Return a list of colours from *palette*, switching to *alt_palette* if needed.
+
+    Parameters
+    ----------
+    palette : str, optional
+        Seaborn palette name, by default ``"deep"``.
+    alt_palette : str, optional
+        Fallback palette when *palette* has too few colours, by default ``"Spectral"``.
+    n_colors_used : int, optional
+        Minimum number of distinct colours required, by default 10.
+    warn_when_switch : bool, optional
+        Emit a warning when the palette is switched, by default True.
+
+    Returns
+    -------
+    list
+        A list of RGB tuples.
+    """
+    max_qual = sns.palettes.QUAL_PALETTE_SIZES.get(palette)
+    if max_qual is not None:
+        colors = sns.color_palette(palette, n_colors=max_qual)
+    else:
+        colors = sns.color_palette(palette, n_colors=n_colors_used)
+
     if len(colors) < n_colors_used:
         if warn_when_switch:
-            warnings.warn(f"{palette} contains less colors ({sns.palettes.QUAL_PALETTE_SIZES[palette]})"
+            warnings.warn(f"{palette} contains fewer colors ({len(colors)})"
                           f" than the number of groups ({n_colors_used}). "
                           f"Palette has been changed to {alt_palette}.")
         colors = sns.color_palette(alt_palette, n_colors=n_colors_used)

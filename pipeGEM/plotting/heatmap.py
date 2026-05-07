@@ -8,46 +8,67 @@ import seaborn as sns
 from ._utils import save_fig, _get_subsystem_ticks
 
 
+def _get_qual_size(palette_name):
+    """Return the max number of qualitative colours for *palette_name*, or None."""
+    return sns.palettes.QUAL_PALETTE_SIZES.get(palette_name)
+
+
+def _resolve_palette(palette_name, n_needed, replacement):
+    """Choose palette and n_colors, falling back to *replacement* when needed."""
+    max_qual = _get_qual_size(palette_name)
+    if max_qual is not None and n_needed <= max_qual:
+        return sns.color_palette(palette_name, n_colors=None)
+    return sns.color_palette(replacement if max_qual is not None else palette_name,
+                             n_colors=n_needed)
+
+
 def _parse_one_axis_colors(groups: pd.DataFrame,
                            color_palette: Union[List[str], str, Dict[str, str]] = "deep",
                            palette_replacement = "Spectral",
                            color_order: Dict[str, List[str]] = None
                            ):
+    """Convert a groups DataFrame to a colours DataFrame for ``sns.clustermap``.
+
+    Parameters
+    ----------
+    groups : pd.DataFrame
+        DataFrame whose columns are group categories and rows are samples.
+    color_palette : str, list of str, or dict
+        Palette specification — a single name, a list (one per column), or a
+        dict mapping column names to palette names.
+    palette_replacement : str
+        Fallback palette when the primary has too few colours.
+    color_order : dict, optional
+        ``{column_name: [ordered_values]}``; controls the value order within
+        each group column.
+
+    Returns
+    -------
+    pd.DataFrame
+        Same shape as *groups* but with RGB colour tuples as values.
+    """
     color_order = [] if color_order is None else color_order
     g_vals = {rcol: sorted(groups[rcol].unique()) if rcol not in color_order else color_order[rcol]
               for rcol in groups.columns}
     color_maps = {}
     if isinstance(color_palette, str):
-
         for rcol, rval in g_vals.items():
-            palette_ = sns.color_palette(color_palette
-                                         if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[color_palette]
-                                         else palette_replacement,
-                                         n_colors=None
-                                         if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[color_palette] else len(rval))
+            palette_ = _resolve_palette(color_palette, len(rval), palette_replacement)
             color_maps[rcol] = dict(zip(rval, palette_[:len(rval)]))
 
     elif isinstance(color_palette, list):
         assert all([isinstance(c, str) for c in color_palette]), "Elements in the color_palette should be strings"
         assert len(color_palette) == len(groups.columns)
         for cp, (rcol, rval) in zip(color_palette, g_vals.items()):
-            palette_ = sns.color_palette(cp
-                                         if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[cp]
-                                         else palette_replacement,
-                                         n_colors=None
-                                         if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[color_palette] else len(rval))
+            palette_ = _resolve_palette(cp, len(rval), palette_replacement)
             color_maps[rcol] = dict(zip(rval, palette_[:len(rval)]))
+
     elif isinstance(color_palette, dict):
         assert all([isinstance(c, str) for c in color_palette]), "Keys in the color_palette should be strings"
         assert all([isinstance(c, str) for c in color_palette.values()]), "Values in the color_palette should be strings"
         assert len(color_palette) == len(groups.columns)
         for rcol, rval in g_vals.items():
-            palette_ = sns.color_palette(color_palette[rcol]
-                                         if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[color_palette[rcol]]
-                                         else palette_replacement,
-                                         n_colors=None
-                                         if len(rval) <= sns.palettes.QUAL_PALETTE_SIZES[color_palette] else len(rval)
-                                         )
+            palette_ = _resolve_palette(color_palette[rcol], len(rval), palette_replacement)
             color_maps[rcol] = dict(zip(rval, palette_[:len(rval)]))
 
     colors = groups.copy()
