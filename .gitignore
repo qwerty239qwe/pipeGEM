@@ -131,3 +131,17 @@ dmypy.json
 
 
 *.png
+
+# Project-specific
+.claude/
+.pytest_state/
+.pytest-tmp/
+.tokensave/
+/data/
+models/
+draft
+nul
+temp_pytest/
+temp_pytest_medium/
+docs/jupyter_execute/
+docs/*.rar
