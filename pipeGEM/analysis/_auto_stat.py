@@ -19,6 +19,11 @@ from pipeGEM.analysis.results.auto_stat import AutoStatResult
 logger = get_logger(__name__)
 
 
+def _normalize_pingouin_p_columns(result_df):
+    """Keep pingouin p-value column names stable across releases."""
+    return result_df.rename(columns={"p_unc": "p-unc"})
+
+
 # -----------------------------------------------------------------------
 # Effect-size helpers
 # -----------------------------------------------------------------------
@@ -216,7 +221,7 @@ class AutoStatTest:
                 data.loc[data[between] == data[between].unique()[1], dv],
             )
             result["test"] = "Mann-Whitney U"
-        return result
+        return _normalize_pingouin_p_columns(result)
 
     def _multi_group_test(self, data, dv, between, parametric):
         if parametric:
@@ -225,15 +230,16 @@ class AutoStatTest:
         else:
             result = pg.kruskal(data=data, dv=dv, between=between)
             result["test"] = "Kruskal-Wallis"
-        return result
+        return _normalize_pingouin_p_columns(result)
 
     def _pairwise_test(self, data, dv, between, parametric):
         if parametric:
-            return pg.pairwise_tukey(data=data, dv=dv, between=between)
+            result = pg.pairwise_tukey(data=data, dv=dv, between=between)
         else:
-            return pg.pairwise_tests(
+            result = pg.pairwise_tests(
                 data=data, dv=dv, between=between, parametric=False,
             )
+        return _normalize_pingouin_p_columns(result)
 
     def _calculate_effect_sizes(self, group_data, n_groups):
         effects = {}

@@ -14,6 +14,8 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 keywords = ["metabolism", "metabolic-model", "computational-biology", "system-biology", "cobra"]
 dependencies = [
@@ -27,7 +29,8 @@ dependencies = [
     "scikit-posthocs",
     "seaborn",
     "umap-learn>=0.5.6",
-    "numba>=0.59",
+    "numba>=0.59; python_version >= '3.10' and python_version < '3.13'",
+    "numba>=0.63; python_version >= '3.13'",
     "biodbs",
     "tqdm",
     "optlang",

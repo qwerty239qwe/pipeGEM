@@ -14,6 +14,11 @@ from pipeGEM.analysis.results import NormalityTestResult, VarHomogeneityTestResu
 DEFAULT_SIGS = [0.05, 0.01, 0.001, 0.0001]
 
 
+def _normalize_pingouin_p_columns(result_df):
+    """Keep pingouin p-value column names stable across releases."""
+    return result_df.rename(columns={"p_unc": "p-unc"})
+
+
 class AssumptionTester:
     def __init__(self):
         pass
@@ -160,6 +165,7 @@ class PairwiseTester(StatisticalTest):
                                             dv=dep_var,
                                             between=between,
                                             **kwargs)
+            result = _normalize_pingouin_p_columns(result)
             if added_label is not None:
                 result["label"] = added_label
             result_obj.add_result(dict(result_df=result,
@@ -205,6 +211,7 @@ class MultiGroupComparison(StatisticalTest):
                                    dv=dep_var,
                                    between=between,
                                    **kwargs)
+        result_df = _normalize_pingouin_p_columns(result_df)
         if added_label is not None:
             result_df["label"] = added_label
 

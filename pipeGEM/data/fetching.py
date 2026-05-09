@@ -1,4 +1,5 @@
 import warnings
+from io import BytesIO
 from pathlib import Path
 from typing import Dict, List, Union
 import pkgutil
@@ -114,15 +115,16 @@ def fetch_KEGG_gene_list(organism) -> pd.DataFrame:
     kegg_data_path = pkgutil.get_data("", f"./data/kegg/{organism}.csv")
 
     if kegg_data_path is not None:
-        return pd.read_csv(kegg_data_path)
+        return pd.read_csv(BytesIO(kegg_data_path))
     url = "http://rest.kegg.jp/list/{org}".format(org=organism)
     resp = requests.get(url)
     data = [line.split("\t") for line in resp.text.split("\n")]
     df = pd.DataFrame(data)
     resource_path = Path(__file__).parent.parent.parent / "data/kegg"
     try:
+        resource_path.mkdir(parents=True, exist_ok=True)
         df.to_csv(resource_path / f"{organism}.csv")
-    except FileNotFoundError as e:
+    except OSError:
         warnings.warn(f"The kegg file couldn't be saved in the {resource_path.resolve()}")
 
     return df
