@@ -5,7 +5,6 @@ Covers:
 - pipeGEM/integration/ec/gecko_light.py  (apply_gecko_light)
 - pipeGEM/integration/ec/gecko_full.py  (apply_gecko_full)
 """
-from copy import deepcopy
 from unittest.mock import MagicMock
 
 import cobra
@@ -248,7 +247,7 @@ class TestApplyGeckoLight:
         mock_enzyme_data.rxn_items.return_value = {
             "R1": {"best_kcat": 0.001, "best_mw": 50.0, "protein_to_use": "P1"},
         }
-        model_copy = deepcopy(mini_model)
+        model_copy = mini_model.copy()
         apply_gecko_light(model_copy, mock_enzyme_data, sigma=0.5, copy_model=False)
         assert model_copy.reactions.get_by_id("R1").upper_bound < 1000
 

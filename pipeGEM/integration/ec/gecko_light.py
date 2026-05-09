@@ -4,14 +4,13 @@ Applies ``kcat * enzyme_abundance`` as upper bounds on enzyme-catalysed
 reactions, without modifying the model structure (no draw/arm reactions
 or protein pool).
 """
-from copy import deepcopy
-
 import numpy as np
 import pandas as pd
 
 from pipeGEM._logging import get_logger
 from pipeGEM.analysis.results._base import timing
 from pipeGEM.analysis.results.ec import GECKOLightAnalysis
+from pipeGEM.integration.ec._copy import copy_cobra_model
 
 logger = get_logger(__name__)
 
@@ -74,7 +73,7 @@ def apply_gecko_light(
     GECKOLightAnalysis
     """
     if copy_model:
-        model = deepcopy(model)
+        model = copy_cobra_model(model)
 
     protected = set(protected_rxns or [])
 

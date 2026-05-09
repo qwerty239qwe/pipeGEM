@@ -5,14 +5,13 @@ reactions from the pool to individual enzymes, and modifying metabolic
 reactions to consume the enzyme pseudo-metabolite proportional to
 ``1 / kcat``.
 """
-from copy import deepcopy
-
 import numpy as np
 
 from pipeGEM._logging import get_logger
 from pipeGEM.analysis.results._base import timing
 from pipeGEM.analysis.results.ec import GECKOFullAnalysis
 from pipeGEM.integration.ec._builder import ECModelBuilder, PROT_POOL_ID
+from pipeGEM.integration.ec._copy import copy_cobra_model
 
 logger = get_logger(__name__)
 
@@ -59,7 +58,7 @@ def apply_gecko_full(
     GECKOFullAnalysis
     """
     if copy_model:
-        model = deepcopy(model)
+        model = copy_cobra_model(model)
 
     protected = set(protected_rxns or [])
 
