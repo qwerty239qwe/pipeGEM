@@ -8,6 +8,8 @@ from pipeGEM.integration.algo.mCADRE import apply_mCADRE
 from pipeGEM.integration.algo.MBA import apply_MBA
 from pipeGEM.integration.algo.INIT import apply_INIT
 from pipeGEM.integration.algo.iMAT import apply_iMAT
+from pipeGEM.integration.ec.gecko_light import apply_gecko_light
+from pipeGEM.integration.ec.gecko_full import apply_gecko_full
 from pipeGEM.utils import ObjectFactory
 
 
@@ -191,6 +193,16 @@ class iMAT(GeneDataIntegrator):
                           **kwargs)
 
 
+class GECKOLight(EnzymeDataIntegrator):
+    def integrate(self, model, data, **kwargs):
+        return apply_gecko_light(model=model, enzyme_data=data, **kwargs)
+
+
+class GECKOFull(EnzymeDataIntegrator):
+    def integrate(self, model, data, **kwargs):
+        return apply_gecko_full(model=model, enzyme_data=data, **kwargs)
+
+
 integrator_factory = Integrators()
 integrator_factory.register("GIMME", GIMME)
 integrator_factory.register("EFlux", EFlux)
@@ -203,3 +215,7 @@ integrator_factory.register("mCADRE", mCADRE)
 integrator_factory.register("MBA", MBA)
 integrator_factory.register("INIT", INIT)
 integrator_factory.register("iMAT", iMAT)
+
+enzyme_integrator_factory = Integrators()
+enzyme_integrator_factory.register("GECKOLight", GECKOLight)
+enzyme_integrator_factory.register("GECKOFull", GECKOFull)

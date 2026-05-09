@@ -2,6 +2,10 @@ import cobra
 import numpy as np
 from decimal import Decimal
 
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def calc_rxn_unbalance_scores(rxn):
     all_c = [abs(c) for m, c in rxn.metabolites.items()]
@@ -51,7 +55,7 @@ def add_scale_rxn_for_met(mod, met_id, mod_rxns, c=0.1, scale_f=1e-4):
         cur_f = cur_f * c
         met = mod.metabolites.get_by_id(met_id)
         if original_met_id + met_postfix in met_ids_in_mod:
-            print(f"{original_met_id + met_postfix} is already in the model")
+            logger.info("%s is already in the model", original_met_id + met_postfix)
             continue
 
         new_met = cobra.Metabolite(id=original_met_id + met_postfix, name=original_met.name + f"_{cur_f}",
@@ -66,7 +70,7 @@ def add_scale_rxn_for_met(mod, met_id, mod_rxns, c=0.1, scale_f=1e-4):
         met_id = original_met_id + met_postfix
 
     if scale_times == 0:
-        print("The reaction is unchanged")
+        logger.info("The reaction is unchanged")
         return
 
     for r in mod_rxns:

@@ -1,5 +1,9 @@
 import pandas as pd
 
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def prep_flux_df(flux_df: pd.DataFrame,
                  rxn_ids) -> (pd.DataFrame, pd.DataFrame):
@@ -24,5 +28,5 @@ def filter_fva_df(fva_df: pd.DataFrame, threshold, verbosity):
     diff = abs(fva_df["maximum"] - fva_df["minimum"]) < threshold
     if verbosity > 0:
         filtered = diff
-        print("Filtering out rxns (abs(max - min) < theshold): ", fva_df.loc[filtered, "Reaction"].index.to_list())
+        logger.info("Filtering out rxns (abs(max - min) < threshold): %s", fva_df.loc[filtered, "Reaction"].index.to_list())
     return fva_df.loc[~diff, :]

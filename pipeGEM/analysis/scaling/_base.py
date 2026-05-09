@@ -7,6 +7,10 @@ from scipy.sparse import csc_matrix, lil_matrix
 from scipy import sparse
 from tqdm import tqdm
 
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def get_decimals(x):
     return len(str(float(x)).split(".")[1])
@@ -58,9 +62,9 @@ class ModelScaler:
         arr = create_stoichiometric_matrix(model)
         old_arr = arr.copy()
         row_psc, col_psc = self.calc_coef_scale_diff(arr)
-        print("Before rescaling:")
-        print(f"Problematic rows (metabolite coefficients): {row_psc}")
-        print(f"Problematic cols (reaction coefficients): {col_psc}")
+        logger.info("Before rescaling:")
+        logger.info("Problematic rows (metabolite coefficients): %s", row_psc)
+        logger.info("Problematic cols (reaction coefficients): %s", col_psc)
         self.m_ind = model.metabolites.index
         self.r_ind = model.reactions.index
         self.cons_scale_diags = np.ones(shape=(len(model.reactions,)))
@@ -69,12 +73,12 @@ class ModelScaler:
         for _ in tqdm(range(n_iter)):
             arr = self.one_operation(arr)
             if self.reach_stop_crit(arr):
-                print("Reached stop criterion")
+                logger.info("Reached stop criterion")
                 break
         row_psc, col_psc = self.calc_coef_scale_diff(arr)
-        print("After rescaling:")
-        print(f"Problematic rows (metabolite coefficients): {row_psc}")
-        print(f"Problematic cols (reaction coefficients): {col_psc}")
+        logger.info("After rescaling:")
+        logger.info("Problematic rows (metabolite coefficients): %s", row_psc)
+        logger.info("Problematic cols (reaction coefficients): %s", col_psc)
         self._diff_A = csc_matrix(arr - old_arr)
         self._old_A = csc_matrix(old_arr)
         self._decimals = lil_matrix(np.zeros(shape=self._diff_A.shape), dtype=int)

@@ -4,6 +4,9 @@ from collections import namedtuple
 from functools import reduce
 
 from pipeGEM.utils import flip_direction, get_rxn_set
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 
@@ -359,7 +362,7 @@ class ftINIT_builder:
                                                lb=pt["lb"], ub=pt["ub"],
                                                type_ab=pt["type"])
             var_dict.update(added_vars)
-            print(f"{len(added_vars)} vars added")
+            logger.debug("%d vars added", len(added_vars))
 
         for r in self.model.reactions:
             var_dict[f"rxn_f_{r.id}"] = r.forward_variable
@@ -368,7 +371,7 @@ class ftINIT_builder:
         met_prod_rxns = {m: self.get_met_prod_rxns(self.model, m) for m in mets}
         constr_add_details = self._init_constraints_details(var_dict, rxn_groups,
                                                             mets=mets, met_prod_rxns=met_prod_rxns)
-        print("after var inclusion: ", len(self.model.variables), len(self.model.constraints))
+        logger.debug("after var inclusion: %d variables, %d constraints", len(self.model.variables), len(self.model.constraints))
         for c in constr_add_details:
             self._add_cons_to_model(model=self.model,
                                     var_coefs=c["var_coefs"],
@@ -378,7 +381,7 @@ class ftINIT_builder:
         for r in rxn_groups["ess_irrev_rxns"]:
             if fluxes[r] > 0:
                 self.model.reactions.get_by_id(r).lower_bound = min(fluxes[r] * 0.99, 0.1)
-            print(f"force irrev essential rxn {r} to have this lower_bound: {self.model.reactions.get_by_id(r).lower_bound}")
+            logger.debug("force irrev essential rxn %s to have this lower_bound: %s", r, self.model.reactions.get_by_id(r).lower_bound)
 
         obj_dict = {}
         for name, var in var_dict.items():
@@ -394,11 +397,11 @@ class ftINIT_builder:
 
     @staticmethod
     def _log_step_info(step, i, previous_result=None):
-        print(f"Starting step {i + 1}")
-        print("ignoring rxn types: ", step.ignored_rxn_types)
-        print("method to use the previous result: ", step.prev_usage)
+        logger.info("Starting step %d", i + 1)
+        logger.info("ignoring rxn types: %s", step.ignored_rxn_types)
+        logger.info("method to use the previous result: %s", step.prev_usage)
         if previous_result is not None:
-            print(previous_result)
+            logger.info("%s", previous_result)
 
     def get_result(self,
                    rxn_score_dict,
@@ -408,7 +411,7 @@ class ftINIT_builder:
                    ):
         backward_rxns = get_rxn_set(self.model, "backward")
         if len(backward_rxns) > 0:
-            print(f"Found and flipped {len(backward_rxns)} reactions")
+            logger.info("Found and flipped %d reactions", len(backward_rxns))
             flip_direction(self.model, backward_rxns)
 
         rxns_turned_on = set()
@@ -437,9 +440,9 @@ class ftINIT_builder:
 
             mingap_result = 1
             next_mingap = None
-            print(len(self.model.variables), len(self.model.constraints))
+            logger.debug("%d variables, %d constraints", len(self.model.variables), len(self.model.constraints))
             for i_pa, params in enumerate(step.MILP_params):
-                print(f"iteration {i_pa}")
+                logger.info("iteration %d", i_pa)
                 with self.model:
                     for exh in self.model.exchanges:
                         if -1000 < exh.lower_bound < 0:
@@ -454,17 +457,17 @@ class ftINIT_builder:
                                        mets=mets,
                                        mipgap=target_mingap,
                                        timelimit=params["timelimit"])
-                    print(len(self.model.variables), len(self.model.constraints))
+                    logger.debug("%d variables, %d constraints", len(self.model.variables), len(self.model.constraints))
                     while status != "optimal":
                         self.model.objective.direction = "min"
                         status = self.model.solver.optimize()
                         if status != "optimal":
-                            print(len(self.model.variables), len(self.model.constraints))
+                            logger.debug("%d variables, %d constraints", len(self.model.variables), len(self.model.constraints))
                             break
 
                             #target_mingap *= 10
                             #self.model.solver.problem.setParam('MIPGap', target_mingap)
-                        print(f"target_mingap: {target_mingap:.4f}; optimization status: {status}")
+                        logger.info("target_mingap: %.4f; optimization status: %s", target_mingap, status)
                     sol = self.model.solver.primal_values
 
                     forward_fluxes = {varname: flux for varname, flux in sol.items()
@@ -488,11 +491,11 @@ class ftINIT_builder:
                                           step.MILP_params[i_pa+1]["abs_mip_gap"] / abs(self.model.solver.problem.ObjVal)))
 
                     if mingap_result < next_mingap:
-                        print(f"Found valid MINGAP in iteration {i_pa}, result MINGap: {mingap_result}")
+                        logger.info("Found valid MINGAP in iteration %d, result MINGap: %s", i_pa, mingap_result)
                         break
-                    print(f"current mingap: {mingap_result}")
+                    logger.debug("current mingap: %s", mingap_result)
 
-        print("MILP finished. Removing reactions...")
+        logger.info("MILP finished. Removing reactions...")
         to_remove = set([r.id for r in self.model.reactions]) - set(essential_rxns + ignored_rxns + list(rxns_turned_on))
         self.model.remove_reactions(list(to_remove), remove_orphans=True)
         return self.model

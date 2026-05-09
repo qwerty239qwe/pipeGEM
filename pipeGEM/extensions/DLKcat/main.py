@@ -22,7 +22,9 @@ def _prepare_preditor_and_data(df, device="cpu", precom_obj_dir=DEFAULT_PRECOMP)
     n_word = len(word_dict)
 
     Kcat_model = KcatPrediction(device, n_fingerprint, n_word)
-    Kcat_model.load_state_dict(torch.load(Path(precom_obj_dir) / 'model_state'))
+    Kcat_model.load_state_dict(torch.load(Path(precom_obj_dir) / 'model_state', map_location=device))
+    Kcat_model.to(device)
+    Kcat_model.eval()
     predictor = Predictor(Kcat_model)
     dataset = SeqSmileDataset(fingerprint_dict=fingerprint_dict,
                               atom_dict=atom_dict,
@@ -44,9 +46,10 @@ def predict_Kcat(df, device="cpu") -> pd.DataFrame:
             results.append({**dict(zip(["rxn", "gene", "met"], labels)), **dict(kcat=None)})
             continue
 
-        inputs = [inp.squeeze() for inp in inputs]
+        inputs = [inp.squeeze().to(device) for inp in inputs]
         try:
-            prediction = predictor.predict(inputs)
+            with torch.no_grad():
+                prediction = predictor.predict(inputs)
             Kcat_log_value = prediction.item()
             Kcat_value = 2 ** Kcat_log_value
         except KeyError:

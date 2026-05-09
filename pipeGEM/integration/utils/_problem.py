@@ -1,5 +1,8 @@
 from optlang.symbolics import Zero
 from optlang.exceptions import IndicatorConstraintsNotSupported
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 type_dic = {"c": "continuous", "b": "binary", "i": "integer"}
@@ -57,7 +60,7 @@ def add_cons_to_model(model,
                     con_dict[f"{prefix}{name}"] = coefs
                     added_cons.append(cons)
                 except IndicatorConstraintsNotSupported:
-                    print(f"Indicator constraint not supported in {prefix}{name}")
+                    logger.warning("Indicator constraint not supported in %s%s", prefix, name)
                     return False
             else:
                 if lb == ub:

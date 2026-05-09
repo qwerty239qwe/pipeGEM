@@ -10,11 +10,14 @@ from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, man
 
 from pipeGEM.core._base import GEMComposite
 from pipeGEM.core._model import Model
+from pipeGEM._logging import get_logger
 from pipeGEM.analysis import ComponentComparisonAnalysis, \
     ComponentNumberAnalysis, prepare_PCA_dfs, PCA_Analysis, FBA_Analysis, DataAggregation
 from pipeGEM.data import GeneData
 from pipeGEM.plotting import plot_clustermap
 from pipeGEM.utils import is_iter, calc_jaccard_index
+
+logger = get_logger(__name__)
 
 
 class Group(GEMComposite):
@@ -391,7 +394,7 @@ class Group(GEMComposite):
             new_group = self.__class__(group=list(self._group.values()), # Pass list of models
                                        name_tag=name_tag,
                                        **self._get_converted_grp_annot()) # Pass existing annotations
-            print(f"Created a new group '{name_tag}' containing models: {list(self._group.keys())}")
+            logger.info("Created a new group '%s' containing models: %s", name_tag, list(self._group.keys()))
             return new_group
 
 

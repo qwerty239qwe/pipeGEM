@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 from ._base import *
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def measure_efficacy(kept_rxn_ids,
@@ -8,21 +11,27 @@ def measure_efficacy(kept_rxn_ids,
                      core_rxn_ids,
                      non_core_rxn_ids,
                      method="F1_score"):
+    def _safe_div(numerator, denominator):
+        return numerator / denominator if denominator else np.nan
+
     FP = len(set(kept_rxn_ids) & set(non_core_rxn_ids))
     TP = len(set(kept_rxn_ids) & set(core_rxn_ids))
     TN = len(set(removed_rxn_ids) & set(non_core_rxn_ids))
     FN = len(set(removed_rxn_ids) & set(core_rxn_ids))
-    print("# Kept core reactions:", TP)
-    print("# Removed core reactions:", FN)
-    print("# Kept non-core reactions:", FP)
-    print("# Removed non-core reactions:", TN)
-    print("Percentage of kept core rxns:", TP / (TP+FN))
-    print("Percentage of removed non-core rxns:", TN / (TN + FP))
+    logger.info("# Kept core reactions: %d", TP)
+    logger.info("# Removed core reactions: %d", FN)
+    logger.info("# Kept non-core reactions: %d", FP)
+    logger.info("# Removed non-core reactions: %d", TN)
+    logger.info("Percentage of kept core rxns: %s", _safe_div(TP, TP + FN))
+    logger.info("Percentage of removed non-core rxns: %s", _safe_div(TN, TN + FP))
     if method == "MCC":
-        return (TN * TP - FN * FP) / np.sqrt((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))
-    precision = TP / (TP + FP)
-    recall = TP / (TP + FN)
+        denominator = np.sqrt((TP + FP) * (TP + FN) * (TN + FP) * (TN + FN))
+        return _safe_div(TN * TP - FN * FP, denominator)
+    precision = _safe_div(TP, TP + FP)
+    recall = _safe_div(TP, TP + FN)
     if method == "F1_score":
+        if np.isnan(precision) or np.isnan(recall) or precision + recall == 0:
+            return np.nan
         return 2 * (precision * recall) / (precision + recall)
     if method == "precision":
         return precision
@@ -100,26 +109,37 @@ class GIMMEAnalysis(BaseAnalysis):
         super().__init__(log)
 
 
-# Not finished
 class SPOTAnalysis(BaseAnalysis):
+    """Analysis result object for the SPOT algorithm.
+
+    Encapsulates the results from the `apply_SPOT` function, which generates
+    an expression-guided flux distribution by maximising a weighted-sum
+    objective over reaction expression scores while maintaining a fraction
+    of the FBA-optimal objective and bounding total flux via an L1 norm
+    constraint.
+
+    Parameters
+    ----------
+    log : dict
+        A dictionary storing parameters used during the SPOT execution,
+        such as ``obj_frac``, ``norm_ub``, ``protected_rxns``, and
+        ``remove_zero_fluxes``.
+
+    Attributes
+    ----------
+    rxn_scores : dict[str, float]
+        The original input dictionary mapping reaction IDs to their
+        expression scores passed to ``apply_SPOT``.
+    flux_result : pandas.DataFrame or None
+        A DataFrame containing the SPOT flux distribution.  Indexed by
+        reaction ID with a single column ``'fluxes'``.  ``None`` when
+        ``return_fluxes=False`` was passed to ``apply_SPOT``.
+    result_model : cobra.Model or None
+        The pruned ``cobra.Model`` after removing reactions with near-zero
+        SPOT flux.  ``None`` when ``remove_zero_fluxes=False`` (default).
+    """
     def __init__(self, log):
         super().__init__(log)
-        self._rxn_scores = None
-        self._fluxes = None
-        self._model = None
-
-    @property
-    def result_model(self):
-        return self._model
-
-    @property
-    def flux_result(self):
-        return self._fluxes
-
-    def add_result(self, rxn_scores, fluxes=None, model=None):
-        self._rxn_scores = rxn_scores
-        self._fluxes = fluxes if fluxes is not None else self._fluxes
-        self._model = model
 
 
 class RIPTiDePruningAnalysis(BaseAnalysis):

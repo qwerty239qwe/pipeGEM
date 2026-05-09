@@ -1,0 +1,140 @@
+site_name: pipeGEM
+site_description: Processing and integrating omics data, media, tasks, and genome-scale metabolic models.
+site_url: https://pipegem.readthedocs.io/
+repo_url: https://github.com/qwerty239qwe/pipeGEM
+repo_name: qwerty239qwe/pipeGEM
+docs_dir: docs_src
+use_directory_urls: false
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - content.tabs.link
+    - navigation.expand
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocs-jupyter:
+      execute: false
+      include_source: true
+      ignore_h1_titles: false
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - .
+          options:
+            docstring_style: numpy
+            docstring_section_style: table
+            filters:
+              - "!^_"
+            inherited_members: false
+            merge_init_into_class: true
+            members_order: source
+            show_if_no_docstring: false
+            show_root_heading: false
+            show_root_full_path: false
+            show_root_toc_entry: false
+            show_signature_annotations: true
+            show_source: false
+            separate_signature: true
+  - redirects:
+      redirect_maps:
+        quickstart.md: getting-started/quickstart.md
+        tutorial/index.md: tutorials/index.md
+        tutorial/1_basic.md: tutorials/1_basic.ipynb
+        tutorial/2_data.md: tutorials/2_data.ipynb
+        tutorial/3_model_testing.md: tutorials/3_model_testing.ipynb
+        tutorial/4_MEM.md: tutorials/4_MEM.ipynb
+        tutorial/5_flux_simulation.md: tutorials/5_flux_simulation.ipynb
+        api/index-old.md: api/index.md
+        api/modules.md: api/index.md
+        api/pipeGEM.md: api/index.md
+        api/pipeGEM.analysis.md: api/index.md
+        api/pipeGEM.analysis.tasks.md: api/tasks.md
+        api/pipeGEM.cli.md: api/cli.md
+        api/pipeGEM.data.md: api/data.md
+        api/pipeGEM.integration.md: api/integration.md
+        api/pipeGEM.plotting.md: api/plotting.md
+        api/pipeGEM.utils.md: api/utils.md
+        api/data-old.md: api/data.md
+        api/model-old.md: api/model.md
+        api/group-old.md: api/group.md
+        api/task-old.md: api/tasks.md
+        api/task.md: api/tasks.md
+        api/threshold-old.md: api/threshold.md
+        api/integration-old.md: api/integration.md
+        api/results-old.md: api/results.md
+        api/pipeGEM.analysis.results.md: api/results.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+  - Tutorials:
+      - Overview: tutorials/index.md
+      - Basic operations: tutorials/1_basic.ipynb
+      - Data fetching and processing: tutorials/2_data.ipynb
+      - Model testing: tutorials/3_model_testing.ipynb
+      - Model extraction methods: tutorials/4_MEM.ipynb
+      - Flux simulation and visualization: tutorials/5_flux_simulation.ipynb
+  - User Guide:
+      - Model and group workflows: user-guide/model-group.md
+      - Data workflows: user-guide/data.md
+      - Medium catalog: user-guide/medium.md
+      - Metabolic tasks: user-guide/tasks.md
+      - Gene data integration: user-guide/integration.md
+      - Flux analysis: user-guide/flux.md
+      - Command line interface: user-guide/cli.md
+      - EC and GECKO models: user-guide/ec-gecko.md
+      - DLKcat: user-guide/dlkcat.md
+  - API Reference:
+      - Overview: api/index.md
+      - Data: api/data.md
+      - Model: api/model.md
+      - Group: api/group.md
+      - Tasks: api/tasks.md
+      - Thresholds: api/threshold.md
+      - Integration: api/integration.md
+      - Results: api/results.md
+      - Plotting: api/plotting.md
+      - Utilities: api/utils.md
+      - CLI: api/cli.md

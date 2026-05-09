@@ -1,139 +1,208 @@
-# PipeGEM v0.1.1
+# PipeGEM v0.2.0
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/pipeGEM.svg)](https://pypi.python.org/pypi/pipeGEM/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![ci](https://github.com/qwerty239qwe/pipeGEM/actions/workflows/ci.yml/badge.svg)
 [![codecov](https://codecov.io/gh/qwerty239qwe/pipeGEM/graph/badge.svg?token=1BJAWO79OL)](https://codecov.io/gh/qwerty239qwe/pipeGEM)
 
 ___
-This is a package for visualizing and analyzing multiple metabolic models. 
-It also allow users to integrate omic data, metabolic tasks, and medium data with GEMs. 
+PipeGEM is a Python package for analyzing and visualizing multiple genome-scale metabolic models (GEMs). It supports the integration of transcriptomic and proteomic data, metabolic task evaluation, and medium composition into GEMs. Flux analysis is powered by [cobrapy](https://cobrapy.readthedocs.io/en/latest/).
 
-The flux analysis functions in the package are based on cobrapy: 
-https://cobrapy.readthedocs.io/en/latest/
+Documentation: [pipegem.readthedocs.io](https://pipegem.readthedocs.io/)
+
 ___
-### How to get PipeGEM
-To install directly from PyPI:
-<br>
-`pip install pipegem`
+### Installation
+
+**pip**
+```bash
+pip install pipegem
+```
+
+**uv**
+```bash
+uv add pipegem
+```
+
+**uv (development)**
+```bash
+git clone https://github.com/qwerty239qwe/pipeGEM.git
+cd pipeGEM
+uv sync
+```
+
+**Documentation build**
+```bash
+uv run --locked --extra doc mkdocs build --strict -d ./docs
+```
+
 ___
-### How to use this package (Python API)
-**single model**
+### Python API
+
+**Single model**
 ```python
 import pipeGEM as pg
 from pipeGEM.utils import load_model
 
-model = load_model("your_model_path")  # cobra.Model
-pmodel = pg.Model(name_tag="model_name", 
-                  model=model)
+model = load_model("your_model_path")  # returns a cobra.Model
+pmodel = pg.Model(name_tag="model_name", model=model)
 
-# Print out model information
 print(pmodel)
 
-# Do and plot pFBA result
 flux_analysis = pmodel.do_flux_analysis("pFBA")
 flux_analysis.plot(
     rxn_ids=['rxn_a', 'rxn_b'],
-    file_name='pfba_flux.png'  # can be None if you don't want to save the figure
-    )
+    file_name='pfba_flux.png'  # pass None to skip saving
+)
 ```
 
-
-**multiple models**
+**Multiple models**
 ```python
 import pipeGEM as pg
 from pipeGEM.utils import load_model
 
-model_a1 = load_model("your_model_path_1")
-model_a2 = load_model("your_model_path_2")
-
-model_b1 = load_model("your_model_path_3")
-model_b2 = load_model("your_model_path_4")
-
-group = pg.Group({
+group = pg.Group(
+    {
         "group_a": {
-            "model_a_dmso": model_a1, 
-            "model_a_metformin": model_a2
+            "model_a_dmso": load_model("path_1"),
+            "model_a_metformin": load_model("path_2"),
         },
         "group_b": {
-            "model_b_dmso": model_b1, 
-            "model_b_metformin": model_b2
-        }
-    }, 
-    name_tag="my_group", 
-    treatments={"model_a_dmso": "DMSO", 
-                "model_b_dmso": "DMSO",
-                "model_a_metformin": "metformin", 
-                "model_b_metformin": "metformin"}
+            "model_b_dmso": load_model("path_3"),
+            "model_b_metformin": load_model("path_4"),
+        },
+    },
+    name_tag="my_group",
+    treatments={
+        "model_a_dmso": "DMSO",
+        "model_b_dmso": "DMSO",
+        "model_a_metformin": "metformin",
+        "model_b_metformin": "metformin",
+    },
 )
 
-# Do and plot pFBA result
 flux_analysis = group.do_flux_analysis("pFBA")
 flux_analysis.plot(rxn_ids=['rxn_a', 'rxn_b'])
 ```
 
-**Generate context-specific models**
+**Context-specific models from omic data**
+
+PipeGEM can reconstruct context-specific GEMs by integrating gene expression data. The example below uses GIMME, but a range of algorithms are available.
+
 ```python
 import numpy as np
 import pipeGEM as pg
 from pipeGEM.utils import load_model
 from pipeGEM.data import GeneData, synthesis
 
-# initialize model
-mod = pg.Model(name_tag="model_name", 
-               model=load_model("your_model_path_1"))
+mod = pg.Model(name_tag="model_name", model=load_model("your_model_path"))
 
-# create dummy transcriptomic data
+# Generate synthetic transcriptomic data for demonstration
 dummy_data = synthesis.get_syn_gene_data(mod, n_sample=3)
 
-# calculate reaction activity score
-gene_data = GeneData(data=dummy_data["sample_0"], # pd.Series or a dict
-                     data_transform=lambda x: np.log2(x), # callable
-                     absent_expression=-np.inf) # value
-mod.add_gene_data(name_or_prefix="sample_0",  # name of the data
-                  data=gene_data, 
-                  or_operation="nanmax",  # alternative: nansum
-                  threshold=-np.inf, 
-                  absent_value=-np.inf)
+gene_data = GeneData(
+    data=dummy_data["sample_0"],
+    data_transform=lambda x: np.log2(x),
+    absent_expression=-np.inf,
+)
+mod.add_gene_data(
+    name_or_prefix="sample_0",
+    data=gene_data,
+    or_operation="nanmax",  # alternative: "nansum"
+    threshold=-np.inf,
+    absent_value=-np.inf,
+)
 
-# apply GIMME algorithm on the model
-gimme_result = mod.integrate_gene_data(data_name="sample_0", integrator="GIMME", high_exp=5*np.log10(2))
+gimme_result = mod.integrate_gene_data(
+    data_name="sample_0",
+    integrator="GIMME",
+    high_exp=5 * np.log10(2),
+)
 context_specific_gem = gimme_result.result_model
+```
 
+Supported integrators: GIMME, iMAT, FASTCORE, SWIFTCORE, MBA, mCADRE, CORDA, ftINIT, RIPTiDe, E-Flux, SPOT, rFASTCORMICS.
+
+**Enzyme-constrained models (GECKO)**
+
+After attaching enzyme kinetic data, call `integrate_enzyme_data` to produce an enzyme-constrained model.
+
+```python
+mod.add_enzyme_data(enzyme_data)  # EnzymeData object
+
+ec_result = mod.integrate_enzyme_data(method="GECKOLight")  # or "GECKOFull"
+ec_model = ec_result.result_model
+```
+
+**Logging**
+
+PipeGEM is silent by default. To enable progress output, adjust the log level before running analyses:
+
+```python
+import logging
+import pipeGEM as pg
+
+pg.set_log_level(logging.INFO)  # show progress messages
+pg.enable_verbose()             # enable DEBUG output with a StreamHandler to stderr
 ```
 
 ___
+### CLI
 
-### Command-Line Interface (CLI) Quick Start
+PipeGEM provides a command-line interface organized around subcommands. To see all available options:
 
-PipeGEM also provides a command-line interface for running predefined pipelines using configuration files.
+```bash
+pipeGEM --version
+pipeGEM --help
+```
 
-1.  **Generate Template Configurations:**
-    Start by generating template TOML configuration files for a specific pipeline (e.g., `integration`). Replace `integration` with the desired pipeline name if needed.
+**Step 1 — Generate template config files**
 
-    ```bash
-    python -m pipeGEM.cli -n template -p integration -o ./
-    ```
-    This will create a `configs` directory in the current folder (if it doesn't exist) containing template `.toml` files like `gene_data_conf.toml`, `model_conf.toml`, etc.
+```bash
+pipeGEM template -p integration -o ./configs
+```
 
-2.  **Modify Configurations (Optional):**
-    Edit the generated `.toml` files in the `configs` directory to specify your input file paths, parameters, and desired settings. For example, in `model_conf.toml`, you might specify the path to your metabolic model file.
+This creates a `configs/` directory containing TOML templates for each required config file.
 
-3.  **Run a Pipeline:**
-    Execute a pipeline using the configuration files. For example, to run the model processing pipeline using the configuration in `configs/model_conf.toml`:
+**Step 2 — Edit the configs**
 
-    ```bash
-    python -m pipeGEM.cli -n model_processing -t configs/model_conf.toml
-    ```
+Fill in your model paths, data paths, and algorithm parameters in the generated TOML files.
 
-    Or, to run the full integration pipeline:
+**Step 3 — Run a pipeline**
 
-    ```bash
-    python -m pipeGEM.cli -n integration \
-        -g configs/gene_data_conf.toml \
-        -t configs/model_conf.toml \
-        -r configs/threshold_conf.toml \
-        -m configs/mapping_conf.toml \
-        -i configs/integration_conf.toml
-    ```
+Add `--dry-run` to any command to validate the configs and preview the planned actions without executing them.
 
-    Refer to the generated template files and the specific pipeline documentation for details on required configurations.
+```bash
+# Process a model
+pipeGEM process -t configs/model_conf.toml
+
+# Find expression thresholds
+pipeGEM threshold -g configs/gene_data_conf.toml -r configs/threshold_conf.toml
+
+# Full context-specific model reconstruction
+pipeGEM integrate \
+    -g configs/gene_data_conf.toml \
+    -t configs/model_conf.toml \
+    -r configs/threshold_conf.toml \
+    -m configs/mapping_conf.toml \
+    -i configs/integration_conf.toml
+
+# Flux analysis
+pipeGEM flux -f configs/flux_conf.toml -t configs/model_conf.toml
+
+# Compare models across conditions
+pipeGEM compare -c configs/comparison_conf.toml
+```
+
+> **Note:** The legacy `-n <pipeline>` style is still accepted for backward compatibility but is deprecated. Please migrate to the subcommand style shown above.
+
+___
+### What's new in 0.2.0
+
+- **CLI subcommands** — the flat `-n <pipeline>` interface has been replaced with proper subcommands (`integrate`, `process`, `threshold`, `flux`, `compare`, `template`). The old style still works but emits a deprecation warning.
+- **`--dry-run` flag** — available on all subcommands; validates configs and prints the planned actions without running the pipeline.
+- **`integrate_enzyme_data()`** — now fully implemented. Accepts `method="GECKOLight"` (default) or `"GECKOFull"`.
+- **Silent by default** — all internal `print` calls have been replaced with structured loggers under the `pipeGEM` namespace. Use `pg.set_log_level` or `pg.enable_verbose` to opt in to output.
+- **Bug fixes:**
+  - `Model.rename()` silently swallowed a `TypeError` when given a non-string argument — it now raises correctly.
+  - `PairwiseTester` always selected non-parametric methods regardless of the normality test result.
+  - `data.preprocessing`: column drops were incorrectly targeting rows; a row-wise `apply` was missing `axis=1`; `na_action=""` was invalid and replaced with `na_action=None`.
+  - `fetch_HPA_data` updated to use the current `biodbs` API (`hpa_search`).

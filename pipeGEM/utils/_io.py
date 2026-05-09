@@ -70,7 +70,7 @@ def model_to_mat(model, file_name, varname=None):
     file_name : str or file-like object
         The file to save to
     varname : string
-       The name of the variable within the workspace
+        The name of the variable within the workspace
     """
     if not scipy_io:
         raise ImportError('load_matlab_model requires scipy')
@@ -133,8 +133,6 @@ def save_model(model: cobra.Model,
         Saved cobra.Model
     output_file_name: Union[str, PathLike]
         Saved core' file name
-    output_extension: str
-        File extension, choices: .mat, .json, .xml, .yaml
     Returns
     -------
     None

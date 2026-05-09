@@ -52,31 +52,38 @@ def plot_rFastCormic_thresholds(x: np.ndarray,
 def plot_percentile_thresholds(data: Union[pd.DataFrame, pd.Series],
                                exp_th: Union[float, pd.Series],
                                figsize: Tuple[float, float] = (8, 6),
-                               palatte: str = "deep",
+                               palette: str = "deep",
+                               palatte: str = None,
                                **kwargs) -> dict:
-    """
-    Plots a histogram of the input data and a vertical line indicating the expression threshold.
+    """Plot a histogram of expression data with threshold lines.
 
     Parameters
     ----------
-    data : pandas.DataFrame or pandas.Series
-        The data to plot in the histogram.
-    exp_th : float, pd.Series
-        The threshold for expressed genes.
+    data : pd.DataFrame or pd.Series
+        Expression data to plot.
+    exp_th : float or pd.Series
+        Expression threshold(s).  A single float draws one line; a Series
+        draws one per entry.
     figsize : tuple, optional
-        A tuple containing the width and height of the figure in inches, by default (8, 6).
-    palatte: str
-        Palatte used to draw the distribution and thresholds.
+        Figure size ``(width, height)`` in inches, by default ``(8, 6)``.
+    palette : str, optional
+        Seaborn palette name, by default ``"deep"``.
+    palatte : str, optional
+        Deprecated spelling kept for backward compatibility.  Use *palette*.
 
     Returns
     -------
     dict
-        A dictionary containing the plot figure.
+        ``{"g": fig}`` — the matplotlib Figure.
     """
+    # backward compat for old typo parameter name
+    if palatte is not None:
+        palette = palatte
+
     fig, ax = plt.subplots(figsize=figsize)
     n_needed_colors = 1 if isinstance(exp_th, float) else len(exp_th)
 
-    colors = handle_colors(palette=palatte,
+    colors = handle_colors(palette=palette,
                            n_colors_used=1+n_needed_colors)
     ax = sns.histplot(data=data,
                       ax=ax,

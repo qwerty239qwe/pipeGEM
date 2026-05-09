@@ -2,6 +2,7 @@ from functools import wraps
 from time import time
 from textwrap import dedent
 from pathlib import Path
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -9,6 +10,9 @@ import pandas as pd
 from pipeGEM.utils import save_toml_file, parse_toml_file, ObjectFactory, \
     save_model, load_model
 from ._file_manager import fmanagers
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def timing(f):
@@ -64,6 +68,9 @@ def _get_module(v, **sp_module_names):
 
 
 class BaseAnalysis:
+    RESULT_FIELDS = {}
+    ALLOW_EXTRA_RESULT_FIELDS = True
+
     def __init__(self, log):
         self._log = log  # analysis record (parameters used to reproduce the same result)
         self._running_time = None
@@ -100,8 +107,41 @@ class BaseAnalysis:
     def result(self) -> dict:
         return self._result
 
+    def _validate_result_keys(self, result) -> None:
+        if not self.RESULT_FIELDS:
+            return
+
+        unknown_keys = set(result) - set(self.RESULT_FIELDS)
+        if unknown_keys and not self.ALLOW_EXTRA_RESULT_FIELDS:
+            raise KeyError(
+                f"Unknown result field(s) for {self.__class__.__name__}: "
+                f"{', '.join(sorted(unknown_keys))}"
+            )
+        if unknown_keys:
+            warnings.warn(
+                f"Unknown result field(s) for {self.__class__.__name__}: "
+                f"{', '.join(sorted(unknown_keys))}",
+                UserWarning,
+                stacklevel=3,
+            )
+
+    def validate_result(self) -> None:
+        missing = [
+            key for key, spec in self.RESULT_FIELDS.items()
+            if spec.get("required", False) and key not in self._result
+        ]
+        if missing:
+            raise KeyError(
+                f"Missing required result field(s) for {self.__class__.__name__}: "
+                f"{', '.join(sorted(missing))}"
+            )
+
+    def set_result(self, **kwargs) -> None:
+        self._validate_result_keys(kwargs)
+        self._result.update(kwargs)
+
     def add_result(self, result) -> None:
-        self._result.update(result)
+        self.set_result(**result)
 
     def add_running_time(self, t):
         self._running_time = t
@@ -153,23 +193,23 @@ class BaseAnalysis:
             if result_types[k] == "Analysis":
                 v.save(parent_dir / self._result_folder_name / k)
                 continue
-            print(f"Saving {k}..")
+            logger.info("Saving %s..", k)
             file_manager = self._fmanagers[result_types[k]]()
             kws = {} if k not in self._result_saving_params else {k: v for k, v in self._result_saving_params[k].items()
                                                                   if k not in ["fm_name"]}
             file_manager.write(v, parent_dir / self._result_folder_name / k, **kws)
-            print(f"{k} is saved as a {result_types[k]}")
+            logger.info("%s is saved as a %s", k, result_types[k])
         save_toml_file(parent_dir / self._result_folder_name / "other_values.toml", singular_values)
 
     def save(self,
              file_path: str):
         saved_dir = Path(file_path)
         saved_dir.mkdir(parents=True)
-        print(f"Created a folder {file_path} to store the result")
+        logger.info("Created a folder %s to store the result", file_path)
         result_types = {}
         for k, v in self._result.items():
             if v is None:
-                print(f"Skipped {k} cause it is None")
+                logger.debug("Skipped %s cause it is None", k)
                 continue
 
             module_sp_kw = self._result_saving_params[k]["module_name"] if (

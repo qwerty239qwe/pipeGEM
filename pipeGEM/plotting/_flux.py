@@ -9,6 +9,9 @@ import seaborn as sns
 from ._utils import save_fig, draw_significance
 from ._prep import prep_fva_plotting_data, filter_fva_df
 # from pipeGEM.analysis import StatisticAnalyzer
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def plot_fba(flux_df: pd.DataFrame,
@@ -27,14 +30,50 @@ def plot_fba(flux_df: pd.DataFrame,
              verbosity: int = 0,
              **kwargs
              ):
+    """Plot FBA flux results as a categorical plot.
+
+    Parameters
+    ----------
+    flux_df : pd.DataFrame
+        DataFrame with a ``"Reaction"`` column and ``"fluxes"`` column (plus
+        optional categorical columns like ``"model"``).
+    rxn_ids : list of str or dict
+        Reaction IDs to plot.  If a dict, keys are original IDs and values
+        are display names.
+    group_by : str, optional
+        Column name used to colour/group the bars (e.g., ``"model"``).
+    kind : str, optional
+        Seaborn catplot kind — ``"bar"``, ``"box"``, ``"violin"``, etc.
+    palette : str, optional
+        Seaborn palette name.
+    filter_all_zeros : bool, optional
+        Remove reactions whose absolute flux is below *threshold*.
+    fig_title : str, optional
+        Figure title.
+    threshold : float, optional
+        Minimum absolute flux for a reaction to be plotted.
+    vertical : bool, optional
+        If *True*, reactions on x-axis, fluxes on y-axis.
+    height, aspect : int, optional
+        Seaborn FacetGrid sizing parameters.
+    name_format : str, optional
+        Template for auto-generated file names.
+    flux_unit : str, optional
+        Unit label appended to the flux axis.
+
+    Returns
+    -------
+    dict
+        ``{"g": FacetGrid, "name_format": str, ...}``
+    """
     if "Reaction" not in flux_df.columns:
         flux_df = flux_df.reset_index().rename(columns={"index": "Reaction"})
-        print("Use index as the reaction IDs")
+        logger.debug("Use index as the reaction IDs")
     flux_df = flux_df.loc[flux_df["Reaction"].isin(rxn_ids), [c for c in flux_df.columns if c != "reduced_costs"]]
     if filter_all_zeros:
         n_all_zeros_rxn = flux_df.query(f"abs(fluxes) < {threshold}").shape[0]
         if verbosity > 0:
-            print(f"Found reactions contain zeros fluxes: {n_all_zeros_rxn} rxns were removed from the plot")
+            logger.info("Found reactions contain zeros fluxes: %d rxns were removed from the plot", n_all_zeros_rxn)
         flux_df = flux_df.query(f"abs(fluxes) > {threshold}")
 
     flux_df = flux_df.reset_index().rename(columns={"fluxes": f'Flux {flux_unit}'})
@@ -49,7 +88,7 @@ def plot_fba(flux_df: pd.DataFrame,
                     height=height,
                     aspect=aspect)
     if fig_title is not None:
-        g.set_title(fig_title)
+        g.figure.suptitle(fig_title)
     plot_kws = {"g": g}
     if name_format:
         for k, v in kwargs.items():
@@ -71,6 +110,32 @@ def plot_fva(fva_df: pd.DataFrame,
              verbosity: int = 0,
              **kwargs
              ):
+    """Plot FVA flux ranges as a boxplot.
+
+    Parameters
+    ----------
+    fva_df : pd.DataFrame
+        DataFrame with ``"Reaction"``, ``"minimum"`` and ``"maximum"`` columns.
+    rxn_ids : list of str or dict
+        Reactions to include.
+    fig_title : str, optional
+        Figure title.
+    filter_all_zeros : bool, optional
+        Remove reactions with ``|max − min| < threshold``.
+    color_by : str, optional
+        Column used for hue grouping, by default ``"model"``.
+    threshold : float, optional
+        Minimum range for a reaction to be plotted.
+    vertical : bool, optional
+        If *True*, reactions on x-axis.
+    name_format : str, optional
+        File-name template.
+
+    Returns
+    -------
+    dict
+        ``{"g": Figure, "name_format": str, ...}``
+    """
     fva_df = fva_df.loc[fva_df["Reaction"].isin(rxn_ids), :]
     if filter_all_zeros:
         fva_df = filter_fva_df(fva_df=fva_df, threshold=threshold, verbosity=verbosity)
@@ -176,7 +241,7 @@ def plot_sampling_catplot(flux_df,
                 x_pos = [flux_df[rxn_id].values.max() + (facet.ax.get_xlim()[1] - facet.ax.get_xlim()[0]) *
                          (num_significance + 1) * 0.1
                          for _ in range(2)]
-                print(x_pos)
+                logger.debug("x_pos: %s", x_pos)
                 y_pos = [ia, ib]
 
             draw_significance(facet.ax, x_pos, y_pos, n_stars)
@@ -190,7 +255,7 @@ def plot_sampling_catplot(flux_df,
                              (facet.ax.get_xlim()[1] - facet.ax.get_xlim()[0]) *
                              (num_significance + 1) * 0.1))
     if y_lim is not None:
-        print(y_lim, )
+        logger.debug("y_lim: %s", y_lim)
         facet.set(ylim=y_lim)
     if x_lim is not None:
         facet.set(xlim=x_lim)
@@ -210,6 +275,34 @@ def plot_sampling_df(flux_df,
                      x_lim=None,
                      **kwargs
                      ):
+    """Plot flux sampling results as a distribution or categorical plot.
+
+    Parameters
+    ----------
+    flux_df : pd.DataFrame
+        Sampling flux DataFrame.
+    rxn_id : str
+        Reaction column to plot.
+    kind : str
+        Seaborn plot kind (``"kde"``, ``"hist"``, ``"box"``, ``"violin"``, …).
+    group_by : str
+        Column used for grouping / hue.
+    group_order : list of str, optional
+        Order of groups on the categorical axis.
+    vertical : bool, optional
+        Orientation.
+    plotting_type : {``"displot"``, ``"catplot"``}
+        Which seaborn high-level function to use.
+    stat_analysis : object, optional
+        A pairwise test result used to draw significance stars (catplot only).
+    y_lim, x_lim : tuple, optional
+        Axis limits.
+
+    Returns
+    -------
+    dict
+        ``{"g": Figure}``
+    """
     assert plotting_type in ["displot", "catplot"]
 
     if plotting_type == "displot":

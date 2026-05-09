@@ -8,6 +8,9 @@ from scipy.optimize import curve_fit
 import numpy as np
 from pipeGEM.utils import ObjectFactory
 from pipeGEM.analysis.results.thresholds import rFASTCORMICSThresholdAnalysis, PercentileThresholdAnalysis, LocalThresholdAnalysis, timing
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ThresholdFinders(ObjectFactory):
@@ -183,7 +186,7 @@ class DistributionBased(ThresholdFinder):
                     continue
                 p_arr[i, j] = self._cal_canyons_p(x1=x1, y1=y1, x2=x2, y2=y2)
         arg_min = np.where(p_arr == np.min(p_arr))
-        print("p_score of init values:", np.min(p_arr))
+        logger.debug("p_score of init values: %s", np.min(p_arr))
         return candidates[arg_min[0][0]], candidates[arg_min[1][0]]
 
     @staticmethod
@@ -191,15 +194,15 @@ class DistributionBased(ThresholdFinder):
         amp1, mean1, cov1, amp2, mean2, cov2 = p
         if abs(np.log2(amp1) - np.log2(amp2)) > np.log2(amp_ratio_tol):
             if verbosity:
-                print("Two gaussian have too large difference in amp")
+                logger.debug("Two gaussian have too large difference in amp")
             return False
         if abs(np.log2(cov1) - np.log2(cov1)) > np.log2(var_ratio_tol):
             if verbosity:
-                print("Two gaussian have too large difference in var")
+                logger.debug("Two gaussian have too large difference in var")
             return False
         if abs(mean1 - mean2) < mean_diff_tol:
             if verbosity:
-                print("Two gaussian have too small mean distance")
+                logger.debug("Two gaussian have too small mean distance")
             return False
         return True
 
@@ -213,7 +216,7 @@ class DistributionBased(ThresholdFinder):
                      return_heuristic=False, k=1):
         c1, c2 = self.get_init_for_bimodal(x, y, max_x=max_x, min_x=min_x)
         c1, c2 = min(c1, c2), max(c1, c2)
-        print("original guess: ", c1, c2)
+        logger.debug("original guess: %s, %s", c1, c2)
         init_vals = (1, c1, 1, 1, c2, 1)
         init_val_displayed = (self._get_y_by_nearest_x(x, y, c1), c1, 1, self._get_y_by_nearest_x(x, y, c2), c2, 1)
         grid = [(2 + 20 * i, 2 + 20 * j) for i in range(0, 5) for j in range(0, 5)]
@@ -256,7 +259,7 @@ class DistributionBased(ThresholdFinder):
                     warnings.warn(f"Fail to find proper parameters, return the best {k} params")
                 else:
                     warnings.warn("Fail to find proper parameters, use initial values")
-                    print("problematic parameter array: ", params_arr)
+                    logger.warning("problematic parameter array: %s", params_arr)
                     self._check_fitted_param(p,
                                              amp_ratio_tol=amp_ratio_tol,
                                              var_ratio_tol=var_ratio_tol,
@@ -270,8 +273,8 @@ class DistributionBased(ThresholdFinder):
         params_arr[params_arr[:, 1] < params_arr[:, 4], :] = params_arr[params_arr[:, 1] < params_arr[:, 4], :][:, [3, 4, 5, 0, 1, 2]]
         A1, A2 = params_arr[0, 0], params_arr[0, 3]
         mu1, mu2 = params_arr[0, 1], params_arr[0, 4]
-        print("best fitted Amps: ", A1, A2)
-        print("best fitted means: ", mu1, mu2)
+        logger.debug("best fitted Amps: %s, %s", A1, A2)
+        logger.debug("best fitted means: %s, %s", mu1, mu2)
         return params_arr, c1, c2
 
 
@@ -336,7 +339,7 @@ class rFASTCORMICSThreshold(DistributionBased):
         else:
             arr = data
 
-        print(f"cutting off {len(arr[arr <= cut_off])} data since their expression values are below {cut_off}")
+        logger.info("cutting off %d data since their expression values are below %s", len(arr[arr <= cut_off]), cut_off)
         arr = arr[arr > cut_off]
         if arr.shape[0] == 0:
             result = rFASTCORMICSThresholdAnalysis(log={"use_first_guess": return_heuristic,
@@ -345,14 +348,14 @@ class rFASTCORMICSThreshold(DistributionBased):
                                                         "k_best": k_best})
             return result
 
-        print(f"data's range: [{arr.min()}, {arr.max()}]")
+        logger.info("data's range: [%s, %s]", arr.min(), arr.max())
         min_x, max_x = np.percentile(arr, hard_x_lims[0] * 100), np.percentile(arr, hard_x_lims[1] * 100)
         kde_f = gaussian_kde(arr)
         x = np.linspace(arr.min(), arr.max(), 10000)
         y = kde_f(x)
         if return_heuristic:
             if k_best > 1:
-                print("Only return a group of params because the return_heuristic is set to True")
+                logger.info("Only return a group of params because the return_heuristic is set to True")
             c1, c2 = self.get_init_for_bimodal(x, y, max_x=max_x, min_x=min_x)
             c1, c2 = min(c1, c2), max(c1, c2)
             params_arr = np.array([[1, c2, 1, 1, c1, 1]])

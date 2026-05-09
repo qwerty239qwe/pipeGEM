@@ -7,6 +7,9 @@ import numpy as np
 import pandas as pd
 
 from pipeGEM.analysis import add_mod_pfba, GIMMEAnalysis, timing
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @timing
@@ -105,7 +108,7 @@ def apply_GIMME(model: cobra.Model,
         sol = model.optimize("minimize")
 
     flux_df = sol.to_frame()
-    print("original obj's optimized value: ", flux_df.loc[ori_obj, "fluxes"])
+    logger.info("original obj's optimized value: %s", flux_df.loc[ori_obj, "fluxes"].to_dict())
 
     new_model = None
     if remove_zero_fluxes:

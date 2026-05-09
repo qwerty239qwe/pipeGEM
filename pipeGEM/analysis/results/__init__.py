@@ -8,3 +8,5 @@ from .group_comp import *
 from .data import *
 from .ko_analysis import *
 from .scaling import *
+from .auto_stat import AutoStatResult
+from .ec import GECKOLightAnalysis, GECKOFullAnalysis

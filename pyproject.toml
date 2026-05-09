@@ -4,18 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pipeGEM"
-version = "0.1.1"
+version = "0.2.0"
 description = "Processing and integrating data with genome-scale metabolic models (GEM)"
 readme = "README.md"
 authors = [{ name = "Yu-Te Lin", email = "qwerty239qwe@gmail.com" }]
 classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 keywords = ["metabolism", "metabolic-model", "computational-biology", "system-biology", "cobra"]
 dependencies = [
@@ -28,7 +28,9 @@ dependencies = [
     "scikit-learn",
     "scikit-posthocs",
     "seaborn",
-    "umap-learn",
+    "umap-learn>=0.5.6",
+    "numba>=0.59; python_version >= '3.10' and python_version < '3.13'",
+    "numba>=0.63; python_version >= '3.13'",
     "biodbs",
     "tqdm",
     "optlang",
@@ -41,7 +43,7 @@ dependencies = [
     "dask[distributed]",
     "openpyxl"
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 
 [project.optional-dependencies]
 dev = [
@@ -51,16 +53,16 @@ dev = [
     "pytest-cov>=4.0.0",
 ]
 doc = [
-    "numpydoc",
-    "nbconvert",
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.26",
+    "mkdocs-jupyter>=0.25",
+    "mkdocs-redirects>=1.2,<1.2.3",
+    "pymdown-extensions>=10.8",
+    "black>=24.0",
+    "nbconvert>=7.16",
     "ipykernel",
-    "sphinx",
-    "sphinx-copybutton",
-    "sphinx-issues",
-    "sphinx-design",
-    "pydata_sphinx_theme",
-    "myst-nb",
-    "ipywidgets"
+    "ipywidgets",
 ]
 dlkcat = [
     "torch",
@@ -69,14 +71,28 @@ dlkcat = [
 
 [project.urls]
 Homepage = "https://github.com/qwerty239qwe/pipeGEM"
+Documentation = "https://pipegem.readthedocs.io/"
 
 [project.scripts]
 pipeGEM = "pipeGEM.cli.cli:main"
 
 [tool.setuptools.package-data]
-"analysis.tasks" = ["task_files/*.json"]
-"data" = ["enzyme_data/*", "medium/*"]
-"cli" = ["configs/*.toml"]
+"pipeGEM.analysis.tasks" = ["task_files/*.json"]
+"pipeGEM.cli" = ["configs/*.toml", "configs/*/*.toml"]
+"pipeGEM.data" = ["enzyme_data/*", "enzyme_data/human/*", "medium/*"]
+"pipeGEM.extensions.DLKcat" = ["precomputed_obj/*"]
 
 [tool.setuptools]
 include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["pipeGEM*"]
+
+[tool.pytest.ini_options]
+norecursedirs = [
+    ".git",
+    ".pytest_cache",
+    ".pytest_state",
+    "temp_pytest",
+    "temp_pytest_medium",
+]

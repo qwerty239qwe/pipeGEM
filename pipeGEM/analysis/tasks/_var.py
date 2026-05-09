@@ -5,4 +5,4 @@ __all__ = ("TASKS_FILE_PATH", "TASKS_MOUSE_FILE_PATH")
 _WORK_DICT = {}
 
 TASKS_FILE_PATH = Path(__file__).resolve().parent / Path('task_files/tasks_human1.json')
-TASKS_MOUSE_FILE_PATH = Path(__file__).resolve().parent / Path('tasks/tasks_for_imm1415.json')
+TASKS_MOUSE_FILE_PATH = Path(__file__).resolve().parent / Path('task_files/tasks_for_imm1415.json')

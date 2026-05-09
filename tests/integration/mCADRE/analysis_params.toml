@@ -1,0 +1,17 @@
+running_time = 1.379589319229126
+
+[log]
+exp_cutoff = 0.9
+absent_value = 0
+absent_value_indicator = -1e-06
+evidence_scores = nan
+tol = 1e-06
+eta = 0.333
+
+[result_types]
+result_model = "cobra.Model"
+removed_rxn_ids = "numpy.NDArrayStr"
+core_rxn_ids = "numpy.NDArrayStr"
+non_expressed_rxn_ids = "numpy.NDArrayStr"
+score_df = "pandas.DataFrame"
+threshold_analysis = "Analysis"

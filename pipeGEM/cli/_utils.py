@@ -14,12 +14,19 @@ from pipeGEM.analysis import consistency_testers
 from pipeGEM.analysis.tasks import TaskContainer
 from pipeGEM.analysis import TaskAnalysis, LocalThresholdAnalysis, rFASTCORMICSThresholdAnalysis, \
     PercentileThresholdAnalysis, ModelScalingResult
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
 
 
-pl_needed_config = {"integration": ["thresholds", "gene_data",
-                                    "mapping", "model", "gene_data_integration"],
-                    "model_processing": ["model"],
-                    "get_threshold": ["thresholds", "gene_data"]}
+pl_needed_config = {
+    "integration": ["thresholds", "gene_data", "mapping", "model", "gene_data_integration"],
+    "model_processing": ["model"],
+    "get_threshold": ["thresholds", "gene_data"],
+    "do_flux_analysis": ["flux_analysis", "multi_model", "gene_data", "thresholds",
+                         "mapping", "gene_data_integration"],
+    "do_model_comparison": ["comparison"],
+}
 
 
 def generate_template_configs(dest_folder, pl_name):
@@ -60,7 +67,7 @@ def preprocess_model(model_conf):
                            **model_conf["medium_data"]["apply_params"])
 
     # rescale
-    if model_conf["rescale"]["precompute_path"] is not None:
+    if model_conf["rescale"].get("precompute_path") is not None:
         rescaled_result = ModelScalingResult.load(model_conf["rescale"]["precompute_path"])
     else:
         rescaled_result = model.check_model_scale(method=model_conf["rescale"]["method"],
@@ -244,7 +251,7 @@ def run_integration_pipeline(gene_data_conf,
     for g_name, g_data in gene_data_dic.items():
 
         if (saved_path / g_name).is_dir():
-            print(f"{g_name} is already there. Skipping it")
+            logger.info("%s is already there. Skipping it", g_name)
             continue
 
         task_supp_rxns[g_name] = map_data(data_name=g_name,
@@ -278,10 +285,10 @@ def do_model_comparison(comparison_configs):
     if Path(comparison_configs["factor_file"]).is_file():
         factors = pd.read_csv(comparison_configs["factor_file"],
                               index_col=0)
-        print("Factor data loaded, top rows are:")
-        print(factors.head())
+        logger.info("Factor data loaded, top rows are:")
+        logger.info("%s", factors.head())
     grp = Group(model_dic, name_tag="group", factors=factors)
-    print(grp.get_info())
+    logger.info("%s", grp.get_info())
     Path(comparison_configs["output_dir"]).mkdir(parents=True, exist_ok=True)
     root = Path(comparison_configs["output_dir"])
     #  number of comp

@@ -14,6 +14,11 @@ class CorrelationAnalysis(BaseAnalysis):
     def __init__(self, log):
         super().__init__(log)
 
+    @property
+    def corr_df(self):
+        """Return the computed correlation matrix."""
+        return self.result["correlation_result"]
+
     def plot(self,
              dpi=150,
              prefix="Dim_reduction_",

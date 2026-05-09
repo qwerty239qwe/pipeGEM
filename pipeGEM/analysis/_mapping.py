@@ -6,6 +6,10 @@ import cobra
 from tqdm import tqdm
 from time import time
 
+from pipeGEM._logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class RxnMapper:
     def __init__(self,
@@ -159,7 +163,7 @@ class RxnMapper:
         for k, v in rxn_score.items():
             if v <= threshold:
                 rxn_score[k] = absent_value
-        print(f"Finished mapping in {time() - start_time} seconds.")
+        logger.info("Finished mapping in %s seconds.", time() - start_time)
         return rxn_score
 
     def partial_map(self, model, new_data, gene_ids, **kwargs):
