@@ -53,16 +53,16 @@ dev = [
     "pytest-cov>=4.0.0",
 ]
 doc = [
-    "numpydoc>=1.8",
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.26",
+    "mkdocs-jupyter>=0.25",
+    "mkdocs-redirects>=1.2,<1.2.3",
+    "pymdown-extensions>=10.8",
+    "black>=24.0",
     "nbconvert>=7.16",
     "ipykernel",
     "ipywidgets",
-    "sphinx>=8.0",
-    "sphinx-copybutton>=0.5",
-    "sphinx-issues>=4.0",
-    "sphinx-design>=0.6",
-    "pydata-sphinx-theme>=0.16",
-    "myst-nb>=1.1",
 ]
 dlkcat = [
     "torch",
@@ -71,6 +71,7 @@ dlkcat = [
 
 [project.urls]
 Homepage = "https://github.com/qwerty239qwe/pipeGEM"
+Documentation = "https://pipegem.readthedocs.io/"
 
 [project.scripts]
 pipeGEM = "pipeGEM.cli.cli:main"

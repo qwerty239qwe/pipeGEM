@@ -7,6 +7,8 @@
 ___
 PipeGEM is a Python package for analyzing and visualizing multiple genome-scale metabolic models (GEMs). It supports the integration of transcriptomic and proteomic data, metabolic task evaluation, and medium composition into GEMs. Flux analysis is powered by [cobrapy](https://cobrapy.readthedocs.io/en/latest/).
 
+Documentation: [pipegem.readthedocs.io](https://pipegem.readthedocs.io/)
+
 ___
 ### Installation
 
@@ -25,6 +27,11 @@ uv add pipegem
 git clone https://github.com/qwerty239qwe/pipeGEM.git
 cd pipeGEM
 uv sync
+```
+
+**Documentation build**
+```bash
+uv run --locked --extra doc mkdocs build --strict -d ./docs
 ```
 
 ___

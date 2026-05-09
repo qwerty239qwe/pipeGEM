@@ -242,7 +242,9 @@ class Task:
             To loose the output constraints to the maximum (0, 1000)
         Returns
         -------
-
+        tuple
+            A tuple containing whether all metabolites exist, added dummy
+            reactions, and objective reactions.
         """
         if met_scaling_coefs is None:
             met_scaling_coefs = {}

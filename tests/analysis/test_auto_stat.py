@@ -3,7 +3,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pipeGEM.analysis._auto_stat import AutoStatTest, _cohens_d, _eta_squared
+from pipeGEM.analysis._auto_stat import (
+    AutoStatTest,
+    _cohens_d,
+    _eta_squared,
+    _normalize_pingouin_p_columns,
+)
 from pipeGEM.analysis.results.auto_stat import AutoStatResult
 
 
@@ -89,6 +94,16 @@ class TestAutoStatTwoGroups:
         ast = AutoStatTest(effect_size=True)
         result = ast.test(df, dv="value", between="group")
         assert "cohens_d" in result.effect_sizes
+
+    @pytest.mark.parametrize("p_column", ["p_unc", "p_val", "pvalue", "p-value", "p.value"])
+    def test_pingouin_pvalue_aliases_normalized(self, p_column):
+        result = _normalize_pingouin_p_columns(pd.DataFrame({p_column: [0.25]}))
+        assert result["p-unc"].iloc[0] == 0.25
+
+    def test_pingouin_pval_column_kept_available_for_correction(self):
+        result = _normalize_pingouin_p_columns(pd.DataFrame({"p-val": [0.25]}))
+        assert result["p-unc"].iloc[0] == 0.25
+        assert result["p-val"].iloc[0] == 0.25
 
 
 # -----------------------------------------------------------------------

@@ -1,0 +1,3 @@
+# CLI
+
+::: pipeGEM.cli.cli

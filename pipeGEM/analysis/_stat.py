@@ -16,7 +16,16 @@ DEFAULT_SIGS = [0.05, 0.01, 0.001, 0.0001]
 
 def _normalize_pingouin_p_columns(result_df):
     """Keep pingouin p-value column names stable across releases."""
-    return result_df.rename(columns={"p_unc": "p-unc"})
+    result_df = result_df.rename(columns={
+        "p_unc": "p-unc",
+        "p_val": "p-unc",
+        "pvalue": "p-unc",
+        "p-value": "p-unc",
+        "p.value": "p-unc",
+    })
+    if "p-unc" not in result_df.columns and "p-val" in result_df.columns:
+        result_df["p-unc"] = result_df["p-val"]
+    return result_df
 
 
 class AssumptionTester:
