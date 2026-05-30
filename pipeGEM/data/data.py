@@ -1505,12 +1505,24 @@ class EnzymeData(BaseData):
              missing = [col for col in required_cols if col not in self._best_matched_df.columns]
              raise ValueError(f"Missing required columns in _best_matched_df: {missing}. Alignment might be incomplete.")
 
-        rxn_dic = {row["rxn"]: {"protein_to_use": row["protein"],
-                                "best_kcat": row["kcat"],
-                                "best_mw": row["mw"]}
-                   for i, row in self._best_matched_df.iterrows()}
-        # Use .items() directly on the created dictionary
-        return rxn_dic # No need to call .items() here, return the dict itself
+        seen = set()
+        duplicates = set()
+        rxn_dic = {}
+        for _, row in self._best_matched_df.iterrows():
+            rxn = row["rxn"]
+            if rxn in seen:
+                duplicates.add(rxn)
+            seen.add(rxn)
+            rxn_dic[rxn] = {"protein_to_use": row["protein"],
+                            "best_kcat": row["kcat"],
+                            "best_mw": row["mw"]}
+        if duplicates:
+            warnings.warn(
+                f"Duplicate reaction rows in best-matched enzyme data: "
+                f"{sorted(duplicates)}. Last row wins per reaction.",
+                stacklevel=2,
+            )
+        return rxn_dic
 
     def run_DLKcat(self,
                    met_data: MetaboliteData, # Added type hint

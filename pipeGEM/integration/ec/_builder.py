@@ -141,11 +141,14 @@ class ECModelBuilder:
         negative lower bound would make backward flux produce enzyme instead.
         """
         if rxn.lower_bound < 0:
+            # ignore_irrev=True so a (lb<0, ub=0) reaction doesn't yield a
+            # dead forward copy with ub=0 (would waste a solver variable).
             return make_irrev_rxn(
                 model,
                 rxn.id,
                 add_inplace=True,
                 remove_original=True,
+                ignore_irrev=True,
             )
         return [rxn]
 

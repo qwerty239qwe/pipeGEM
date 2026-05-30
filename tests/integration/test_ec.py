@@ -641,3 +641,314 @@ class TestApplyGeckoFull:
         assert np.isclose(solution.fluxes["_R_RREV"], expected_flux)
         assert np.isclose(solution.objective_value, expected_flux)
         assert np.isclose(solution.fluxes[f"EX_{PROT_POOL_ID}"], expected_pool_ub)
+
+
+# =====================================================================
+# Edge cases & error paths (coverage tests)
+# =====================================================================
+
+class TestECModelBuilderErrorPaths:
+    def test_add_protein_pool_existing_exchange_wrong_mets_raises(self, mini_model):
+        builder = ECModelBuilder(sigma=0.5, ptot=0.4, f_factor=0.6)
+        bad_met = cobra.Metabolite("not_pool", compartment="c")
+        bad_exchange = cobra.Reaction(f"EX_{PROT_POOL_ID}")
+        bad_exchange.lower_bound = 0
+        bad_exchange.upper_bound = 1.0
+        bad_exchange.add_metabolites({bad_met: 1.0})
+        mini_model.add_reactions([bad_exchange])
+
+        with pytest.raises(ValueError, match="does not exchange"):
+            builder.add_protein_pool(mini_model)
+
+    def test_create_draw_reaction_existing_invalid_draw_raises(self, mini_model):
+        builder = ECModelBuilder()
+        prot_pool = builder.add_protein_pool(mini_model)
+        bad = cobra.Reaction("draw_P1", lower_bound=0, upper_bound=1)
+        other = cobra.Metabolite("other_c", compartment="c")
+        bad.add_metabolites({other: 1.0})
+        mini_model.add_reactions([bad])
+
+        with pytest.raises(ValueError, match="not a valid draw reaction"):
+            builder.create_draw_reaction(mini_model, prot_pool, "P1", mw=50.0)
+
+    def test_reversible_zero_ub_no_dead_forward_arm(self):
+        model = cobra.Model("zero_ub_rev")
+        a = cobra.Metabolite("a_c", compartment="c")
+        b = cobra.Metabolite("b_c", compartment="c")
+        ex_b = cobra.Reaction("EX_b", lower_bound=-1000, upper_bound=0)
+        ex_b.add_metabolites({b: -1})
+        rrev = cobra.Reaction("RREV", lower_bound=-1000, upper_bound=0)
+        rrev.add_metabolites({a: -1, b: 1})
+        dm_a = cobra.Reaction("DM_a", lower_bound=0, upper_bound=1000)
+        dm_a.add_metabolites({a: -1})
+        model.add_reactions([ex_b, rrev, dm_a])
+        model.objective = "DM_a"
+
+        enzyme_data = MagicMock()
+        enzyme_data.rxn_items.return_value = {
+            "RREV": {"best_kcat": 1.0, "best_mw": 10.0, "protein_to_use": "P1"},
+        }
+        result = apply_gecko_full(
+            model, enzyme_data, sigma=0.5, ptot=0.2, f_factor=0.5, copy_model=True,
+        )
+        rxn_ids = {r.id for r in result.ec_model.reactions}
+        assert "_F_RREV" not in rxn_ids
+        assert "_R_RREV" in rxn_ids
+        assert set(result.arm_reactions) == {"_R_RREV"}
+
+
+class TestGeckoFullEdgePaths:
+    def test_protected_rxn_skipped_in_full(self, linear_flux_model, mock_enzyme_data):
+        mock_enzyme_data.rxn_items.return_value = {
+            "R1": {"best_kcat": 1.0, "best_mw": 10.0, "protein_to_use": "P1"},
+        }
+        result = apply_gecko_full(
+            linear_flux_model, mock_enzyme_data,
+            sigma=0.5, ptot=0.2, f_factor=0.5,
+            protected_rxns=["R1"], copy_model=True,
+        )
+        assert "R1" not in result.arm_reactions
+        assert len(result.draw_reactions) == 0
+
+    def test_rxn_not_in_model_skipped_in_full(self, linear_flux_model, mock_enzyme_data):
+        mock_enzyme_data.rxn_items.return_value = {
+            "GHOST": {"best_kcat": 1.0, "best_mw": 10.0, "protein_to_use": "P1"},
+        }
+        result = apply_gecko_full(
+            linear_flux_model, mock_enzyme_data,
+            sigma=0.5, ptot=0.2, f_factor=0.5, copy_model=True,
+        )
+        assert result.log["n_enzyme_constraints"] == 0
+
+    def test_protein_to_use_none_falls_back_to_rxn_id(self, linear_flux_model, mock_enzyme_data):
+        mock_enzyme_data.rxn_items.return_value = {
+            "R1": {"best_kcat": 1.0, "best_mw": 10.0, "protein_to_use": None},
+        }
+        result = apply_gecko_full(
+            linear_flux_model, mock_enzyme_data,
+            sigma=0.5, ptot=0.2, f_factor=0.5, copy_model=True,
+        )
+        assert "draw_R1" in result.draw_reactions
+        assert "prot_R1" in {m.id for m in result.ec_model.metabolites}
+
+    def test_only_backward_reaction_skips_dead_forward(self):
+        """Reaction with lb<0, ub=0: only backward arm added; forward skipped."""
+        model = cobra.Model("only_back")
+        a = cobra.Metabolite("a_c", compartment="c")
+        b = cobra.Metabolite("b_c", compartment="c")
+        ex_b = cobra.Reaction("EX_b", lower_bound=-1000, upper_bound=0)
+        ex_b.add_metabolites({b: -1})
+        backonly = cobra.Reaction("BACK", lower_bound=-1000, upper_bound=0)
+        backonly.add_metabolites({a: -1, b: 1})
+        dm_a = cobra.Reaction("DM_a", lower_bound=0, upper_bound=1000)
+        dm_a.add_metabolites({a: -1})
+        model.add_reactions([ex_b, backonly, dm_a])
+
+        enzyme_data = MagicMock()
+        enzyme_data.rxn_items.return_value = {
+            "BACK": {"best_kcat": 1.0, "best_mw": 10.0, "protein_to_use": "P1"},
+        }
+        result = apply_gecko_full(
+            model, enzyme_data, sigma=0.5, ptot=0.2, f_factor=0.5, copy_model=True,
+        )
+        assert result.log["n_enzyme_constraints"] == 1
+        assert "_R_BACK" in result.arm_reactions
+        assert "_F_BACK" not in result.arm_reactions
+
+
+class TestGeckoLightEdgePaths:
+    def test_protein_abundance_used_when_available(self, mini_model, mock_enzyme_data):
+        mock_enzyme_data.rxn_items.return_value = {
+            "R1": {"best_kcat": 1.0, "best_mw": 10.0, "protein_to_use": "P1"},
+        }
+        prot_ab = MagicMock()
+        prot_ab._prot_abund_df = pd.DataFrame(
+            {"abundance": [0.001]}, index=["P1"],
+        )
+        result = apply_gecko_light(
+            mini_model, mock_enzyme_data,
+            protein_abundance=prot_ab,
+            sigma=0.5, copy_model=True,
+        )
+        new_ub = result.result["ec_model"].reactions.get_by_id("R1").upper_bound
+        assert np.isclose(new_ub, 1.8)
+        assert result.enzyme_usage.loc[0, "abundance"] == 0.001
+
+    def test_protein_abundance_missing_id_falls_back(self, mini_model, mock_enzyme_data):
+        mock_enzyme_data.rxn_items.return_value = {
+            "R1": {"best_kcat": 0.001, "best_mw": 10.0, "protein_to_use": "P1"},
+        }
+        prot_ab = MagicMock()
+        prot_ab._prot_abund_df = pd.DataFrame(
+            {"abundance": [99.0]}, index=["P_OTHER"],
+        )
+        result = apply_gecko_light(
+            mini_model, mock_enzyme_data,
+            protein_abundance=prot_ab,
+            sigma=0.5, ptot=0.5, f_factor=0.5, copy_model=True,
+        )
+        assert np.isclose(result.enzyme_usage.loc[0, "abundance"], 0.25)
+
+    def test_check_gene_and_enzymes(self, mini_model):
+        from pipeGEM.integration.ec.gecko_light import _check_gene_and_enzymes
+
+        class FakeED:
+            def __contains__(self, x):
+                return False
+
+        g = cobra.Gene("g1")
+        mini_model.genes.append(g)
+        missing = _check_gene_and_enzymes(mini_model, FakeED())
+        assert "g1" in missing
+
+
+class TestCopyCobraModel:
+    def test_copy_uses_model_copy_when_available(self):
+        from pipeGEM.integration.ec._copy import copy_cobra_model
+
+        class Fake:
+            def copy(self):
+                return "copied"
+
+        assert copy_cobra_model(Fake()) == "copied"
+
+    def test_copy_falls_back_to_deepcopy(self):
+        from pipeGEM.integration.ec._copy import copy_cobra_model
+
+        class NoCopy:
+            def __init__(self, val):
+                self.val = val
+
+        original = NoCopy([1, 2, 3])
+        result = copy_cobra_model(original)
+        assert result is not original
+        assert result.val == [1, 2, 3]
+        assert result.val is not original.val
+
+
+class TestEnzymeDataRxnItemsDuplicate:
+    def test_duplicate_rxn_warns(self):
+        enzyme_df = pd.DataFrame({
+            "MW": [10.0],
+            "Kcat": [1.0],
+            "Sequence": ["A"],
+            "Reaction": ["R1"],
+        }, index=["g1"])
+        enzyme_data = EnzymeData(enzyme_df, rxn_id_col="Reaction")
+        # Inject duplicate rxn rows directly into _best_matched_df.
+        enzyme_data._best_matched_df = pd.DataFrame({
+            "rxn": ["R1", "R1", "R2"],
+            "protein": ["P1", "P1b", "P2"],
+            "kcat": [1.0, 2.0, 3.0],
+            "mw": [10.0, 20.0, 30.0],
+        })
+        with pytest.warns(UserWarning, match="Duplicate reaction rows"):
+            items = enzyme_data.rxn_items()
+        # Last row for R1 wins
+        assert items["R1"]["best_kcat"] == 2.0
+        assert items["R2"]["best_kcat"] == 3.0
+
+
+# =====================================================================
+# autopacmen.auto_parameterize
+# =====================================================================
+
+class TestAutoParameterize:
+    @pytest.fixture
+    def base_enzyme_data(self):
+        df = pd.DataFrame({
+            "MW": [10.0, 20.0, 30.0],
+            "Kcat": [1.0, np.nan, 5.0],
+            "Sequence": ["A", "B", "C"],
+            "Reaction": ["R1", "R2", "R3"],
+        }, index=["g1", "g2", "g3"])
+        return EnzymeData(df, rxn_id_col="Reaction")
+
+    def test_manual_median_fill(self, base_enzyme_data):
+        from pipeGEM.integration.ec.autopacmen import auto_parameterize
+        model = cobra.Model("dummy")
+        result = auto_parameterize(
+            model, base_enzyme_data,
+            kcat_source="manual", fill_missing="median",
+        )
+        assert isinstance(result, EnzymeData)
+        assert result._enzyme_df.loc["g2", "Kcat"] == 3.0
+
+    def test_geometric_mean_fill(self, base_enzyme_data):
+        from pipeGEM.integration.ec.autopacmen import auto_parameterize
+        model = cobra.Model("dummy")
+        result = auto_parameterize(
+            model, base_enzyme_data,
+            kcat_source="manual", fill_missing="geometric_mean",
+        )
+        expected = np.exp(np.log([1.0, 5.0]).mean())
+        assert np.isclose(result._enzyme_df.loc["g2", "Kcat"], expected)
+
+    def test_geometric_mean_all_missing_uses_1(self):
+        from pipeGEM.integration.ec.autopacmen import auto_parameterize
+        df = pd.DataFrame({
+            "MW": [10.0],
+            "Kcat": [np.nan],
+            "Sequence": ["A"],
+            "Reaction": ["R1"],
+        }, index=["g1"])
+        ed = EnzymeData(df, rxn_id_col="Reaction")
+        model = cobra.Model("dummy")
+        result = auto_parameterize(
+            model, ed, kcat_source="manual", fill_missing="geometric_mean",
+        )
+        assert result._enzyme_df.loc["g1", "Kcat"] == 1.0
+
+    def test_dlkcat_no_metabolite_data_falls_back_to_median(self, base_enzyme_data):
+        from pipeGEM.integration.ec.autopacmen import auto_parameterize
+        model = cobra.Model("dummy")
+        with pytest.warns(UserWarning, match="DLKcat requested but metabolite_data is None"):
+            result = auto_parameterize(
+                model, base_enzyme_data,
+                kcat_source="manual", fill_missing="dlkcat",
+            )
+        assert result._enzyme_df.loc["g2", "Kcat"] == 3.0
+
+    def test_sabio_rk_warns_and_continues(self, base_enzyme_data):
+        from pipeGEM.integration.ec.autopacmen import auto_parameterize
+        model = cobra.Model("dummy")
+        with pytest.warns(UserWarning, match="SABIO-RK"):
+            result = auto_parameterize(
+                model, base_enzyme_data,
+                kcat_source="sabio-rk", fill_missing="median",
+            )
+        assert isinstance(result, EnzymeData)
+
+    def test_brenda_failure_logged_and_continues(self, base_enzyme_data):
+        from pipeGEM.integration.ec.autopacmen import auto_parameterize
+        model = cobra.Model("dummy")
+        result = auto_parameterize(
+            model, base_enzyme_data,
+            kcat_source="brenda", fill_missing="median",
+        )
+        assert isinstance(result, EnzymeData)
+
+    def test_merge_kcat_from_source_no_ec_col(self, base_enzyme_data):
+        from pipeGEM.integration.ec.autopacmen import _merge_kcat_from_source
+        df = base_enzyme_data._enzyme_df.copy()
+        src = pd.DataFrame({"EC": ["1.1.1.1"], "kcat": [99.0]})
+        result = _merge_kcat_from_source(df, src, "Kcat", "EC_num")
+        pd.testing.assert_frame_equal(result, df)
+
+    def test_merge_kcat_from_source_no_missing_returns_early(self):
+        from pipeGEM.integration.ec.autopacmen import _merge_kcat_from_source
+        df = pd.DataFrame({"Kcat": [1.0, 2.0], "EC_num": ["1.1.1.1", "2.2.2.2"]})
+        src = pd.DataFrame({"EC": ["1.1.1.1"], "kcat": [99.0]})
+        result = _merge_kcat_from_source(df, src, "Kcat", "EC_num")
+        assert (result["Kcat"] == [1.0, 2.0]).all()
+
+    def test_merge_kcat_from_source_fills_via_ec(self):
+        from pipeGEM.integration.ec.autopacmen import _merge_kcat_from_source
+        df = pd.DataFrame({
+            "Kcat": [np.nan, 2.0],
+            "EC_num": ["1.1.1.1", "2.2.2.2"],
+        })
+        src = pd.DataFrame({"EC": ["1.1.1.1"], "kcat": [99.0]})
+        result = _merge_kcat_from_source(df, src, "Kcat", "EC_num")
+        assert result.loc[0, "Kcat"] == 99.0
+        assert result.loc[1, "Kcat"] == 2.0
