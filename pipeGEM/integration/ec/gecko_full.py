@@ -105,12 +105,18 @@ def apply_gecko_full(
             builder.create_arm_reaction(model, constrained_rxn, enz_met, kcat)
             n_enzyme_constraints += 1
 
+    pool_exchange_id = f"EX_{PROT_POOL_ID}"
+    pool_ub = (
+        model.reactions.get_by_id(pool_exchange_id).upper_bound
+        if pool_exchange_id in {r.id for r in model.reactions}
+        else 0
+    )
     logger.info(
         "Full GECKO applied: %d reactions constrained, %d draw reactions, "
         "protein pool ub = %.6g.",
         n_enzyme_constraints,
         len(builder.draw_reaction_ids),
-        next(iter(prot_pool.reactions)).upper_bound if prot_pool.reactions else 0,
+        pool_ub,
     )
 
     return GECKOFullAnalysis.from_results(

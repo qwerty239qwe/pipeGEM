@@ -94,8 +94,8 @@ def apply_gecko_light(
 
         rxn = model.reactions.get_by_id(rxn_id)
         kcat = info.get("best_kcat", None)
-        if kcat is None or np.isnan(kcat):
-            logger.debug("No kcat for reaction %s, skipping.", rxn_id)
+        if kcat is None or np.isnan(kcat) or kcat <= 0:
+            logger.debug("No (or non-positive) kcat for reaction %s, skipping.", rxn_id)
             continue
 
         # Determine protein abundance. Absolute abundance data takes
