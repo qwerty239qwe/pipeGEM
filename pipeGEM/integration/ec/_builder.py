@@ -101,6 +101,13 @@ class ECModelBuilder:
                 raise ValueError(
                     f"Existing {draw_rxn_id} is not a valid draw reaction for {enz_met_id}."
                 )
+            existing_mw = -draw_rxn.metabolites[prot_pool]
+            if not np.isclose(existing_mw, mw):
+                logger.warning(
+                    "Draw reaction %s already exists with MW=%.6g; "
+                    "ignoring new value MW=%.6g.",
+                    draw_rxn_id, existing_mw, mw,
+                )
             if draw_rxn.id not in self._draw_rxn_ids:
                 self._draw_rxn_ids.append(draw_rxn.id)
             return enz_met
@@ -163,9 +170,11 @@ class ECModelBuilder:
 
         coeff = -1.0 / kcat_per_h  # enzyme consumed per unit flux
 
-        # Add enzyme metabolite to the existing reaction
-        rxn.add_metabolites({enz_met: coeff})
-        self._arm_rxn_ids.append(rxn.id)
+        # Use combine=False so a second call on the same (rxn, enz_met) pair
+        # overwrites rather than doubling the stoichiometry.
+        rxn.add_metabolites({enz_met: coeff}, combine=False)
+        if rxn.id not in self._arm_rxn_ids:
+            self._arm_rxn_ids.append(rxn.id)
 
     @property
     def draw_reaction_ids(self):

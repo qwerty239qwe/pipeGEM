@@ -494,6 +494,95 @@ class TestApplyGeckoFull:
         assert result.log["n_enzyme_constraints"] == 6
         assert np.isclose(solution.fluxes[f"EX_{PROT_POOL_ID}"], pool_ub)
 
+    def test_arm_reaction_idempotent_under_double_call(self, mini_model):
+        """Calling create_arm_reaction twice must not double the enzyme stoich."""
+        builder = ECModelBuilder()
+        prot_pool = builder.add_protein_pool(mini_model)
+        enz_met = builder.create_draw_reaction(mini_model, prot_pool, "P1", mw=50.0)
+        rxn = mini_model.reactions.get_by_id("R1")
+
+        builder.create_arm_reaction(mini_model, rxn, enz_met, kcat=10.0)
+        builder.create_arm_reaction(mini_model, rxn, enz_met, kcat=10.0)
+
+        expected_coeff = -1.0 / (10.0 * 3600.0)
+        assert np.isclose(rxn.metabolites[enz_met], expected_coeff)
+        assert builder.arm_reaction_ids.count("R1") == 1
+
+    def test_create_draw_reaction_warns_on_mw_mismatch(self, mini_model, caplog):
+        """Reusing an existing draw with a different MW should warn, not silently ignore."""
+        import logging
+        builder = ECModelBuilder()
+        prot_pool = builder.add_protein_pool(mini_model)
+        builder.create_draw_reaction(mini_model, prot_pool, "P1", mw=50.0)
+        with caplog.at_level(logging.WARNING):
+            builder.create_draw_reaction(mini_model, prot_pool, "P1", mw=120.0)
+        assert any("MW=50" in r.message and "MW=120" in r.message for r in caplog.records)
+        draw_rxn = mini_model.reactions.get_by_id("draw_P1")
+        assert draw_rxn.metabolites[prot_pool] == -50.0
+
+    def test_full_gecko_idempotent_under_double_apply(self, linear_flux_model, mock_enzyme_data):
+        """Applying full GECKO twice should not double-constrain reactions."""
+        mock_enzyme_data.rxn_items.return_value = {
+            "R1": {"best_kcat": 1.0, "best_mw": 10.0, "protein_to_use": "P1"},
+        }
+        first = apply_gecko_full(
+            linear_flux_model, mock_enzyme_data,
+            sigma=0.5, ptot=0.2, f_factor=0.5, copy_model=True,
+        )
+        second = apply_gecko_full(
+            first.ec_model, mock_enzyme_data,
+            sigma=0.5, ptot=0.2, f_factor=0.5, copy_model=True,
+        )
+        first_flux = first.ec_model.optimize().objective_value
+        second_flux = second.ec_model.optimize().objective_value
+        assert np.isclose(first_flux, second_flux)
+
+    def test_gecko_light_skips_negative_kcat(self, mini_model, mock_enzyme_data):
+        """Negative kcat must not produce a negative upper bound."""
+        mock_enzyme_data.rxn_items.return_value = {
+            "R1": {"best_kcat": -5.0, "best_mw": 50.0, "protein_to_use": "P1"},
+        }
+        result = apply_gecko_light(
+            mini_model, mock_enzyme_data, sigma=0.5, copy_model=True,
+        )
+        assert "R1" not in result.kcat_mapping
+        assert result.result["ec_model"].reactions.get_by_id("R1").upper_bound == 1000
+
+    def test_gecko_light_skips_zero_kcat(self, mini_model, mock_enzyme_data):
+        mock_enzyme_data.rxn_items.return_value = {
+            "R1": {"best_kcat": 0.0, "best_mw": 50.0, "protein_to_use": "P1"},
+        }
+        result = apply_gecko_light(
+            mini_model, mock_enzyme_data, sigma=0.5, copy_model=True,
+        )
+        assert "R1" not in result.kcat_mapping
+
+    def test_full_gecko_pool_exchange_ub_unchanged_after_draws(
+        self, linear_flux_model, mock_enzyme_data
+    ):
+        """EX_prot_pool ub must equal ptot*f*sigma even after many draws added.
+
+        Regression for: log line previously read upper_bound from an arbitrary
+        reaction in prot_pool.reactions (a frozenset containing both the
+        exchange and every draw_* reaction), giving misleading values.
+        """
+        mock_enzyme_data.rxn_items.return_value = {
+            "R1": {"best_kcat": 1.0, "best_mw": 10.0, "protein_to_use": "P1"},
+            "R2": {"best_kcat": 1.0, "best_mw": 20.0, "protein_to_use": "P2"},
+        }
+        result = apply_gecko_full(
+            linear_flux_model, mock_enzyme_data,
+            sigma=0.5, ptot=0.2, f_factor=0.5, copy_model=True,
+        )
+        expected_ub = 0.5 * 0.2 * 0.5
+        ex_rxn = result.ec_model.reactions.get_by_id(f"EX_{PROT_POOL_ID}")
+        assert np.isclose(ex_rxn.upper_bound, expected_ub)
+        # Draw reactions exist and have ub != expected_ub (their own ub 1000).
+        draw_rxns = [r for r in result.ec_model.reactions if r.id.startswith("draw_")]
+        assert draw_rxns
+        for d in draw_rxns:
+            assert not np.isclose(d.upper_bound, expected_ub)
+
     def test_reversible_reaction_is_split_before_enzyme_constraint(self):
         """Backward flux should consume enzyme instead of producing it."""
         model = cobra.Model("reverse_flux")
