@@ -43,11 +43,14 @@ class RemovableGeneDataIntegrator(GeneDataIntegrator):
         self._model = model
         raise NotImplementedError()
 
-    def apply(self, **kwargs):
+    def apply(self, model, data, **kwargs):
+        self._model = model
         self._model.__enter__()
-        self.integrate(**kwargs)
+        return self.integrate(model, data, **kwargs)
 
-    def remove(self, exc, value, tb, **kwargs):
+    def remove(self, exc=None, value=None, tb=None, **kwargs):
+        if self._model is None:
+            return
         self._model.__exit__(exc, value, tb)
 
 
