@@ -20,7 +20,6 @@ def test_metabolic_atlas_exists():
         pytest.skip("Live model registry APIs are unavailable in this environment")
     metabolic_atlas_models = result[result["database"] == "metabolic atlas"]
     assert not metabolic_atlas_models.empty
-    # Additional checks to verify the data structure
-    assert "model_id" in metabolic_atlas_models.columns
-    assert "description" in metabolic_atlas_models.columns
-    assert len(metabolic_atlas_models) > 0  # Ensure at least one model exists
+    # schema produced by AtlasDataBaseFetcher.manipulate_df
+    for col in ["id", "organism", "reaction_count", "metabolite_count", "gene_count"]:
+        assert col in metabolic_atlas_models.columns

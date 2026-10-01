@@ -89,6 +89,7 @@ include-package-data = true
 include = ["pipeGEM*"]
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
 norecursedirs = [
     ".git",
     ".pytest_cache",
