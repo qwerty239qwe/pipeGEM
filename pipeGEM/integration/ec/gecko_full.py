@@ -6,6 +6,7 @@ reactions to consume the enzyme pseudo-metabolite proportional to
 ``1 / kcat``.
 """
 import numpy as np
+import pandas as pd
 
 from pipeGEM._logging import get_logger
 from pipeGEM.analysis.results._base import timing
@@ -88,8 +89,9 @@ def apply_gecko_full(
         if mw is None or np.isnan(mw) or mw <= 0:
             logger.debug("Invalid MW for %s, skipping.", rxn_id)
             continue
-        if prot_id is None:
-            prot_id = rxn_id  # fallback
+        if prot_id is None or pd.isna(prot_id):
+            # fallback; a NaN id would merge every such rxn into one "prot_nan" enzyme
+            prot_id = rxn_id
 
         rxn = model.reactions.get_by_id(rxn_id)
         constrained_rxns = builder.prepare_reaction_for_enzyme_constraint(model, rxn)
@@ -98,7 +100,9 @@ def apply_gecko_full(
             continue
 
         # Create draw reaction (pool -> individual enzyme)
-        enz_met = builder.create_draw_reaction(model, prot_pool, prot_id, mw)
+        # EnzymeData MW is in Da (g/mol); pool is g/gDW and enzyme usage is
+        # mmol/gDW, so the draw coefficient must be g/mmol (kDa).
+        enz_met = builder.create_draw_reaction(model, prot_pool, prot_id, mw / 1000.0)
 
         # Modify each non-negative directional reaction to consume the enzyme
         for constrained_rxn in constrained_rxns:

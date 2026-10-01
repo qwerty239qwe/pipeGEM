@@ -354,7 +354,7 @@ class TestApplyGeckoFull:
     def test_protein_pool_limits_flux_to_calculated_capacity(self, linear_flux_model, mock_enzyme_data):
         """Full GECKO should limit flux through MW, kcat, and the protein pool."""
         mock_enzyme_data.rxn_items.return_value = {
-            "R1": {"best_kcat": 1.0, "best_mw": 10.0, "protein_to_use": "P1"},
+            "R1": {"best_kcat": 1.0, "best_mw": 10_000.0, "protein_to_use": "P1"},
         }
         sigma = 0.5
         ptot = 0.2
@@ -385,7 +385,7 @@ class TestApplyGeckoFull:
 
     def test_full_gecko_uses_dlkcat_fallback_from_enzyme_data(self, linear_flux_model):
         enzyme_df = pd.DataFrame({
-            "MW": [10.0],
+            "MW": [10_000.0],
             "Kcat": [np.nan],
             "DLKcat": [1.0],
             "Sequence": ["ACDEF"],
@@ -458,11 +458,11 @@ class TestApplyGeckoFull:
 
         enzyme_data = MagicMock()
         enzyme_data.rxn_items.return_value = {
-            "FAST_1": {"best_kcat": 10.0, "best_mw": 10.0, "protein_to_use": "P_FAST"},
-            "FAST_2": {"best_kcat": 10.0, "best_mw": 10.0, "protein_to_use": "P_FAST"},
-            "SLOW_1": {"best_kcat": 1.0, "best_mw": 100.0, "protein_to_use": "P_SLOW"},
-            "SLOW_2": {"best_kcat": 1.0, "best_mw": 100.0, "protein_to_use": "P_SLOW"},
-            "B_C_LINK": {"best_kcat": 5.0, "best_mw": 10.0, "protein_to_use": "P_LINK"},
+            "FAST_1": {"best_kcat": 10.0, "best_mw": 10_000.0, "protein_to_use": "P_FAST"},
+            "FAST_2": {"best_kcat": 10.0, "best_mw": 10_000.0, "protein_to_use": "P_FAST"},
+            "SLOW_1": {"best_kcat": 1.0, "best_mw": 100_000.0, "protein_to_use": "P_SLOW"},
+            "SLOW_2": {"best_kcat": 1.0, "best_mw": 100_000.0, "protein_to_use": "P_SLOW"},
+            "B_C_LINK": {"best_kcat": 5.0, "best_mw": 10_000.0, "protein_to_use": "P_LINK"},
         }
 
         result = apply_gecko_full(
@@ -609,7 +609,7 @@ class TestApplyGeckoFull:
 
         enzyme_data = MagicMock()
         enzyme_data.rxn_items.return_value = {
-            "RREV": {"best_kcat": 1.0, "best_mw": 10.0, "protein_to_use": "P1"},
+            "RREV": {"best_kcat": 1.0, "best_mw": 10_000.0, "protein_to_use": "P1"},
         }
         sigma = 0.5
         ptot = 0.2
@@ -686,7 +686,7 @@ class TestECModelBuilderErrorPaths:
 
         enzyme_data = MagicMock()
         enzyme_data.rxn_items.return_value = {
-            "RREV": {"best_kcat": 1.0, "best_mw": 10.0, "protein_to_use": "P1"},
+            "RREV": {"best_kcat": 1.0, "best_mw": 10_000.0, "protein_to_use": "P1"},
         }
         result = apply_gecko_full(
             model, enzyme_data, sigma=0.5, ptot=0.2, f_factor=0.5, copy_model=True,
@@ -952,3 +952,101 @@ class TestAutoParameterize:
         result = _merge_kcat_from_source(df, src, "Kcat", "EC_num")
         assert result.loc[0, "Kcat"] == 99.0
         assert result.loc[1, "Kcat"] == 2.0
+
+
+# =====================================================================
+# Regression tests for GECKO bugs
+# =====================================================================
+
+def _rxn_model(r1_bounds, extra_parallel=False):
+    """EX_a (uptake <= 10) -> R1 -> R2 (objective, reversible)."""
+    model = cobra.Model("regress")
+    a = cobra.Metabolite("a_c", compartment="c")
+    b = cobra.Metabolite("b_c", compartment="c")
+    ex_a = cobra.Reaction("EX_a", lower_bound=-10, upper_bound=1000)
+    ex_a.add_metabolites({a: -1})
+    r1 = cobra.Reaction("R1", lower_bound=r1_bounds[0], upper_bound=r1_bounds[1])
+    r1.add_metabolites({a: -1, b: 1})
+    r1.gene_reaction_rule = "g1"
+    r2 = cobra.Reaction("R2", lower_bound=-1000, upper_bound=1000)
+    r2.add_metabolites({b: -1})
+    rxns = [ex_a, r1, r2]
+    if extra_parallel:
+        r3 = cobra.Reaction("R3", lower_bound=0, upper_bound=1000)
+        r3.add_metabolites({a: -1, b: 1})
+        rxns.append(r3)
+    model.add_reactions(rxns)
+    model.objective = "R2"
+    return model
+
+
+def _mock_items(items):
+    ed = MagicMock()
+    ed.rxn_items.return_value = items
+    return ed
+
+
+class TestGeckoRegressions:
+    def test_full_gecko_converts_enzyme_data_mw_from_dalton(self):
+        """EnzymeData MW is in Da; the pool needs g/mmol, else 1000x over-constrained."""
+        model = _rxn_model((0, 1000))
+        enzyme_data = EnzymeData(
+            pd.DataFrame({"Kcat": [0.1], "Sequence": ["M" + "A" * 450]}, index=["g1"]),
+        )
+        enzyme_data.align(model, run_DLKcat=False)
+        mw_da = enzyme_data.rxn_items()["R1"]["best_mw"]
+        assert mw_da > 1000  # sanity: inferred MW is in Dalton
+
+        result = apply_gecko_full(model, enzyme_data, sigma=0.5, ptot=0.5, f_factor=0.5)
+        ec = result.ec_model
+        pool_coeff = ec.reactions.get_by_id("draw_g1").metabolites[ec.metabolites.get_by_id(PROT_POOL_ID)]
+
+        assert np.isclose(pool_coeff, -mw_da / 1000.0)
+        expected = 0.125 * 0.1 * 3600.0 / (mw_da / 1000.0)  # pool-limited, ~1.4 < uptake 10
+        assert expected < 10.0
+        assert np.isclose(ec.slim_optimize(), expected)
+
+    def test_full_gecko_nan_protein_does_not_merge_enzymes(self):
+        """NaN protein_to_use must fall back to the rxn id, not a shared 'prot_nan'."""
+        model = _rxn_model((0, 1000), extra_parallel=True)
+        result = apply_gecko_full(model, _mock_items({
+            "R1": {"best_kcat": 1.0, "best_mw": 50_000.0, "protein_to_use": np.nan},
+            "R3": {"best_kcat": 1.0, "best_mw": 50_000.0, "protein_to_use": np.nan},
+        }))
+        assert set(result.draw_reactions) == {"draw_R1", "draw_R3"}
+        assert "prot_nan" not in {m.id for m in result.ec_model.metabolites}
+
+    def test_full_gecko_split_keeps_forced_backward_flux(self):
+        """A (lb=-10, ub=-2) reaction must still carry >= 2 backward after splitting."""
+        model = _rxn_model((-10, -2))
+        result = apply_gecko_full(model, _mock_items({
+            "R1": {"best_kcat": 1.0, "best_mw": 50_000.0, "protein_to_use": "P1"},
+        }))
+        ec = result.ec_model
+        assert ec.reactions.get_by_id("_R_R1").bounds == (2, 10)
+        assert "_F_R1" not in {r.id for r in ec.reactions}
+
+    def test_light_gecko_constrains_backward_direction(self):
+        """Reversible reactions must be capped in both directions."""
+        model = _rxn_model((-1000, 1000))
+        kcat, sigma, ptot, f_factor = 1e-4, 0.5, 0.5, 0.5
+        cap = kcat * ptot * f_factor * sigma * 3600.0
+        result = apply_gecko_light(model, _mock_items({
+            "R1": {"best_kcat": kcat, "best_mw": 50_000.0, "protein_to_use": "P1"},
+        }), sigma=sigma, ptot=ptot, f_factor=f_factor)
+        ec = result.ec_model
+        assert np.allclose(ec.reactions.R1.bounds, (-cap, cap))
+        assert result.modified_bounds["R1"] == ec.reactions.R1.bounds
+        ec.objective = {ec.reactions.R1: -1}  # maximise backward flux
+        assert np.isclose(ec.slim_optimize(), cap)
+
+    def test_light_gecko_forced_flux_above_capacity_does_not_crash(self, caplog):
+        """lb > enzyme capacity used to raise ValueError from cobra's bound setter."""
+        model = _rxn_model((5, 1000))
+        with caplog.at_level("WARNING"):
+            result = apply_gecko_light(model, _mock_items({
+                "R1": {"best_kcat": 1e-4, "best_mw": 50_000.0, "protein_to_use": "P1"},
+            }))
+        assert result.ec_model.reactions.R1.bounds == (5, 1000)
+        assert result.log["n_bound_reductions"] == 0
+        assert any("conflicts with bounds" in r.message for r in caplog.records)

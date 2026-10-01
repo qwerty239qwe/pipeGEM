@@ -82,6 +82,8 @@ class ECModelBuilder:
     ) -> cobra.Metabolite:
         """Create a draw reaction from the pool to an individual enzyme.
 
+        *mw* must be in g/mmol (kDa) so that pool usage is in g/gDW.
+
         Returns the enzyme pseudo-metabolite so it can be referenced by
         arm reactions.
         """

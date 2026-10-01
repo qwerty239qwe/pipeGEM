@@ -125,14 +125,16 @@ def make_irrev_rxn(mod,
 
     new_rxns = []
     if can_forward:
-        forward_rxn = cobra.Reaction(f"{forward_prefix}{rxn.id}", upper_bound=rxn.upper_bound, lower_bound=0)
+        forward_rxn = cobra.Reaction(f"{forward_prefix}{rxn.id}", upper_bound=rxn.upper_bound,
+                                     lower_bound=max(0, rxn.lower_bound))
         _copy_attrs(forward_rxn, "forward")
         forward_rxn.add_metabolites({
             met: c for met, c in rxn.metabolites.items()
         })
         new_rxns.append(forward_rxn)
     if can_backward:
-        reversed_rxn = cobra.Reaction(f"{backward_prefix}{rxn.id}", upper_bound=-rxn.lower_bound, lower_bound=0)
+        reversed_rxn = cobra.Reaction(f"{backward_prefix}{rxn.id}", upper_bound=-rxn.lower_bound,
+                                      lower_bound=max(0, -rxn.upper_bound))
         _copy_attrs(reversed_rxn, "backward")
         reversed_rxn.subtract_metabolites({
             met: c for met, c in rxn.metabolites.items()

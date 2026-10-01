@@ -34,8 +34,8 @@ def apply_gecko_light(
 ):
     """Apply simple kcat-based enzyme constraints (GECKO-light).
 
-    For every reaction in *model* that has associated kcat data, the upper
-    bound is constrained to::
+    For every reaction in *model* that has associated kcat data, the absolute
+    flux (both bounds, for reversible reactions) is constrained to::
 
         new_ub = kcat [1/s] * abundance [mmol/gDW] * sigma * 3600
 
@@ -112,14 +112,24 @@ def apply_gecko_light(
         # new_ub = kcat [1/s] * abundance [mmol/gDW] * sigma * 3600 [s/h]
         new_ub = kcat * abundance * sigma * 3600.0
 
-        old_ub = rxn.upper_bound
-        bound_reduced = new_ub < old_ub
-        if bound_reduced:
-            rxn.upper_bound = new_ub
+        # The enzyme caps |flux| in both directions, not only the forward one.
+        old_lb, old_ub = rxn.bounds
+        new_bounds = (max(old_lb, -new_ub), min(old_ub, new_ub))
+        bound_reduced = new_bounds != (old_lb, old_ub)
+        if new_bounds[0] > new_bounds[1]:
+            # forced flux (e.g. lb > 0) exceeds enzyme capacity; tightening
+            # would raise in cobra, so keep the original bounds.
+            logger.warning(
+                "Enzyme capacity %.4g for %s conflicts with bounds (%.4g, %.4g); "
+                "leaving bounds unchanged.", new_ub, rxn_id, old_lb, old_ub,
+            )
+            bound_reduced = False
+        elif bound_reduced:
+            rxn.bounds = new_bounds
             n_bound_reductions += 1
             logger.debug(
-                "Constrained %s: ub %.4g -> %.4g (kcat=%.4g, abund=%.4g)",
-                rxn_id, old_ub, new_ub, kcat, abundance,
+                "Constrained %s: bounds (%.4g, %.4g) -> (%.4g, %.4g) (kcat=%.4g, abund=%.4g)",
+                rxn_id, old_lb, old_ub, *new_bounds, kcat, abundance,
             )
 
         modified_bounds[rxn_id] = (rxn.lower_bound, rxn.upper_bound)
