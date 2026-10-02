@@ -106,7 +106,7 @@ def apply_gecko_light(
         if protein_abundance is not None and prot_id is not None:
             prot_df = protein_abundance._prot_abund_df
             if prot_id in prot_df.index:
-                abundance = prot_df.loc[prot_id, "abundance"]
+                abundance = prot_df.loc[prot_id, protein_abundance.abundance_col]
 
         # kcat is in 1/s -> convert to 1/h
         # new_ub = kcat [1/s] * abundance [mmol/gDW] * sigma * 3600 [s/h]

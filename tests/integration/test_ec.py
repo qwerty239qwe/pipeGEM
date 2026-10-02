@@ -17,6 +17,7 @@ from pipeGEM.integration.ec.gecko_light import apply_gecko_light
 from pipeGEM.integration.ec.gecko_full import apply_gecko_full
 from pipeGEM.analysis.results.ec import GECKOLightAnalysis, GECKOFullAnalysis
 from pipeGEM.data import EnzymeData
+from pipeGEM.data.data import ProteinAbundanceData
 
 
 # =====================================================================
@@ -761,10 +762,9 @@ class TestGeckoLightEdgePaths:
         mock_enzyme_data.rxn_items.return_value = {
             "R1": {"best_kcat": 1.0, "best_mw": 10.0, "protein_to_use": "P1"},
         }
-        prot_ab = MagicMock()
-        prot_ab._prot_abund_df = pd.DataFrame(
+        prot_ab = ProteinAbundanceData(pd.DataFrame(
             {"abundance": [0.001]}, index=["P1"],
-        )
+        ))
         result = apply_gecko_light(
             mini_model, mock_enzyme_data,
             protein_abundance=prot_ab,
@@ -778,10 +778,9 @@ class TestGeckoLightEdgePaths:
         mock_enzyme_data.rxn_items.return_value = {
             "R1": {"best_kcat": 0.001, "best_mw": 10.0, "protein_to_use": "P1"},
         }
-        prot_ab = MagicMock()
-        prot_ab._prot_abund_df = pd.DataFrame(
+        prot_ab = ProteinAbundanceData(pd.DataFrame(
             {"abundance": [99.0]}, index=["P_OTHER"],
-        )
+        ))
         result = apply_gecko_light(
             mini_model, mock_enzyme_data,
             protein_abundance=prot_ab,

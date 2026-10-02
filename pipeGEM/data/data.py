@@ -1289,6 +1289,7 @@ class ProteinAbundanceData(BaseData):
         if abundance_col not in self._prot_abund_df:
             raise KeyError(f"abundance_col {abundance_col} cannot be found in the data, "
                            f"possible column names = {self._prot_abund_df.columns}")
+        self.abundance_col = abundance_col
 
     def calc_f_coef(self):
         """Calculate fractional protein coefficients.
