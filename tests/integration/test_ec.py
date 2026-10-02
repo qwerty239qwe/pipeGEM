@@ -6,6 +6,7 @@ Covers:
 - pipeGEM/integration/ec/gecko_full.py  (apply_gecko_full)
 """
 from unittest.mock import MagicMock
+from contextlib import nullcontext
 
 import cobra
 import numpy as np
@@ -853,6 +854,71 @@ class TestEnzymeDataRxnItemsDuplicate:
 # =====================================================================
 
 class TestAutoParameterize:
+    @pytest.mark.parametrize("strategy, expected", [("median", 10.), ("geometric_mean", 8.), ("dlkcat", 10.)])
+    def test_fill_uses_only_finite_positive_kcats(self, strategy, expected):
+        from pipeGEM.integration.ec.autopacmen import auto_parameterize
+        values = [4., 16., 0., -2., np.nan, np.inf, -np.inf]
+        original = pd.DataFrame({"Kcat": values, "MW": 50_000.}, index=[f"g{i}" for i in range(len(values))])
+        data = EnzymeData(original)
+        with pytest.warns(UserWarning, match="DLKcat requested") if strategy == "dlkcat" else nullcontext():
+            filled = auto_parameterize(cobra.Model(), data, fill_missing=strategy)
+        np.testing.assert_allclose(filled._enzyme_df["Kcat"], [4., 16.] + [expected] * 5)
+        pd.testing.assert_frame_equal(data._enzyme_df, original)
+
+    @pytest.mark.parametrize("strategy", ["median", "geometric_mean"])
+    def test_all_nonpositive_or_missing_kcats_use_positive_fallback(self, strategy):
+        from pipeGEM.integration.ec.autopacmen import auto_parameterize
+        data = EnzymeData(pd.DataFrame({"Kcat": [0., -2., np.nan], "MW": 50_000.}, index=["g1", "g2", "g3"]))
+        filled = auto_parameterize(cobra.Model(), data, fill_missing=strategy)
+        np.testing.assert_allclose(filled._enzyme_df["Kcat"], 1.)
+
+    @pytest.mark.parametrize("strategy", ["median", "geometric_mean", "dlkcat"])
+    @pytest.mark.parametrize("missing", [None, pd.NA])
+    def test_object_missing_kcats_use_positive_fallback(self, strategy, missing):
+        from pipeGEM.integration.ec.autopacmen import auto_parameterize
+        original = pd.DataFrame({"Kcat": [missing, missing], "MW": 50_000.}, index=["g1", "g2"])
+        data = EnzymeData(original)
+        with pytest.warns(UserWarning, match="DLKcat requested") if strategy == "dlkcat" else nullcontext():
+            filled = auto_parameterize(cobra.Model(), data, fill_missing=strategy)
+        np.testing.assert_allclose(filled._enzyme_df["Kcat"], 1.)
+        pd.testing.assert_frame_equal(data._enzyme_df, original)
+
+    @pytest.mark.parametrize("strategy, expected", [("median", 10.), ("geometric_mean", 8.)])
+    def test_object_kcats_are_normalized_before_filling(self, strategy, expected):
+        from pipeGEM.integration.ec.autopacmen import auto_parameterize
+        data = EnzymeData(pd.DataFrame({"Kcat": ["4", "16", None, "invalid", "0", "inf"], "MW": 50_000.}))
+        filled = auto_parameterize(cobra.Model(), data, fill_missing=strategy)
+        np.testing.assert_allclose(filled._enzyme_df["Kcat"], [4., 16.] + [expected] * 4)
+
+    def test_database_object_kcats_are_normalized(self):
+        from pipeGEM.integration.ec.autopacmen import _merge_kcat_from_source
+        frame = pd.DataFrame({"Kcat": [None], "EC": ["1"]})
+        source = pd.DataFrame({"EC": ["1"] * 4, "kcat": ["4", "16", None, "invalid"]})
+        filled = _merge_kcat_from_source(frame, source, "Kcat", "EC")
+        assert filled.loc[0, "Kcat"] == pytest.approx(10.)
+
+    def test_database_median_ignores_invalid_donors(self):
+        from pipeGEM.integration.ec.autopacmen import _merge_kcat_from_source
+        frame = pd.DataFrame({"Kcat": [0., 2.], "EC": ["1", "2"]})
+        source = pd.DataFrame({"EC": ["1"] * 6, "kcat": [4., 16., 0., -2., np.nan, np.inf]})
+        result = _merge_kcat_from_source(frame, source, "Kcat", "EC")
+        np.testing.assert_allclose(result["Kcat"], [10., 2.])
+
+    @pytest.mark.parametrize("prediction_fails", [False, True])
+    def test_dlkcat_invalid_predictions_use_positive_median(self, monkeypatch, prediction_fails):
+        from pipeGEM.integration.ec.autopacmen import auto_parameterize
+        data = EnzymeData(pd.DataFrame({"Kcat": [4., 0., -2., np.nan, np.inf], "MW": 50_000.}))
+
+        def predict(*args, **kwargs):
+            if prediction_fails:
+                raise RuntimeError("prediction unavailable")
+            data._enzyme_df[data.alt_kcat_col] = [np.nan, 16., 0., -1., np.inf]
+
+        monkeypatch.setattr(data, "run_DLKcat", predict)
+        result = auto_parameterize(cobra.Model(), data, fill_missing="dlkcat", metabolite_data=object())
+        expected = [4.] * 5 if prediction_fails else [4., 16., 10., 10., 10.]
+        np.testing.assert_allclose(result._enzyme_df["Kcat"], expected)
+
     @pytest.fixture
     def base_enzyme_data(self):
         df = pd.DataFrame({
@@ -986,6 +1052,52 @@ def _mock_items(items):
 
 
 class TestGeckoRegressions:
+    @pytest.mark.parametrize("use_id_column", [False, True])
+    def test_duplicate_abundance_ids_rejected_at_construction(self, use_id_column):
+        frame = pd.DataFrame({"protein": ["P1", "P1"], "abundance": [1e-3, 2e-3]}, index=["P1", "P1"])
+        with pytest.raises(ValueError, match="[Dd]uplicate protein IDs.*P1"):
+            ProteinAbundanceData(frame, prot_id_col="protein" if use_id_column else None)
+
+    @pytest.mark.parametrize("invalid", [-1., np.inf, -np.inf])
+    def test_invalid_abundance_rejected(self, invalid):
+        with pytest.raises(ValueError, match="finite and non-negative"):
+            ProteinAbundanceData(pd.DataFrame({"abundance": [invalid]}, index=["P1"]))
+
+    @pytest.mark.parametrize("sigma", [0.25, 0.5, 1.])
+    def test_full_gecko_measured_abundance_is_shared_between_reactions(self, linear_flux_model, sigma):
+        enzyme_data = _mock_items({
+            rxn: {"best_kcat": kcat, "best_mw": 50_000., "protein_to_use": "P1"}
+            for rxn, kcat in [("R1", 1.), ("R2", 2.)]
+        })
+        abundance = 1e-4
+        data = ProteinAbundanceData(pd.DataFrame({"measured": [abundance]}, index=["P1"]), abundance_col="measured")
+        full = apply_gecko_full(linear_flux_model, enzyme_data, protein_abundance=data, sigma=sigma)
+        light = apply_gecko_light(linear_flux_model, enzyme_data, protein_abundance=data, sigma=sigma)
+        expected_shared_flux = abundance * sigma * 3600. / (1. / 1. + 1. / 2.)
+        assert full.ec_model.slim_optimize() == pytest.approx(expected_shared_flux)
+        assert full.ec_model.reactions.draw_P1.upper_bound == pytest.approx(abundance * sigma)
+        # Light intentionally gives each reaction its own cap for the same enzyme.
+        assert light.ec_model.slim_optimize() == pytest.approx(abundance * sigma * 3600.)
+        assert linear_flux_model.reactions.R1.upper_bound == 1000.
+
+    @pytest.mark.parametrize("missing_id", [False, True])
+    def test_full_gecko_missing_abundance_retains_pool_constraint(self, linear_flux_model, missing_id):
+        enzyme_data = _mock_items({"R1": {"best_kcat": 0.1, "best_mw": 50_000., "protein_to_use": "P1"}})
+        data = ProteinAbundanceData(pd.DataFrame({"abundance": [np.nan]}, index=["unrelated" if missing_id else "P1"]))
+        without = apply_gecko_full(linear_flux_model, enzyme_data)
+        with_missing = apply_gecko_full(linear_flux_model, enzyme_data, protein_abundance=data)
+        assert with_missing.ec_model.slim_optimize() == pytest.approx(without.ec_model.slim_optimize())
+        light_without = apply_gecko_light(linear_flux_model, enzyme_data)
+        light_missing = apply_gecko_light(linear_flux_model, enzyme_data, protein_abundance=data)
+        assert light_missing.modified_bounds == light_without.modified_bounds
+
+    @pytest.mark.parametrize("method", [apply_gecko_full, apply_gecko_light])
+    def test_zero_abundance_blocks_reaction(self, linear_flux_model, method):
+        enzyme_data = _mock_items({"R1": {"best_kcat": 1., "best_mw": 50_000., "protein_to_use": "P1"}})
+        data = ProteinAbundanceData(pd.DataFrame({"abundance": [0.]}, index=["P1"]))
+        result = method(linear_flux_model, enzyme_data, protein_abundance=data)
+        assert result.ec_model.slim_optimize() == pytest.approx(0.)
+
     def test_full_gecko_converts_enzyme_data_mw_from_dalton(self):
         """EnzymeData MW is in Da; the pool needs g/mmol, else 1000x over-constrained."""
         model = _rxn_model((0, 1000))
@@ -1039,13 +1151,25 @@ class TestGeckoRegressions:
         ec.objective = {ec.reactions.R1: -1}  # maximise backward flux
         assert np.isclose(ec.slim_optimize(), cap)
 
-    def test_light_gecko_forced_flux_above_capacity_does_not_crash(self, caplog):
-        """lb > enzyme capacity used to raise ValueError from cobra's bound setter."""
-        model = _rxn_model((5, 1000))
-        with caplog.at_level("WARNING"):
-            result = apply_gecko_light(model, _mock_items({
-                "R1": {"best_kcat": 1e-4, "best_mw": 50_000.0, "protein_to_use": "P1"},
-            }))
-        assert result.ec_model.reactions.R1.bounds == (5, 1000)
-        assert result.log["n_bound_reductions"] == 0
-        assert any("conflicts with bounds" in r.message for r in caplog.records)
+    @pytest.mark.parametrize("bounds", [(5, 1000), (-1000, -5)])
+    @pytest.mark.parametrize("abundance", [0., 1e-4])
+    @pytest.mark.parametrize("copy_model", [False, True])
+    def test_light_gecko_rejects_forced_flux_above_capacity(self, bounds, abundance, copy_model):
+        model = _rxn_model(bounds)
+        data = ProteinAbundanceData(pd.DataFrame({"abundance": [abundance]}, index=["P1"]))
+        with pytest.raises(ValueError, match=r"Enzyme capacity .*R1.*conflicts with bounds"):
+            apply_gecko_light(model, _mock_items({
+                "R1": {"best_kcat": 1., "best_mw": 50_000., "protein_to_use": "P1"},
+            }), protein_abundance=data, copy_model=copy_model)
+        assert model.reactions.R1.bounds == bounds
+
+    def test_light_gecko_conflict_does_not_partially_modify_in_place(self):
+        model = _rxn_model((0, 1000))
+        model.reactions.R2.bounds = (5, 1000)
+        original = {r.id: r.bounds for r in model.reactions}
+        with pytest.raises(ValueError, match=r"R2.*conflicts with bounds"):
+            apply_gecko_light(model, _mock_items({
+                rxn: {"best_kcat": 1e-4, "best_mw": 50_000., "protein_to_use": rxn}
+                for rxn in ("R1", "R2")
+            }), copy_model=False)
+        assert {r.id: r.bounds for r in model.reactions} == original

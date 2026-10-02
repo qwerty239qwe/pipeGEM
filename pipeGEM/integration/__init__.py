@@ -13,7 +13,7 @@ from pipeGEM.integration.ec import apply_gecko_light, apply_gecko_full, auto_par
 
 
 __all__ = ("integrator_factory", "GIMME", "RIPTiDe", "RIPTiDeSampling", "RIPTiDePruning",
-           "EFlux", "CORDA", "rFASTCORMICS",
+           "EFlux", "CORDA", "rFASTCORMICS", "FASTCORE", "SWIFTCORE", "SPOT",
            "apply_MBA", "apply_INIT", "apply_FASTCORE",
            "apply_EFlux", "apply_GIMME", "apply_iMAT",
            "apply_mCADRE", "apply_CORDA", "apply_rFASTCORMICS",

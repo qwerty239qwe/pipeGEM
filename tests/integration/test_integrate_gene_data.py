@@ -300,3 +300,72 @@ class TestRemovableGeneDataIntegratorApply:
         # _model is None before apply(); remove() must not raise
         integ = _ProbeIntegrator()
         integ.remove()
+
+    @pytest.mark.parametrize("wrapped", [False, True])
+    @pytest.mark.parametrize("error_type", [ValueError, KeyboardInterrupt])
+    def test_failed_apply_restores_model_and_preserves_outer_context(self, ecoli_core, monkeypatch, wrapped, error_type):
+        ecoli_core = ecoli_core.copy()
+        model = Model(model=ecoli_core) if wrapped else ecoli_core
+        integ = _ProbeIntegrator()
+        integrate = integ.integrate
+        error = error_type("integration failed")
+
+        def fail(model, data, **kwargs):
+            integrate(model, data, **kwargs)
+            raise error
+
+        monkeypatch.setattr(integ, "integrate", fail)
+        with model:
+            model.reactions.PFK.lower_bound = 1.
+            with pytest.raises(error_type) as caught:
+                integ.apply(model, "PFK")
+            assert caught.value is error
+            assert model.reactions.PFK.lower_bound == 1.
+            assert len(ecoli_core._contexts) == 1
+            integ.remove()
+            assert len(ecoli_core._contexts) == 1
+            monkeypatch.setattr(integ, "integrate", integrate)
+            assert integ.apply(model, "PFK") == "integrated"
+            integ.remove()
+            assert model.reactions.PFK.lower_bound == 1.
+        assert len(ecoli_core._contexts) == 0
+
+    @pytest.mark.parametrize("wrapped", [False, True])
+    def test_repeated_remove_preserves_outer_context(self, ecoli_core, wrapped):
+        ecoli_core = ecoli_core.copy()
+        model = Model(model=ecoli_core) if wrapped else ecoli_core
+        integ = _ProbeIntegrator()
+        with model:
+            model.reactions.PFK.lower_bound = 1.
+            integ.apply(model, "PFK")
+            integ.remove()
+            integ.remove()
+            assert model.reactions.PFK.lower_bound == 1.
+            assert len(ecoli_core._contexts) == 1
+        assert len(ecoli_core._contexts) == 0
+
+    def test_repeated_apply_preserves_first_model_context(self, ecoli_core):
+        ecoli_core = ecoli_core.copy()
+        other_model = ecoli_core.copy()
+        integ = _ProbeIntegrator()
+        original_lb = ecoli_core.reactions.PFK.lower_bound
+        other_lb = other_model.reactions.PFK.lower_bound
+        integ.apply(ecoli_core, "PFK")
+        try:
+            with pytest.raises(RuntimeError, match="already applied"):
+                integ.apply(other_model, "PFK")
+            assert len(ecoli_core._contexts) == 1
+            assert len(other_model._contexts) == 0
+            assert other_model.reactions.PFK.lower_bound == other_lb
+        finally:
+            integ.remove()
+        assert ecoli_core.reactions.PFK.lower_bound == original_lb
+
+    def test_remove_after_direct_integrate_preserves_outer_context(self, ecoli_core):
+        model = ecoli_core.copy()
+        integ = _ProbeIntegrator()
+        with model:
+            integ.integrate(model, "PFK")
+            integ.remove()
+            assert model.reactions.PFK.lower_bound == -123.
+            assert len(model._contexts) == 1

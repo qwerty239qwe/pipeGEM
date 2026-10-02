@@ -252,6 +252,8 @@ def _traverse_dic_add_doc(dic, table_or_doc):
             table_or_doc[k] = _traverse_dic_add_doc(v, new_tab)
         elif v is None:
             table_or_doc[k] = np.nan
+        elif isinstance(v, set):
+            table_or_doc[k] = sorted(v)
         else:
             table_or_doc[k] = v
     return table_or_doc

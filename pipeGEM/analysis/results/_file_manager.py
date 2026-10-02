@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+import json
 
 from pipeGEM.utils import ObjectFactory, save_model, load_model, load_pg_model, save_toml_file, parse_toml_file
 import pandas as pd
@@ -39,6 +40,7 @@ class FrameFileManager(BaseFileManager):
         obj.to_csv(Path(file_name).with_suffix(suffix), **kwargs)
 
     def read(self, file_name, **kwargs):
+        kwargs.setdefault("index_col", 0)
         return pd.read_csv(file_name, **kwargs)
 
 
@@ -88,6 +90,29 @@ class PGModelFileManager(BaseFileManager):
 
     def read(self, file_name, **kwargs):
         return load_pg_model(file_name=file_name)
+
+
+class CobraSolutionFileManager(BaseFileManager):
+    def __init__(self):
+        super().__init__(cobra.Solution, default_suffix=".json")
+
+    def write(self, obj, file_name, **kwargs):
+        data = {"objective_value": obj.objective_value, "status": obj.status}
+        for field in ("fluxes", "reduced_costs", "shadow_prices"):
+            series = getattr(obj, field)
+            data[field] = None if series is None else {
+                "index": series.index.tolist(), "data": series.tolist(), "name": series.name,
+            }
+        with open(Path(file_name).with_suffix(self.suffix), "w", encoding="utf-8") as stream:
+            json.dump(data, stream)
+
+    def read(self, file_name, **kwargs):
+        with open(file_name, encoding="utf-8") as stream:
+            data = json.load(stream)
+        for field in ("fluxes", "reduced_costs", "shadow_prices"):
+            if data[field] is not None:
+                data[field] = pd.Series(**data[field], dtype=float)
+        return cobra.Solution(**data)
 
 
 class NDArrayStrFileManager(BaseFileManager):
@@ -210,6 +235,7 @@ fmanagers = FileManagers()
 fmanagers.register("pandas.DataFrame", FrameFileManager)
 fmanagers.register("pandas.Series", SeriesFileManager)
 fmanagers.register("cobra.Model", CobraModelFileManager)
+fmanagers.register("cobra.Solution", CobraSolutionFileManager)
 fmanagers.register("pipeGEM.Model", PGModelFileManager)
 fmanagers.register("numpy.NDArrayStr", NDArrayStrFileManager)
 fmanagers.register("numpy.NDArrayFloat", NDArrayFloatFileManager)

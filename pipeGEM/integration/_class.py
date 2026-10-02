@@ -8,6 +8,10 @@ from pipeGEM.integration.algo.mCADRE import apply_mCADRE
 from pipeGEM.integration.algo.MBA import apply_MBA
 from pipeGEM.integration.algo.INIT import apply_INIT
 from pipeGEM.integration.algo.iMAT import apply_iMAT
+from pipeGEM.integration.algo.FASTCORE import apply_FASTCORE
+from pipeGEM.integration.algo.SWIFTCORE import swiftCore
+from pipeGEM.integration.utils import parse_predefined_threshold
+from pipeGEM.analysis.results._base import BaseAnalysis
 from pipeGEM.integration.ec.gecko_light import apply_gecko_light
 from pipeGEM.integration.ec.gecko_full import apply_gecko_full
 from pipeGEM.utils import ObjectFactory
@@ -38,20 +42,29 @@ class RemovableGeneDataIntegrator(GeneDataIntegrator):
     def __init__(self):
         super(RemovableGeneDataIntegrator, self).__init__()
         self._model = None
+        self._applied_model = None
 
     def integrate(self, model, data, **kwargs):
         self._model = model
         raise NotImplementedError()
 
     def apply(self, model, data, **kwargs):
+        if self._applied_model is not None:
+            raise RuntimeError("Integrator is already applied; call remove() before applying it again.")
         self._model = model
-        self._model.__enter__()
-        return self.integrate(model, data, **kwargs)
+        model.__enter__()
+        self._applied_model = model
+        try:
+            return self.integrate(model, data, **kwargs)
+        except BaseException as exc:
+            self.remove(type(exc), exc, exc.__traceback__)
+            raise
 
     def remove(self, exc=None, value=None, tb=None, **kwargs):
-        if self._model is None:
+        if self._applied_model is None:
             return
-        self._model.__exit__(exc, value, tb)
+        self._applied_model.__exit__(exc, value, tb)
+        self._applied_model = None
 
 
 class GIMME(RemovableGeneDataIntegrator):
@@ -146,6 +159,43 @@ class rFASTCORMICS(GeneDataIntegrator):
                                   **kwargs)
 
 
+def _core_reaction_ids(model, data, C, protected_rxns, predefined_threshold):
+    if C is None:
+        thresholds = parse_predefined_threshold(predefined_threshold, gene_data=data.gene_data,
+                                               threshold_type_if_none="percentile", p=[25, 75])
+        C = {r for r, score in data.rxn_scores.items() if score > thresholds["exp_th"]}
+    core = set(C) | set(protected_rxns or [])
+    unknown = core - {r.id for r in model.reactions}
+    if unknown:
+        raise ValueError(f"Unknown core reaction IDs: {sorted(unknown)}")
+    return core
+
+
+class FASTCORE(GeneDataIntegrator):
+    def integrate(self, model, data, C=None, nonP=None, epsilon=1e-6, return_model=True,
+                  protected_rxns=None, predefined_threshold=None, rxn_scaling_coefs=None, **kwargs):
+        core = _core_reaction_ids(model, data, C, protected_rxns, predefined_threshold)
+        return apply_FASTCORE(C=core, nonP=[] if nonP is None else nonP, model=model, epsilon=epsilon,
+                              return_model=return_model, rxn_scaling_coefs=rxn_scaling_coefs, **kwargs)
+
+
+class SWIFTCORE(GeneDataIntegrator):
+    def integrate(self, model, data, C=None, protected_rxns=None, predefined_threshold=None,
+                  rxn_scaling_coefs=None, **kwargs):
+        if rxn_scaling_coefs is not None:
+            raise ValueError("SWIFTCORE does not support rxn_scaling_coefs")
+        core = _core_reaction_ids(model, data, C, protected_rxns, predefined_threshold)
+        indices = [i for i, r in enumerate(model.reactions) if r.id in core]
+        result_model = swiftCore(model, core_index=indices, **kwargs)
+        kept = {r.id for r in result_model.reactions}
+        result = BaseAnalysis(log={"method": "SWIFTCORE"})
+        result.set_result(
+            result_model=result_model,
+            kept_rxn_ids=sorted(kept), removed_rxn_ids=sorted({r.id for r in model.reactions} - kept),
+        )
+        return result
+
+
 class CORDA(GeneDataIntegrator):
     def __init__(self):
         super().__init__()
@@ -209,6 +259,9 @@ class GECKOFull(EnzymeDataIntegrator):
 integrator_factory = Integrators()
 integrator_factory.register("GIMME", GIMME)
 integrator_factory.register("EFlux", EFlux)
+integrator_factory.register("SPOT", SPOT)
+integrator_factory.register("FASTCORE", FASTCORE)
+integrator_factory.register("SWIFTCORE", SWIFTCORE)
 integrator_factory.register("RIPTiDePruning", RIPTiDePruning)
 integrator_factory.register("RIPTiDeSampling", RIPTiDeSampling)
 integrator_factory.register("RIPTiDe", RIPTiDe)

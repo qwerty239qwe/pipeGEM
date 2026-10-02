@@ -670,7 +670,8 @@ class Model(GEMComposite):
             Name of the gene data to be integrated with the model
         integrator: str or Integrator
             Name of the used integrator (algorithm name)
-            Possible choices: GIMME, CORDA, rFASTCORMICS, mCADRE, RIPTiDe, and Eflux (for now).
+            Possible choices: GIMME, EFlux, SPOT, FASTCORE, SWIFTCORE,
+            CORDA, rFASTCORMICS, mCADRE, MBA, INIT, iMAT, and RIPTiDe.
         integrator_init_kwargs: optional, dict
             Keyword arguments for initializing the integrator
         rxn_scaling_coefs: optional, dict

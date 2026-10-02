@@ -41,8 +41,9 @@ def apply_gecko_full(
     enzyme_data : pipeGEM.data.EnzymeData
         Enzyme data aligned with the model.
     protein_abundance : pipeGEM.data.ProteinAbundanceData, optional
-        Protein abundance data (currently used for logging only; the pool
-        constraint implicitly limits usage).
+        Measured abundance in mmol/gDW. Each protein's draw reaction is
+        capped at abundance * sigma, sharing capacity across its reactions.
+        Missing IDs or NaN measurements retain the protein pool constraint.
     sigma : float
         Average enzyme saturation factor (0 – 1).
     ptot : float
@@ -103,6 +104,11 @@ def apply_gecko_full(
         # EnzymeData MW is in Da (g/mol); pool is g/gDW and enzyme usage is
         # mmol/gDW, so the draw coefficient must be g/mmol (kDa).
         enz_met = builder.create_draw_reaction(model, prot_pool, prot_id, mw / 1000.0)
+        if protein_abundance is not None and prot_id in protein_abundance._prot_abund_df.index:
+            abundance = protein_abundance._prot_abund_df.loc[prot_id, protein_abundance.abundance_col]
+            if pd.notna(abundance):
+                draw_rxn = model.reactions.get_by_id(f"draw_{prot_id}")
+                draw_rxn.upper_bound = min(draw_rxn.upper_bound, abundance * sigma)
 
         # Modify each non-negative directional reaction to consume the enzyme
         for constrained_rxn in constrained_rxns:

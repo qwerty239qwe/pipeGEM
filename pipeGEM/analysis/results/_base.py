@@ -163,11 +163,12 @@ class BaseAnalysis:
             else:
                 result_key = fn.stem
 
-            if result_key not in result_types and ignore_not_in_types:
+            if fn.name == "other_values.toml":
+                result_dic.update({k: v for k, v in parse_toml_file(fn).items()
+                                   if k in result_types or not ignore_not_in_types})
                 continue
 
-            if fn.name == "other_values.toml":
-                result_dic.update(parse_toml_file(fn))
+            if result_key not in result_types and ignore_not_in_types:
                 continue
 
             if result_types[result_key] == "Analysis":

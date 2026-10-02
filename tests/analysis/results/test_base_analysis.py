@@ -1,7 +1,9 @@
 """Tests for pipeGEM/analysis/results/_base.py — BaseAnalysis class."""
 import pytest
+import numpy as np
 
 from pipeGEM.analysis.results._base import BaseAnalysis
+from pipeGEM.data import GeneData
 
 
 class TestBaseAnalysis:
@@ -87,3 +89,22 @@ class TestBaseAnalysis:
         ba = BaseAnalysis(log={})
         s = ba.format_str()
         assert "Running time" not in s
+
+
+def test_percentile_threshold_round_trip(tmp_path):
+    result = GeneData({"g1": 1., "g2": 4., "g3": 9.}).get_threshold("percentile", p=[25, 75])
+    result.save(tmp_path / "threshold")
+    loaded = type(result).load(tmp_path / "threshold")
+    assert loaded.exp_th == result.exp_th
+    assert loaded.non_exp_th == result.non_exp_th
+    np.testing.assert_array_equal(loaded.data, result.data)
+
+
+def test_load_result_selects_only_requested_scalar(tmp_path):
+    result = BaseAnalysis(log={})
+    result.add_result({"score": 3, "other_score": 7})
+    result.save(tmp_path / "analysis")
+    loaded = BaseAnalysis.load_result(
+        tmp_path / "analysis/result/score", key="score", result_type="python.int",
+    )
+    assert loaded.result == {"score": 3}

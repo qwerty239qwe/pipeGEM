@@ -16,6 +16,22 @@ from pipeGEM.data.data import EnzymeData
 logger = get_logger(__name__)
 
 
+def _positive_kcats(values):
+    values = pd.to_numeric(values, errors="coerce")
+    return values.where(np.isfinite(values) & (values > 0))
+
+
+def _fill_kcats(values, strategy="median"):
+    values = _positive_kcats(values)
+    valid = values.dropna()
+    if valid.empty:
+        fill_value = 1.0
+        logger.warning("No finite positive kcats available; using placeholder 1.0 s^-1.")
+    else:
+        fill_value = np.exp(np.log(valid).mean()) if strategy == "geometric_mean" else valid.median()
+    return values.fillna(fill_value)
+
+
 def auto_parameterize(
     model,
     enzyme_data: EnzymeData,
@@ -60,10 +76,13 @@ def auto_parameterize(
     Returns
     -------
     EnzymeData
-        The enriched enzyme data with filled kcat values.
+        The enriched enzyme data with finite positive kcat values. Zero,
+        negative and infinite kcats are treated as missing. Fill statistics
+        use finite positive values, or 1.0 s^-1 if none are available.
     """
     df = enzyme_data._enzyme_df.copy()
     kcat_col = enzyme_data.kcat_col
+    df[kcat_col] = _positive_kcats(df[kcat_col])
 
     # ------------------------------------------------------------------
     # Step 1: Fetch from database (if requested)
@@ -87,19 +106,8 @@ def auto_parameterize(
     n_missing_before = df[kcat_col].isna().sum()
     logger.info("Missing kcat values before filling: %d / %d", n_missing_before, len(df))
 
-    if fill_missing == "median":
-        fill_value = df[kcat_col].median()
-        df[kcat_col] = df[kcat_col].fillna(fill_value)
-        logger.info("Filled missing kcats with median: %.4g", fill_value)
-
-    elif fill_missing == "geometric_mean":
-        valid = df[kcat_col].dropna()
-        if len(valid) > 0:
-            fill_value = np.exp(np.log(valid[valid > 0]).mean())
-        else:
-            fill_value = 1.0
-        df[kcat_col] = df[kcat_col].fillna(fill_value)
-        logger.info("Filled missing kcats with geometric mean: %.4g", fill_value)
+    if fill_missing in ("median", "geometric_mean"):
+        df[kcat_col] = _fill_kcats(df[kcat_col], fill_missing)
 
     elif fill_missing == "dlkcat":
         if metabolite_data is None:
@@ -107,24 +115,20 @@ def auto_parameterize(
                 "DLKcat requested but metabolite_data is None. "
                 "Falling back to median filling."
             )
-            fill_value = df[kcat_col].median()
-            df[kcat_col] = df[kcat_col].fillna(fill_value)
         else:
             logger.info("Running DLKcat prediction for missing kcats...")
             try:
                 enzyme_data.run_DLKcat(metabolite_data, device=device)
-                df = enzyme_data._enzyme_df.copy()
                 # After DLKcat, use alt_kcat_col to fill gaps
                 alt_col = enzyme_data.alt_kcat_col
-                if alt_col in df.columns:
-                    df[kcat_col] = df[kcat_col].fillna(df[alt_col])
-                # Final fallback with median
-                fill_value = df[kcat_col].median()
-                df[kcat_col] = df[kcat_col].fillna(fill_value)
+                if alt_col in enzyme_data._enzyme_df.columns:
+                    df[alt_col] = enzyme_data._enzyme_df[alt_col]
+                    df[kcat_col] = df[kcat_col].fillna(_positive_kcats(df[alt_col]))
             except Exception as exc:
                 logger.warning("DLKcat prediction failed: %s. Using median.", exc)
-                fill_value = df[kcat_col].median()
-                df[kcat_col] = df[kcat_col].fillna(fill_value)
+        df[kcat_col] = _fill_kcats(df[kcat_col])
+    else:
+        raise ValueError(f"Unknown kcat fill strategy: {fill_missing}")
 
     n_missing_after = df[kcat_col].isna().sum()
     logger.info(
@@ -158,10 +162,12 @@ def _merge_kcat_from_source(df, source_df, kcat_col, ec_col):
         return df
 
     # Only fill where kcat is missing
+    df[kcat_col] = _positive_kcats(df[kcat_col])
     missing_mask = df[kcat_col].isna()
     if not missing_mask.any():
         return df
 
+    source_df = source_df.assign(kcat=_positive_kcats(source_df["kcat"]))
     ec_to_kcat = source_df.groupby("EC")["kcat"].median().to_dict()
     for idx in df[missing_mask].index:
         ec = df.loc[idx, ec_col]

@@ -681,10 +681,11 @@ class TestEnzymeDataAlign:
         with pytest.raises(NotImplementedError):
             ed.align(MagicMock(), run_DLKcat=False)
 
-    def test_align_uses_dlkcat_for_missing_kcat(self, trivial_linear_model, monkeypatch):
+    @pytest.mark.parametrize("kcat", [np.nan, 0., -1., np.inf, -np.inf])
+    def test_align_uses_dlkcat_for_invalid_kcat(self, trivial_linear_model, monkeypatch, kcat):
         df = pd.DataFrame({
             "MW": [50000.0],
-            "Kcat": [np.nan],
+            "Kcat": [kcat],
             "Sequence": ["ACDEF"],
             "Reaction": ["R1"],
         }, index=["g1"])
@@ -751,8 +752,9 @@ class TestEnzymeDataAlign:
         assert item["best_kcat"] == 4.0
         assert item["best_mw"] == 20.0
 
+    @pytest.mark.parametrize("invalid_prediction", [-1., 0., np.nan, np.inf, -np.inf])
     def test_run_dlkcat_filters_rows_and_ignores_invalid_predictions(
-        self, trivial_linear_model, monkeypatch
+        self, trivial_linear_model, monkeypatch, invalid_prediction
     ):
         df = pd.DataFrame({
             "MW": [10.0, 10.0, 10.0, 10.0],
@@ -773,7 +775,7 @@ class TestEnzymeDataAlign:
                 "rxn": ["R1", "R3"],
                 "gene": ["g1", "g3"],
                 "met": ["A_c", "C_c"],
-                "kcat": [11.0, -1.0],
+                "kcat": [11.0, invalid_prediction],
             })
 
         monkeypatch.setattr(
@@ -795,6 +797,22 @@ class TestEnzymeDataAlign:
         assert pd.isna(ed._enzyme_df.loc["g2", "DLKcat"])
         assert pd.isna(ed._enzyme_df.loc["g3", "DLKcat"])
         assert pd.isna(ed._enzyme_df.loc["g4", "DLKcat"])
+
+    @pytest.mark.parametrize("kcat, predicted, mw, expected", [
+        (np.inf, 4., 50_000., 4.),
+        (np.nan, np.inf, 50_000., None),
+        (4., np.nan, np.inf, None),
+    ])
+    def test_align_excludes_nonfinite_enzyme_parameters(self, trivial_linear_model, kcat, predicted, mw, expected):
+        data = EnzymeData(pd.DataFrame({
+            "Kcat": [kcat], "DLKcat": [predicted], "MW": [mw], "Reaction": ["R1"],
+        }, index=["g1"]), rxn_id_col="Reaction")
+        data.align(trivial_linear_model, run_DLKcat=False)
+        items = data.rxn_items()
+        if expected is None:
+            assert "R1" not in items
+        else:
+            assert items["R1"]["best_kcat"] == expected
 
     def test_run_dlkcat_missing_output_kcat_column_raises(self, monkeypatch):
         df = pd.DataFrame({

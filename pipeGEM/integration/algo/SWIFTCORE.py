@@ -95,8 +95,8 @@ class CoreProblem(Problem):
         rev = np.ones(self.S.shape[1])
         rev[self.lbs >= 0], rev[self.ubs <= 0] = 0, -1
         self.ubs[rev == -1], self.lbs[rev == -1] = -self.lbs[rev == -1], 0 # -self.ubs[rev == -1]
-        self.ubs /= norm(self.ubs, ord=np.inf)
-        self.lbs /= norm(self.lbs, ord=np.inf)
+        self.ubs = self.ubs / (norm(self.ubs, ord=np.inf) or 1.0)
+        self.lbs = self.lbs / (norm(self.lbs, ord=np.inf) or 1.0)
         self.react_num = np.arange(self.S.shape[1])
         self.couplings = np.arange(self.S.shape[1])
         if self.do_reduction:
@@ -156,10 +156,10 @@ def swiftCore(model, core_index, weights=None, reduction=False, k=10, tol=1e-16)
         weights = np.ones(shape=(len(model.reactions),))
     elif isinstance(weights, dict):
         weights = np.array([weights[r.id] for r in model.reactions])
-    elif isinstance(weights, list):
+    else:
         if len(weights) != len(model.reactions):
             raise ValueError("Length of the weights need to be equal to the size of reactions")
-        weights = np.array(weights)
+    weights = np.array(weights, dtype=float, copy=True)
 
     is_core = np.array([(i in core_index) for i in range(len(model.reactions))])
     weights[is_core] = 0

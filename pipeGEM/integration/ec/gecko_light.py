@@ -41,6 +41,8 @@ def apply_gecko_light(
 
     where the factor 3600 converts from per-second to per-hour to match
     typical COBRA flux units (mmol / gDW / h).
+    Each reaction receives an independent cap, including reactions sharing
+    an enzyme. Use full GECKO to share one enzyme budget across reactions.
     If absolute protein abundance is not provided, ``ptot * f_factor`` is
     used as a coarse fallback abundance scale so those parameters have a
     concrete effect.
@@ -71,6 +73,12 @@ def apply_gecko_light(
     Returns
     -------
     GECKOLightAnalysis
+
+    Raises
+    ------
+    ValueError
+        If enzyme capacity conflicts with a reaction's required flux.
+        Bounds are validated before any changes are applied to the model.
     """
     if copy_model:
         model = copy_cobra_model(model)
@@ -106,7 +114,9 @@ def apply_gecko_light(
         if protein_abundance is not None and prot_id is not None:
             prot_df = protein_abundance._prot_abund_df
             if prot_id in prot_df.index:
-                abundance = prot_df.loc[prot_id, protein_abundance.abundance_col]
+                measured = prot_df.loc[prot_id, protein_abundance.abundance_col]
+                if pd.notna(measured):
+                    abundance = measured
 
         # kcat is in 1/s -> convert to 1/h
         # new_ub = kcat [1/s] * abundance [mmol/gDW] * sigma * 3600 [s/h]
@@ -117,22 +127,18 @@ def apply_gecko_light(
         new_bounds = (max(old_lb, -new_ub), min(old_ub, new_ub))
         bound_reduced = new_bounds != (old_lb, old_ub)
         if new_bounds[0] > new_bounds[1]:
-            # forced flux (e.g. lb > 0) exceeds enzyme capacity; tightening
-            # would raise in cobra, so keep the original bounds.
-            logger.warning(
-                "Enzyme capacity %.4g for %s conflicts with bounds (%.4g, %.4g); "
-                "leaving bounds unchanged.", new_ub, rxn_id, old_lb, old_ub,
+            raise ValueError(
+                f"Enzyme capacity {new_ub:.4g} for {rxn_id} conflicts with bounds "
+                f"({old_lb:.4g}, {old_ub:.4g}). Required flux exceeds enzyme capacity."
             )
-            bound_reduced = False
         elif bound_reduced:
-            rxn.bounds = new_bounds
             n_bound_reductions += 1
             logger.debug(
                 "Constrained %s: bounds (%.4g, %.4g) -> (%.4g, %.4g) (kcat=%.4g, abund=%.4g)",
                 rxn_id, old_lb, old_ub, *new_bounds, kcat, abundance,
             )
 
-        modified_bounds[rxn_id] = (rxn.lower_bound, rxn.upper_bound)
+        modified_bounds[rxn_id] = new_bounds
         kcat_mapping[rxn_id] = kcat
         enzyme_usage_rows.append({
             "reaction": rxn_id,
@@ -143,6 +149,9 @@ def apply_gecko_light(
             "old_ub": old_ub,
             "bound_reduced": bound_reduced,
         })
+
+    for rxn_id, bounds in modified_bounds.items():
+        model.reactions.get_by_id(rxn_id).bounds = bounds
 
     enzyme_usage = pd.DataFrame(enzyme_usage_rows)
     logger.info(
