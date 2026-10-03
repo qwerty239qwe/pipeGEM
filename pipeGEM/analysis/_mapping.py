@@ -1,12 +1,13 @@
-import cobra
-import numpy as np
-from typing import Union
-
-import cobra
-from tqdm import tqdm
+from ast import And, BoolOp, Name, Or
+from math import isfinite
 from time import time
 
+import cobra
+import numpy as np
+from tqdm import tqdm
+
 from pipeGEM._logging import get_logger
+from ._reducing import MergedReaction
 
 logger = get_logger(__name__)
 
@@ -14,7 +15,7 @@ logger = get_logger(__name__)
 class RxnMapper:
     def __init__(self,
                  data,
-                 model: Union[cobra.Model],
+                 model: cobra.Model,
                  threshold=0,
                  absent_value=0,
                  missing_value=np.nan,
@@ -37,9 +38,9 @@ class RxnMapper:
         missing_value : float, optional
             Value to use when gene is missing, by default np.nan.
         and_operation : str, optional
-            Operation to apply to inner gene-rule-reaction scores, by default "nanmin".
+            NumPy reduction for AND nodes in the GPR tree, by default "nanmin".
         or_operation : str, optional
-            Operation to apply to outer gene-rule-reaction scores, by default "nanmax".
+            NumPy reduction for OR nodes in the GPR tree, by default "nanmax".
         plus_operation : str, optional
             Operation to apply to reduced reaction scores, by default "nansum".
         **kwargs
@@ -48,59 +49,17 @@ class RxnMapper:
         self.genes = data.genes
         self.gene_data = data.gene_data
         self.missing_value = missing_value  # if the gene is not shown in the given data
-        self.rxn_scores = self._map_to_rxns(model,
-                                            threshold=threshold,
-                                            absent_value=absent_value,
-                                            and_operation=and_operation,
-                                            or_operation=or_operation,
-                                            plus_operation=plus_operation,
-                                            **kwargs)
+        self._mapping_options = dict(threshold=threshold, absent_value=absent_value,
+                                     and_operation=and_operation, or_operation=or_operation,
+                                     plus_operation=plus_operation, **kwargs)
+        self.rxn_scores = self._map_to_rxns(model, **self._mapping_options)
 
-    def _inner_grr_helper(self, grr_list) -> list:
-        """
-        Helper function to compute inner gene-rule-reaction scores.
-
-        Parameters
-        ----------
-        grr_list : str
-            Gene-rule-reaction string to compute scores for.
-
-        Returns
-        -------
-        list
-            List of scores for the given gene-rule-reaction string.
-        """
-        inner_grr_scores = []
-        for g in grr_list.split('and'):
-            if g == "" or not g in self.genes:
-                inner_grr_scores.append(self.missing_value)
-            else:
-                inner_grr_scores.append(self.gene_data[g])
-        return inner_grr_scores
-
-    def _outer_grr_helper(self,
-                          inner_grr_scores,
-                          operation="nanmin") -> float:
-        """
-        Helper function to compute outer gene-rule-reaction scores.
-
-        Parameters
-        ----------
-        inner_grr_scores : list
-            List of inner gene-rule-reaction scores.
-        operation : str, optional
-            Operation to apply to the inner scores, by default "nanmin".
-
-        Returns
-        -------
-        float
-            Score for the given outer gene-rule-reaction string.
-        """
-        if len(inner_grr_scores) == 0:
+    def _reduce_scores(self, scores, operation):
+        if not any(isfinite(score) for score in scores):
             return self.missing_value
-        if all([not np.isfinite(i) for i in inner_grr_scores]):
-            return self.missing_value
-        return getattr(np, operation)(inner_grr_scores)
+        if len(scores) == 1 and operation is np.nansum:
+            return scores[0]
+        return operation(scores)
 
     def _map_to_rxns(self,
                      model,
@@ -109,7 +68,7 @@ class RxnMapper:
                      and_operation="nanmin",
                      or_operation="nanmax",
                      plus_operation="nansum",
-                     gene_ids = None):
+                     gene_ids=None):
         """
         Map genes to reactions based on a given metabolic model.
 
@@ -126,7 +85,7 @@ class RxnMapper:
         or_operation : str, optional
             NumPy operation to use for OR conditions. Default is "nanmax".
         plus_operation : str, optional
-            NumPy operation to use for combining OR conditions. Default is "nansum".
+            NumPy operation for combining merged reaction components. Default is "nansum".
         gene_ids : list, optional
             Subset of gene IDs to map to reactions.
 
@@ -136,36 +95,45 @@ class RxnMapper:
             Dictionary of reaction IDs and their scores.
         """
         start_time = time()
+        reducers = {And: getattr(np, and_operation), Or: getattr(np, or_operation)}
+        plus_reducer = getattr(np, plus_operation)
+        requested_genes = None if gene_ids is None else set(gene_ids)
+        gene_data = self.gene_data
 
-        grrs = {r.id: r.gene_reaction_rule.replace(' ', '').replace('(', '').replace(')', '')
-                for r in model.reactions} if gene_ids is None else \
-               {r.id: r.gene_reaction_rule.replace(' ', '').replace('(', '').replace(')', '')
-                for r in model.reactions if len(set([g.id for g in r.genes]) & set(gene_ids)) > 0}
+        def evaluate(node):
+            if isinstance(node, Name):
+                return gene_data.get(node.id, self.missing_value)
+            if isinstance(node, BoolOp):
+                return self._reduce_scores([evaluate(child) for child in node.values],
+                                           reducers[type(node.op)])
+            raise TypeError(f"Unsupported GPR node: {type(node).__name__}")
 
         rxn_score = {}
-        for rxn_id, grr in tqdm(grrs.items()):
-            if len(grr) == 0:
-                rxn_score[rxn_id] = self.missing_value
+        for reaction in tqdm(model.reactions):
+            if requested_genes is not None and not any(
+                    gene.id in requested_genes for gene in reaction.genes):
                 continue
-            plus_grr_list = []
-            for grr_i in grr.split("plus"):
-                outer_grr_list = []
-                for gl in grr_i.split("or"):
-                    inner_grr_scores = self._inner_grr_helper(gl)
-                    outer_grr_list.append(self._outer_grr_helper(inner_grr_scores, and_operation))
-                plus_grr_list.append(self._outer_grr_helper(outer_grr_list, or_operation))
-            if all([not np.isfinite(i) for i in plus_grr_list]):
-                rxn_score[rxn_id] = self.missing_value
+            if isinstance(reaction, MergedReaction):
+                scores = [evaluate(component.gpr.body) for component in reaction.merged_rxns
+                          if component.gpr.body is not None]
+            elif reaction.gpr.body is None:
+                scores = []
             else:
-                rxn_score[rxn_id] = getattr(np, plus_operation)(plus_grr_list)
-            rxn_score[rxn_id] = rxn_score[rxn_id] if np.isfinite(rxn_score[rxn_id]) else self.missing_value
-
-        for k, v in rxn_score.items():
-            if v <= threshold:
-                rxn_score[k] = absent_value
+                scores = [evaluate(reaction.gpr.body)]
+            score = self._reduce_scores(scores, plus_reducer)
+            score = score if isfinite(score) else self.missing_value
+            rxn_score[reaction.id] = absent_value if score <= threshold else score
         logger.info("Finished mapping in %s seconds.", time() - start_time)
         return rxn_score
 
     def partial_map(self, model, new_data, gene_ids, **kwargs):
-        new_rxn_score = self._map_to_rxns(model=model, gene_ids=gene_ids, **kwargs)
+        """Refresh affected reactions from a complete updated GeneData dataset.
+
+        ``gene_ids`` identifies changed genes. Other reaction scores are retained;
+        constructor mapping options apply unless overridden for this update.
+        """
+        options = {**self._mapping_options, **kwargs, "gene_ids": gene_ids}
+        self.genes = new_data.genes
+        self.gene_data = new_data.gene_data
+        new_rxn_score = self._map_to_rxns(model=model, **options)
         self.rxn_scores.update(new_rxn_score)
