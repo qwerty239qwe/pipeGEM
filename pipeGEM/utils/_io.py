@@ -165,13 +165,14 @@ def load_model(model_file_path: str) -> cobra.Model:
     cobra.Model
     """
     fn_path = Path(model_file_path)
-    if fn_path.suffix == ".xml":
+    extension = fn_path.suffix.lower()
+    if extension == ".xml":
         return cobra.io.read_sbml_model(str(fn_path))
-    elif fn_path.suffix == ".mat":
+    elif extension == ".mat":
         return cobra.io.load_matlab_model(str(fn_path))
-    elif fn_path.suffix == ".json":
+    elif extension == ".json":
         return cobra.io.load_json_model(str(fn_path))
-    elif fn_path.suffix == ".yaml" or fn_path.suffix == ".yml":
+    elif extension == ".yaml" or extension == ".yml":
         return cobra.io.load_yaml_model(fn_path)
     else:
         raise ValueError(f"Invalid file extension: {fn_path.suffix}")

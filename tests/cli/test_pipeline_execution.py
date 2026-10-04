@@ -11,13 +11,15 @@ from pipeGEM.utils import save_model
 
 
 @pytest.mark.parametrize("model_type", ["pg", "cobra"])
-def test_flux_loads_models_and_named_factors(tmp_path, trivial_linear_model, model_type):
+@pytest.mark.parametrize("suffix", [".json", ".JSON", ".JsOn"])
+def test_flux_loads_models_and_named_factors(tmp_path, trivial_linear_model, model_type, suffix):
     models = tmp_path / "models"
     models.mkdir()
     if model_type == "pg":
         Model(name_tag="sample", model=trivial_linear_model).save_model(models / "sample.json")
     else:
         save_model(trivial_linear_model, models / "sample.json")
+    (models / "sample.json").rename(models / f"sample{suffix}")
     (models / "notes.txt").write_text("not a model", encoding="utf-8")
     (models / "subdir").mkdir()
     factors = tmp_path / "factors.csv"
@@ -35,10 +37,13 @@ def test_flux_loads_models_and_named_factors(tmp_path, trivial_linear_model, mod
 
 
 @pytest.mark.parametrize("model_type", ["pg", "cobra"])
-def test_comparison_ignores_sidecars_and_directories(tmp_path, trivial_linear_model, monkeypatch, model_type):
+@pytest.mark.parametrize("suffix", [".json", ".JSON", ".JsOn"])
+def test_comparison_ignores_sidecars_and_directories(
+        tmp_path, trivial_linear_model, monkeypatch, model_type, suffix):
     models = tmp_path / "models"
     models.mkdir()
     Model(name_tag="sample", model=trivial_linear_model).save_model(models / "sample.json")
+    (models / "sample.json").rename(models / f"sample{suffix}")
     (models / "notes.txt").write_text("not a model", encoding="utf-8")
     (models / "subdir").mkdir()
     seen = []
