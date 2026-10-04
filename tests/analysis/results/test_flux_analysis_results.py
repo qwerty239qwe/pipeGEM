@@ -1,4 +1,30 @@
 import pandas as pd
+import pytest
+
+from pipeGEM import Model
+
+
+@pytest.mark.parametrize("method", ["FBA", "pFBA"])
+def test_single_model_flux_round_trip(tmp_path, trivial_linear_model, method):
+    result = Model(model=trivial_linear_model).do_flux_analysis(method, solver="glpk")
+    result.save(tmp_path / method)
+    loaded = type(result).load(tmp_path / method)
+    pd.testing.assert_frame_equal(loaded.flux_df, result.flux_df)
+    assert loaded.solution.status == result.solution.status
+    assert loaded.solution.objective_value == pytest.approx(result.solution.objective_value)
+    for field in ("fluxes", "reduced_costs", "shadow_prices"):
+        pd.testing.assert_series_equal(getattr(loaded.solution, field), getattr(result.solution, field))
+
+
+def test_categorical_flux_metadata_round_trip(tmp_path, trivial_linear_model):
+    result = Model(model=trivial_linear_model).do_flux_analysis("FBA", solver="glpk")
+    result.add_categorical("sample", col_name="model")
+    result.save(tmp_path / "flux")
+    loaded = type(result).load(tmp_path / "flux")
+    loaded.add_categorical("control", col_name="condition")
+    assert loaded.log["categorical"] == {"model", "condition"}
+    aggregated = type(result).aggregate([loaded, loaded], "concat")
+    assert len(aggregated.flux_df) == 2 * len(loaded.flux_df)
 
 
 def test_sampling_get_item(sampling_result, ecoli_core):

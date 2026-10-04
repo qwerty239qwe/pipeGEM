@@ -1270,12 +1270,16 @@ class ProteinAbundanceData(BaseData):
         Column to use as the index (protein IDs).  If ``None``, the
         existing index is kept.
     abundance_col : str, optional
-        Column containing abundance values (default ``"abundance"``).
+        Column containing abundance in mmol/gDW (default ``"abundance"``).
+        IDs must be unique. NaN denotes an unmeasured protein; zero is allowed.
 
     Raises
     ------
     KeyError
         If *abundance_col* is not found in the DataFrame.
+    ValueError
+        If protein IDs are duplicated or measured abundances are negative
+        or infinite.
     """
 
     def __init__(self,
@@ -1286,9 +1290,19 @@ class ProteinAbundanceData(BaseData):
         self._prot_abund_df = data.copy()
         if prot_id_col is not None:
             self._prot_abund_df.index = self._prot_abund_df[prot_id_col]
+        duplicated = self._prot_abund_df.index[self._prot_abund_df.index.duplicated()].unique()
+        if len(duplicated):
+            raise ValueError(f"Duplicate protein IDs: {list(duplicated)}. "
+                             "Resolve replicate measurements before constructing ProteinAbundanceData.")
         if abundance_col not in self._prot_abund_df:
             raise KeyError(f"abundance_col {abundance_col} cannot be found in the data, "
                            f"possible column names = {self._prot_abund_df.columns}")
+        values = pd.to_numeric(self._prot_abund_df[abundance_col], errors="raise")
+        observed = values.dropna()
+        if (observed < 0).any() or not np.isfinite(observed).all():
+            raise ValueError("Protein abundances must be finite and non-negative (mmol/gDW).")
+        self._prot_abund_df[abundance_col] = values
+        self.abundance_col = abundance_col
 
     def calc_f_coef(self):
         """Calculate fractional protein coefficients.
@@ -1505,12 +1519,24 @@ class EnzymeData(BaseData):
              missing = [col for col in required_cols if col not in self._best_matched_df.columns]
              raise ValueError(f"Missing required columns in _best_matched_df: {missing}. Alignment might be incomplete.")
 
-        rxn_dic = {row["rxn"]: {"protein_to_use": row["protein"],
-                                "best_kcat": row["kcat"],
-                                "best_mw": row["mw"]}
-                   for i, row in self._best_matched_df.iterrows()}
-        # Use .items() directly on the created dictionary
-        return rxn_dic # No need to call .items() here, return the dict itself
+        seen = set()
+        duplicates = set()
+        rxn_dic = {}
+        for _, row in self._best_matched_df.iterrows():
+            rxn = row["rxn"]
+            if rxn in seen:
+                duplicates.add(rxn)
+            seen.add(rxn)
+            rxn_dic[rxn] = {"protein_to_use": row["protein"],
+                            "best_kcat": row["kcat"],
+                            "best_mw": row["mw"]}
+        if duplicates:
+            warnings.warn(
+                f"Duplicate reaction rows in best-matched enzyme data: "
+                f"{sorted(duplicates)}. Last row wins per reaction.",
+                stacklevel=2,
+            )
+        return rxn_dic
 
     def run_DLKcat(self,
                    met_data: MetaboliteData, # Added type hint
@@ -1527,7 +1553,7 @@ class EnzymeData(BaseData):
 
         Notes
         -----
-        Predictions are stored in ``alt_kcat_col``. Existing positive values
+        Predictions are stored in ``alt_kcat_col``. Existing finite positive values
         in ``kcat_col`` are treated as curated values and are not overwritten.
         """
         try:
@@ -1547,7 +1573,7 @@ class EnzymeData(BaseData):
             self._enzyme_df[self.alt_kcat_col] = np.nan
 
         kcat_values = pd.to_numeric(self._enzyme_df.get(self.kcat_col), errors="coerce")
-        needs_prediction = kcat_values.isna() | (kcat_values <= 0)
+        needs_prediction = kcat_values.isna() | ~np.isfinite(kcat_values) | (kcat_values <= 0)
         if not needs_prediction.any():
             return
 
@@ -1581,7 +1607,7 @@ class EnzymeData(BaseData):
 
         for _, pred in prediction_df.iterrows():
             value = pd.to_numeric(pred["kcat"], errors="coerce")
-            if pd.isna(value) or value <= 0:
+            if pd.isna(value) or not np.isfinite(value) or value <= 0:
                 continue
             matched = (
                 needs_prediction
@@ -1601,7 +1627,8 @@ class EnzymeData(BaseData):
 
         Maps genes in the enzyme DataFrame to their corresponding reactions
         and metabolites using the model's GPR rules.  Optionally runs DLKcat
-        to predict missing kcat values.
+        to predict missing or invalid kcat values. Only finite positive kcats
+        and molecular weights are retained when selecting enzyme matches.
 
         Parameters
         ----------
@@ -1704,7 +1731,7 @@ class EnzymeData(BaseData):
         alt_source = self._enzyme_df.get(self.alt_kcat_col, pd.Series(np.nan, index=self._enzyme_df.index))
         kcat = pd.to_numeric(kcat_source, errors="coerce")
         alt_kcat = pd.to_numeric(alt_source, errors="coerce")
-        best_kcat = kcat.where(kcat > 0, alt_kcat)
+        best_kcat = kcat.where(np.isfinite(kcat) & (kcat > 0), alt_kcat)
         mw = pd.to_numeric(self._enzyme_df.get(self.mw_col), errors="coerce")
 
         matched = pd.DataFrame({
@@ -1713,7 +1740,8 @@ class EnzymeData(BaseData):
             "kcat": best_kcat.values,
             "mw": mw.values,
         }, index=self._enzyme_df.index)
-        matched = matched[(matched["kcat"] > 0) & (matched["mw"] > 0)]
+        matched = matched[np.isfinite(matched["kcat"]) & np.isfinite(matched["mw"])
+                          & (matched["kcat"] > 0) & (matched["mw"] > 0)]
         if matched.empty:
             self._best_matched_df = matched
             return

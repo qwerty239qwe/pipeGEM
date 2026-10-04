@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from ._io import load_medium, load_threshold_analysis, load_gene_data
+from .errors import PipelineError
 
 from pipeGEM import Model, load_model, Group
 from pipeGEM.utils import parse_toml_file, save_toml_file
@@ -15,6 +16,7 @@ from pipeGEM.analysis.tasks import TaskContainer
 from pipeGEM.analysis import TaskAnalysis, LocalThresholdAnalysis, rFASTCORMICSThresholdAnalysis, \
     PercentileThresholdAnalysis, ModelScalingResult
 from pipeGEM._logging import get_logger
+from pipeGEM.analysis.results._base import BaseAnalysis
 
 logger = get_logger(__name__)
 
@@ -270,16 +272,24 @@ def run_integration_pipeline(gene_data_conf,
         del task_supp_rxns[g_name]
 
 
-def do_model_comparison(comparison_configs):
-    input_path = Path(comparison_configs["models_input_path"])
+def _load_models(input_path, model_type):
+    if model_type not in ("pg", "cobra"):
+        raise ValueError("model_type must be either pg or cobra")
     model_dic = {}
-    for model in input_path.iterdir():
-        if comparison_configs["model_type"] == "pg":
+    for model in sorted(Path(input_path).iterdir()):
+        if not model.is_file() or model.suffix.lower() not in (".json", ".xml", ".mat", ".yaml", ".yml"):
+            continue
+        if model_type == "pg":
             model_dic[model.stem] = Model.load_model(model)
-        elif comparison_configs["model_type"] == "cobra":
-            model_dic[model.stem] = load_model(str(model))
         else:
-            raise ValueError(comparison_configs["model_type"], "must be either pg or cobra.")
+            model_dic[model.stem] = load_model(str(model))
+    if not model_dic:
+        raise PipelineError(f"No model files found in {input_path}")
+    return model_dic
+
+
+def do_model_comparison(comparison_configs):
+    model_dic = _load_models(comparison_configs["models_input_path"], comparison_configs["model_type"])
 
     factors = None
     if Path(comparison_configs["factor_file"]).is_file():
@@ -349,9 +359,17 @@ def _fa_with_data(multi_model_conf,
         rxn_s_factors = None
     task_supp_rxns = {}
     saved_path = integration_conf.pop("saved_path")
+    models = []
     for g_name, g_data in gene_data_dic.items():
         file_saved_path = saved_path.format(g_name)
         if Path(file_saved_path).is_dir():
+            int_result = BaseAnalysis.load(file_saved_path)
+            result_model = getattr(int_result, "result_model", None)
+            if result_model is None:
+                result_model = getattr(getattr(int_result, "fastcore_result", None), "result_model", None)
+            if result_model is None:
+                raise PipelineError(f"Saved integration result for {g_name} has no result_model")
+            models.append(Model(model=result_model, name_tag=g_name))
             continue
 
         model = _load_exist_model(model_path_struct, g_name, model_type)
@@ -367,10 +385,17 @@ def _fa_with_data(multi_model_conf,
 
         int_result = model.integrate_gene_data(data_name=g_name,
                                                **int_c)
+        result_model = getattr(int_result, "result_model", None)
+        if result_model is None:
+            raise PipelineError(
+                f"Integration for {g_name} produced no result_model; configure the integrator to return a model"
+            )
         if not Path(file_saved_path).parent.is_dir():
             Path(file_saved_path).parent.mkdir(parents=True, exist_ok=True)
 
         int_result.save(file_saved_path)
+        models.append(Model(model=result_model, name_tag=g_name))
+    return models
 
 
 def do_flux_analysis(fa_configs,
@@ -381,22 +406,17 @@ def do_flux_analysis(fa_configs,
                      integration_conf,
                      ):
     if integration_conf is not None:
-        _fa_with_data(multi_model_conf, gene_data_conf, threshold_conf, mapping_conf, integration_conf)
-        return
+        models = _fa_with_data(multi_model_conf, gene_data_conf, threshold_conf, mapping_conf, integration_conf)
     else:
-        model_path_dir = multi_model_conf["models_input_dir"]
         model_type = multi_model_conf["model_type"]
-        group_factor = pd.read_csv(multi_model_conf["group_factor_path"])
-        models = []
-        for fn in Path(model_path_dir).iterdir():
-            if model_type == "cobra":
-                models.append(Model(model=load_model(str(fn)), name_tag=fn.stem))
-            elif model_type == "pg":
-                models.append(Model.load_model(fn))
-
-        group = Group(group=models, name_tag="group", factors=group_factor)
-
-        fa_saved_path = fa_configs.pop("saved_path")
-        flux_result = group.do_flux_analysis(**fa_configs)
-        flux_result.save(fa_saved_path)
+        loaded_models = _load_models(multi_model_conf["models_input_dir"], model_type)
+        models = (list(loaded_models.values()) if model_type == "pg" else
+                  [Model(model=model, name_tag=name) for name, model in loaded_models.items()])
+    factor_path = multi_model_conf.get("group_factor_path")
+    group_factor = pd.read_csv(factor_path, index_col=0) if factor_path else None
+    group = Group(group=models, name_tag="group", factors=group_factor)
+    fa_configs = dict(fa_configs)
+    fa_saved_path = fa_configs.pop("saved_path")
+    flux_result = group.do_flux_analysis(**fa_configs)
+    flux_result.save(fa_saved_path)
 

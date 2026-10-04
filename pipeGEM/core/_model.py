@@ -65,6 +65,7 @@ class Model(GEMComposite):
         self._gene_data: Union[Dict[str, GeneData]] = {}
         self._enzyme_data: Optional[EnzymeData] = None  # this is a singleton obj in the model
         self._metabolite_data: Optional[MetaboliteData] = None  # this is a singleton obj in the model
+        self._prot_abund_data = {}
         self._medium_data = {}
         self._tasks = {}
         self._merged_rxn_lu_table = {}
@@ -249,6 +250,24 @@ class Model(GEMComposite):
 
         self._medium_data[name] = data
         self._medium_data[name].align(self, **kwargs)
+
+    def add_metabolite_data(self, data: MetaboliteData) -> None:
+        """Attach metabolite data (e.g. SMILES used by DLKcat)."""
+        self._metabolite_data = data
+
+    def add_enzyme_data(self, data: EnzymeData, **kwargs) -> None:
+        """Attach enzyme data and align it to this model.
+
+        **kwargs are passed to ``EnzymeData.align``.
+        """
+        if not isinstance(data, EnzymeData):
+            raise TypeError(f"data should be an EnzymeData object, got {type(data)} instead")
+        data.align(self, **kwargs)
+        self._enzyme_data = data
+
+    def add_protein_abundance_data(self, name, data) -> None:
+        """Attach a ProteinAbundanceData under *name* for ``integrate_enzyme_data``."""
+        self._prot_abund_data[name] = data
 
     def apply_medium(self, name, **kwargs):
         """Apply a defined medium composition to the model's exchange reactions."""
@@ -620,7 +639,11 @@ class Model(GEMComposite):
 
         protein_abundance = None
         if prot_abund_data_name is not None:
-            protein_abundance = getattr(self, '_prot_abund_data', {}).get(prot_abund_data_name)
+            # a typo used to silently fall back to the ptot * f_factor estimate
+            if prot_abund_data_name not in self._prot_abund_data:
+                raise KeyError(f"No protein abundance data named '{prot_abund_data_name}'. "
+                               f"Available: {list(self._prot_abund_data)}")
+            protein_abundance = self._prot_abund_data[prot_abund_data_name]
 
         integrator = enzyme_integrator_factory.create(method)
         return integrator.integrate(
@@ -647,7 +670,8 @@ class Model(GEMComposite):
             Name of the gene data to be integrated with the model
         integrator: str or Integrator
             Name of the used integrator (algorithm name)
-            Possible choices: GIMME, CORDA, rFASTCORMICS, mCADRE, RIPTiDe, and Eflux (for now).
+            Possible choices: GIMME, EFlux, SPOT, FASTCORE, SWIFTCORE,
+            CORDA, rFASTCORMICS, mCADRE, MBA, INIT, iMAT, and RIPTiDe.
         integrator_init_kwargs: optional, dict
             Keyword arguments for initializing the integrator
         rxn_scaling_coefs: optional, dict

@@ -6,6 +6,7 @@ reactions to consume the enzyme pseudo-metabolite proportional to
 ``1 / kcat``.
 """
 import numpy as np
+import pandas as pd
 
 from pipeGEM._logging import get_logger
 from pipeGEM.analysis.results._base import timing
@@ -40,8 +41,9 @@ def apply_gecko_full(
     enzyme_data : pipeGEM.data.EnzymeData
         Enzyme data aligned with the model.
     protein_abundance : pipeGEM.data.ProteinAbundanceData, optional
-        Protein abundance data (currently used for logging only; the pool
-        constraint implicitly limits usage).
+        Measured abundance in mmol/gDW. Each protein's draw reaction is
+        capped at abundance * sigma, sharing capacity across its reactions.
+        Missing IDs or NaN measurements retain the protein pool constraint.
     sigma : float
         Average enzyme saturation factor (0 – 1).
     ptot : float
@@ -88,8 +90,9 @@ def apply_gecko_full(
         if mw is None or np.isnan(mw) or mw <= 0:
             logger.debug("Invalid MW for %s, skipping.", rxn_id)
             continue
-        if prot_id is None:
-            prot_id = rxn_id  # fallback
+        if prot_id is None or pd.isna(prot_id):
+            # fallback; a NaN id would merge every such rxn into one "prot_nan" enzyme
+            prot_id = rxn_id
 
         rxn = model.reactions.get_by_id(rxn_id)
         constrained_rxns = builder.prepare_reaction_for_enzyme_constraint(model, rxn)
@@ -98,19 +101,32 @@ def apply_gecko_full(
             continue
 
         # Create draw reaction (pool -> individual enzyme)
-        enz_met = builder.create_draw_reaction(model, prot_pool, prot_id, mw)
+        # EnzymeData MW is in Da (g/mol); pool is g/gDW and enzyme usage is
+        # mmol/gDW, so the draw coefficient must be g/mmol (kDa).
+        enz_met = builder.create_draw_reaction(model, prot_pool, prot_id, mw / 1000.0)
+        if protein_abundance is not None and prot_id in protein_abundance._prot_abund_df.index:
+            abundance = protein_abundance._prot_abund_df.loc[prot_id, protein_abundance.abundance_col]
+            if pd.notna(abundance):
+                draw_rxn = model.reactions.get_by_id(f"draw_{prot_id}")
+                draw_rxn.upper_bound = min(draw_rxn.upper_bound, abundance * sigma)
 
         # Modify each non-negative directional reaction to consume the enzyme
         for constrained_rxn in constrained_rxns:
             builder.create_arm_reaction(model, constrained_rxn, enz_met, kcat)
             n_enzyme_constraints += 1
 
+    pool_exchange_id = f"EX_{PROT_POOL_ID}"
+    pool_ub = (
+        model.reactions.get_by_id(pool_exchange_id).upper_bound
+        if pool_exchange_id in {r.id for r in model.reactions}
+        else 0
+    )
     logger.info(
         "Full GECKO applied: %d reactions constrained, %d draw reactions, "
         "protein pool ub = %.6g.",
         n_enzyme_constraints,
         len(builder.draw_reaction_ids),
-        next(iter(prot_pool.reactions)).upper_bound if prot_pool.reactions else 0,
+        pool_ub,
     )
 
     return GECKOFullAnalysis.from_results(

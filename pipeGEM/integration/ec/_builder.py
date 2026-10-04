@@ -82,6 +82,8 @@ class ECModelBuilder:
     ) -> cobra.Metabolite:
         """Create a draw reaction from the pool to an individual enzyme.
 
+        *mw* must be in g/mmol (kDa) so that pool usage is in g/gDW.
+
         Returns the enzyme pseudo-metabolite so it can be referenced by
         arm reactions.
         """
@@ -100,6 +102,13 @@ class ECModelBuilder:
             if prot_pool not in draw_rxn.metabolites or enz_met not in draw_rxn.metabolites:
                 raise ValueError(
                     f"Existing {draw_rxn_id} is not a valid draw reaction for {enz_met_id}."
+                )
+            existing_mw = -draw_rxn.metabolites[prot_pool]
+            if not np.isclose(existing_mw, mw):
+                logger.warning(
+                    "Draw reaction %s already exists with MW=%.6g; "
+                    "ignoring new value MW=%.6g.",
+                    draw_rxn_id, existing_mw, mw,
                 )
             if draw_rxn.id not in self._draw_rxn_ids:
                 self._draw_rxn_ids.append(draw_rxn.id)
@@ -134,11 +143,14 @@ class ECModelBuilder:
         negative lower bound would make backward flux produce enzyme instead.
         """
         if rxn.lower_bound < 0:
+            # ignore_irrev=True so a (lb<0, ub=0) reaction doesn't yield a
+            # dead forward copy with ub=0 (would waste a solver variable).
             return make_irrev_rxn(
                 model,
                 rxn.id,
                 add_inplace=True,
                 remove_original=True,
+                ignore_irrev=True,
             )
         return [rxn]
 
@@ -163,9 +175,11 @@ class ECModelBuilder:
 
         coeff = -1.0 / kcat_per_h  # enzyme consumed per unit flux
 
-        # Add enzyme metabolite to the existing reaction
-        rxn.add_metabolites({enz_met: coeff})
-        self._arm_rxn_ids.append(rxn.id)
+        # Use combine=False so a second call on the same (rxn, enz_met) pair
+        # overwrites rather than doubling the stoichiometry.
+        rxn.add_metabolites({enz_met: coeff}, combine=False)
+        if rxn.id not in self._arm_rxn_ids:
+            self._arm_rxn_ids.append(rxn.id)
 
     @property
     def draw_reaction_ids(self):

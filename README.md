@@ -119,7 +119,9 @@ gimme_result = mod.integrate_gene_data(
 context_specific_gem = gimme_result.result_model
 ```
 
-Supported integrators: GIMME, iMAT, FASTCORE, SWIFTCORE, MBA, mCADRE, CORDA, ftINIT, RIPTiDe, E-Flux, SPOT, rFASTCORMICS.
+Supported integrators: GIMME, iMAT, FASTCORE, SWIFTCORE, MBA, mCADRE, CORDA, INIT, RIPTiDe, EFlux, SPOT, rFASTCORMICS.
+
+FASTCORE and SWIFTCORE accept core reaction IDs via `C`, or select reactions above `predefined_threshold["exp_th"]` (the 75th expression percentile by default). `protected_rxns` are added to the core. FASTCORE also accepts non-penalized reaction IDs via `nonP`; SWIFTCORE does not support `rxn_scaling_coefs`. The lower-level ftINIT implementation is an unfinished prototype and is not available through `Model.integrate_gene_data`.
 
 **Enzyme-constrained models (GECKO)**
 

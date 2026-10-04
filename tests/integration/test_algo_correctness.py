@@ -150,8 +150,8 @@ class TestGeckoFullExact:
         assert np.isclose(pool_rxn.upper_bound, expected)
 
     def test_gecko_full_draw_stoichiometry(self, model):
-        """Draw reaction: pool coeff = -mw, enzyme coeff = +1.0."""
-        mw = 50.0
+        """Draw reaction: pool coeff = -mw [Da] / 1000 (g/mmol), enzyme coeff = +1.0."""
+        mw = 50_000.0
         ed = _make_enzyme_data({
             "R1": {"best_kcat": 10.0, "best_mw": mw, "protein_to_use": "P1"},
         })
@@ -160,7 +160,7 @@ class TestGeckoFullExact:
         draw_rxn = ec.reactions.get_by_id("draw_P1")
         pool_met = ec.metabolites.get_by_id(PROT_POOL_ID)
         enz_met = ec.metabolites.get_by_id("prot_P1")
-        assert np.isclose(draw_rxn.metabolites[pool_met], -mw)
+        assert np.isclose(draw_rxn.metabolites[pool_met], -mw / 1000.0)
         assert np.isclose(draw_rxn.metabolites[enz_met], 1.0)
 
     def test_gecko_full_arm_stoichiometry(self, model):

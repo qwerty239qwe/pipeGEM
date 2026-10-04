@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pipeGEM"
-version = "0.2.0"
+version = "0.2.1"
 description = "Processing and integrating data with genome-scale metabolic models (GEM)"
 readme = "README.md"
 authors = [{ name = "Yu-Te Lin", email = "qwerty239qwe@gmail.com" }]
@@ -89,6 +89,7 @@ include-package-data = true
 include = ["pipeGEM*"]
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
 norecursedirs = [
     ".git",
     ".pytest_cache",

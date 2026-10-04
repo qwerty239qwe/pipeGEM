@@ -19,7 +19,7 @@ Typical preparation steps:
 
 1. Put genes on the index and samples or conditions in columns.
 2. Use a transform such as log scaling when the downstream algorithm expects transformed expression.
-3. Set `absent_expression` to a value that represents genes missing from the measurement.
+3. Set `absent_expression` to represent measured genes at or below `expression_threshold`.
 4. Check model gene identifiers before integration; mismatched IDs are the most common reason for sparse reaction scores.
 
 ```python
@@ -34,6 +34,23 @@ gene_data = GeneData(
 
 model.add_gene_data("treated_rep1", gene_data)
 ```
+
+Reaction mapping follows the model's parsed GPR tree, including parentheses.
+The defaults take the minimum for `and` and the maximum for `or`: with
+`g1=2`, `g2=5`, and `g3=10`, `g1 and (g2 or g3)` scores **2**.
+For merged reactions, `plus_operation="nansum"` combines the component scores.
+
+Genes absent from the dataset use `missing_value` (default `NaN`). The default
+`nanmin` and `nanmax` reductions ignore missing values when another value is
+available; use `and_operation="min"` to propagate a missing complex subunit.
+Empty rules and rules with no finite scores return the missing value. Scores
+at or below `threshold` become `absent_value`. `data_transform` is applied
+when accessing `GeneData.rxn_scores`, after mapping.
+
+`gene_data.rxn_mapper.partial_map(model, updated_data, changed_gene_ids)`
+recomputes reactions involving the changed genes. Supply a complete updated
+`GeneData` dataset, including unchanged genes. Mapping options from the initial
+alignment are retained unless overridden for that update.
 
 ## Fetching and synthesis
 

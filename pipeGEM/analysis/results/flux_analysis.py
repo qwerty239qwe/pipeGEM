@@ -30,6 +30,8 @@ class FluxAnalysis(BaseAnalysis):
     def __init__(self, log):
 
         super(FluxAnalysis, self).__init__(log)
+        if "categorical" in self._log:
+            self._log["categorical"] = set(self._log["categorical"])
 
     def add_categorical(self,
                         value: str,

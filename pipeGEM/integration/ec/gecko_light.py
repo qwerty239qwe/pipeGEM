@@ -34,13 +34,15 @@ def apply_gecko_light(
 ):
     """Apply simple kcat-based enzyme constraints (GECKO-light).
 
-    For every reaction in *model* that has associated kcat data, the upper
-    bound is constrained to::
+    For every reaction in *model* that has associated kcat data, the absolute
+    flux (both bounds, for reversible reactions) is constrained to::
 
         new_ub = kcat [1/s] * abundance [mmol/gDW] * sigma * 3600
 
     where the factor 3600 converts from per-second to per-hour to match
     typical COBRA flux units (mmol / gDW / h).
+    Each reaction receives an independent cap, including reactions sharing
+    an enzyme. Use full GECKO to share one enzyme budget across reactions.
     If absolute protein abundance is not provided, ``ptot * f_factor`` is
     used as a coarse fallback abundance scale so those parameters have a
     concrete effect.
@@ -71,6 +73,12 @@ def apply_gecko_light(
     Returns
     -------
     GECKOLightAnalysis
+
+    Raises
+    ------
+    ValueError
+        If enzyme capacity conflicts with a reaction's required flux.
+        Bounds are validated before any changes are applied to the model.
     """
     if copy_model:
         model = copy_cobra_model(model)
@@ -94,8 +102,8 @@ def apply_gecko_light(
 
         rxn = model.reactions.get_by_id(rxn_id)
         kcat = info.get("best_kcat", None)
-        if kcat is None or np.isnan(kcat):
-            logger.debug("No kcat for reaction %s, skipping.", rxn_id)
+        if kcat is None or np.isnan(kcat) or kcat <= 0:
+            logger.debug("No (or non-positive) kcat for reaction %s, skipping.", rxn_id)
             continue
 
         # Determine protein abundance. Absolute abundance data takes
@@ -106,23 +114,31 @@ def apply_gecko_light(
         if protein_abundance is not None and prot_id is not None:
             prot_df = protein_abundance._prot_abund_df
             if prot_id in prot_df.index:
-                abundance = prot_df.loc[prot_id, "abundance"]
+                measured = prot_df.loc[prot_id, protein_abundance.abundance_col]
+                if pd.notna(measured):
+                    abundance = measured
 
         # kcat is in 1/s -> convert to 1/h
         # new_ub = kcat [1/s] * abundance [mmol/gDW] * sigma * 3600 [s/h]
         new_ub = kcat * abundance * sigma * 3600.0
 
-        old_ub = rxn.upper_bound
-        bound_reduced = new_ub < old_ub
-        if bound_reduced:
-            rxn.upper_bound = new_ub
+        # The enzyme caps |flux| in both directions, not only the forward one.
+        old_lb, old_ub = rxn.bounds
+        new_bounds = (max(old_lb, -new_ub), min(old_ub, new_ub))
+        bound_reduced = new_bounds != (old_lb, old_ub)
+        if new_bounds[0] > new_bounds[1]:
+            raise ValueError(
+                f"Enzyme capacity {new_ub:.4g} for {rxn_id} conflicts with bounds "
+                f"({old_lb:.4g}, {old_ub:.4g}). Required flux exceeds enzyme capacity."
+            )
+        elif bound_reduced:
             n_bound_reductions += 1
             logger.debug(
-                "Constrained %s: ub %.4g -> %.4g (kcat=%.4g, abund=%.4g)",
-                rxn_id, old_ub, new_ub, kcat, abundance,
+                "Constrained %s: bounds (%.4g, %.4g) -> (%.4g, %.4g) (kcat=%.4g, abund=%.4g)",
+                rxn_id, old_lb, old_ub, *new_bounds, kcat, abundance,
             )
 
-        modified_bounds[rxn_id] = (rxn.lower_bound, rxn.upper_bound)
+        modified_bounds[rxn_id] = new_bounds
         kcat_mapping[rxn_id] = kcat
         enzyme_usage_rows.append({
             "reaction": rxn_id,
@@ -133,6 +149,9 @@ def apply_gecko_light(
             "old_ub": old_ub,
             "bound_reduced": bound_reduced,
         })
+
+    for rxn_id, bounds in modified_bounds.items():
+        model.reactions.get_by_id(rxn_id).bounds = bounds
 
     enzyme_usage = pd.DataFrame(enzyme_usage_rows)
     logger.info(

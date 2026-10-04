@@ -8,6 +8,62 @@ from pipeGEM.data import GeneData
 from pipeGEM.analysis import DataAggregation
 
 
+@pytest.mark.parametrize("integrator", ["FASTCORE", "SWIFTCORE", "SPOT"])
+def test_advertised_integrators_use_public_model_api(trivial_linear_model, integrator):
+    mod = Model(model=trivial_linear_model)
+    mod.add_gene_data("sample", pd.Series({"g1": 10., "g2": 1., "g3": 1., "g4": 1.}))
+    original_bounds = {r.id: r.bounds for r in mod.reactions}
+    result = mod.integrate_gene_data(
+        "sample", integrator=integrator,
+        predefined_threshold={"exp_th": 5., "non_exp_th": 0.},
+        protected_rxns=["BIOMASS"],
+    )
+    if integrator == "SPOT":
+        assert result.flux_result.loc["BIOMASS", "fluxes"] >= 1.
+    else:
+        assert {"R1", "BIOMASS"} <= {r.id for r in result.result_model.reactions}
+        assert result.result_model.slim_optimize() == pytest.approx(10.)
+        assert set(result.kept_rxn_ids) == {r.id for r in result.result_model.reactions}
+    assert {r.id: r.bounds for r in mod.reactions} == original_bounds
+
+
+@pytest.mark.parametrize("integrator", ["FASTCORE", "SWIFTCORE"])
+def test_core_integrators_validate_explicit_reaction_ids(trivial_linear_model, integrator):
+    mod = Model(model=trivial_linear_model)
+    mod.add_gene_data("sample", pd.Series({"g1": 10., "g2": 1., "g3": 1., "g4": 1.}))
+    with pytest.raises(ValueError, match="Unknown core reaction IDs.*missing"):
+        mod.integrate_gene_data("sample", integrator=integrator, C=["missing"])
+
+
+@pytest.mark.parametrize("integrator", ["FASTCORE", "SWIFTCORE"])
+@pytest.mark.parametrize("explicit_core", [False, True])
+def test_core_integrators_select_and_persist_core(trivial_linear_model, integrator, tmp_path, explicit_core):
+    mod = Model(model=trivial_linear_model)
+    mod.add_gene_data("sample", pd.Series({"g1": 10., "g2": 1., "g3": 1., "g4": 1.}))
+    weights = np.ones(len(mod.reactions), dtype=int)
+    kwargs = {"weights": weights} if integrator == "SWIFTCORE" else {"nonP": np.array(["R_transport"])}
+    result = mod.integrate_gene_data("sample", integrator=integrator, C=["R2"] if explicit_core else None,
+                                     protected_rxns=["BIOMASS"], **kwargs)
+    assert {"R2" if explicit_core else "R1", "BIOMASS"} <= {r.id for r in result.result_model.reactions}
+    result.save(tmp_path / integrator)
+    loaded = type(result).load(tmp_path / integrator)
+    assert loaded.result_model.slim_optimize() == pytest.approx(10.)
+    np.testing.assert_array_equal(weights, 1)
+
+
+def test_swiftcore_zero_lower_bounds(trivial_linear_model):
+    # Express uptake in the forward direction so every lower bound is zero.
+    uptake = trivial_linear_model.reactions.EX_A
+    uptake.add_metabolites({met: -2 * coef for met, coef in uptake.metabolites.items()})
+    uptake.bounds = (0, 10)
+    mod = Model(model=trivial_linear_model)
+    mod.add_gene_data("sample", pd.Series({"g1": 10., "g2": 1., "g3": 1., "g4": 1.}))
+    with np.errstate(divide="raise", invalid="raise"):
+        result = mod.integrate_gene_data("sample", integrator="SWIFTCORE", C=["R1"], protected_rxns=["BIOMASS"])
+    assert "R1" in result.kept_rxn_ids
+    assert result.result_model.slim_optimize() == pytest.approx(trivial_linear_model.slim_optimize())
+
+
 def test_init_model(ecoli_core):
     mod = Model(model=ecoli_core, name_tag="ecoli")
     assert mod is not None
